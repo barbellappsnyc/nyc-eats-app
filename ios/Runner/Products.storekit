@@ -1,0 +1,84 @@
+{
+  "appPolicies" : {
+    "eula" : "",
+    "policies" : [
+      {
+        "locale" : "en_US",
+        "policyText" : "",
+        "policyURL" : ""
+      }
+    ]
+  },
+  "identifier" : "51287A59",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+    {
+      "displayPrice" : "12.99",
+      "familyShareable" : false,
+      "internalID" : "81948032",
+      "localizations" : [
+        {
+          "description" : "Lifetime Access",
+          "displayName" : "Diplomat Passport",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "nyceats_diplomat",
+      "referenceName" : "Diplomat Passport",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "3.99",
+      "familyShareable" : false,
+      "internalID" : "A8B142A4",
+      "localizations" : [
+        {
+          "description" : "Lifetime Access",
+          "displayName" : "Standard Passport",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "nyceats_standard",
+      "referenceName" : "Standard Passport",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "0.99",
+      "familyShareable" : false,
+      "internalID" : "D819D773",
+      "localizations" : [
+        {
+          "description" : "Lifetime Access",
+          "displayName" : "Single Visa",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "nyceats_single",
+      "referenceName" : "Single Visa",
+      "type" : "Consumable"
+    }
+  ],
+  "settings" : {
+    "_askToBuyEnabled" : false,
+    "_billingGracePeriodEnabled" : false,
+    "_billingIssuesEnabled" : false,
+    "_disableDialogs" : false,
+    "_failTransactionsEnabled" : false,
+    "_locale" : "en_US",
+    "_renewalBillingIssuesEnabled" : false,
+    "_storefront" : "USA",
+    "_storeKitErrors" : [
+
+    ],
+    "_timeRate" : 0
+  },
+  "subscriptionGroups" : [
+
+  ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}

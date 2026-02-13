@@ -1,0 +1,1383 @@
+final List<Map<String, dynamic>> rawMichelinData = [
+  // PASTE YOUR COPIED JSON HERE
+
+  
+  {
+    "name": "Icca",
+    "cuisine": "japanese",
+    "price": 4,
+    "lat": 40.7143008,
+    "lng": -74.0076845,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Huso",
+    "cuisine": "contemporary",
+    "price": 4,
+    "lat": 40.71736629999999,
+    "lng": -74.0105217,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Crown Shy",
+    "cuisine": "contemporary",
+    "price": 3,
+    "lat": 40.70619620000001,
+    "lng": -74.0075229,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Bridges",
+    "cuisine": "contemporary",
+    "price": 3,
+    "lat": 40.7140307,
+    "lng": -73.9980719,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Yamada",
+    "cuisine": "japanese",
+    "price": 4,
+    "lat": 40.7159317,
+    "lng": -73.9972602,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Le Coucou",
+    "cuisine": "french",
+    "price": 4,
+    "lat": 40.7191167,
+    "lng": -74.0001861,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Muku",
+    "cuisine": "japanese",
+    "price": 4,
+    "lat": 40.7218848,
+    "lng": -74.0099346,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "L'Abeille",
+    "cuisine": "french",
+    "price": 4,
+    "lat": 40.7220453,
+    "lng": -74.0099342,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Corima",
+    "cuisine": "mexican",
+    "price": 4,
+    "lat": 40.7146783,
+    "lng": -73.9931228,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Dirt Candy",
+    "cuisine": "vegetarian",
+    "price": 4,
+    "lat": 40.7178611,
+    "lng": -73.9907054,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Torrisi",
+    "cuisine": "contemporary",
+    "price": 4,
+    "lat": 40.7242743,
+    "lng": -73.9954023,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Estela",
+    "cuisine": "contemporary",
+    "price": 4,
+    "lat": 40.72464129999999,
+    "lng": -73.994739,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Torien",
+    "cuisine": "japanese",
+    "price": 4,
+    "lat": 40.7247436,
+    "lng": -73.9931265,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Yoshino",
+    "cuisine": "japanese",
+    "price": 4,
+    "lat": 40.7262286,
+    "lng": -73.9921624,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "63 Clinton",
+    "cuisine": "contemporary",
+    "price": 4,
+    "lat": 40.6327246,
+    "lng": -74.07799709999999,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Family Meal at Blue Hill",
+    "cuisine": "american",
+    "price": 4,
+    "lat": 40.7320465,
+    "lng": -73.9996685,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Sushi Nakazawa New York",
+    "cuisine": "japanese",
+    "price": 4,
+    "lat": 40.7318046,
+    "lng": -74.0045493,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Jeju Noodle Bar",
+    "cuisine": "korean",
+    "price": 3,
+    "lat": 40.7329889,
+    "lng": -74.0073417,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Frevo",
+    "cuisine": "contemporary",
+    "price": 4,
+    "lat": 40.7331351,
+    "lng": -73.9986886,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Shmoné",
+    "cuisine": "israeli",
+    "price": 4,
+    "lat": 40.7335735,
+    "lng": -73.9990515,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Tuome",
+    "cuisine": "fusion",
+    "price": 3,
+    "lat": 40.724053,
+    "lng": -73.98285249999999,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Bar Miller",
+    "cuisine": "japanese",
+    "price": 4,
+    "lat": 40.7239629,
+    "lng": -73.980822,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Tsukimi",
+    "cuisine": "japanese",
+    "price": 4,
+    "lat": 40.7290299,
+    "lng": -73.9854663,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Semma",
+    "cuisine": "indian",
+    "price": 3,
+    "lat": 40.7360304,
+    "lng": -74.0005639,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Kosaka",
+    "cuisine": "japanese",
+    "price": 4,
+    "lat": 40.7382662,
+    "lng": -74.0014434,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Casa Mono",
+    "cuisine": "spanish",
+    "price": 3,
+    "lat": 40.7358936,
+    "lng": -73.9871361,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Oiji Mi",
+    "cuisine": "korean",
+    "price": 4,
+    "lat": 40.7396687,
+    "lng": -73.9924795,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "bōm",
+    "cuisine": "korean",
+    "price": 4,
+    "lat": 40.7396687,
+    "lng": -73.9924795,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Gramercy Tavern",
+    "cuisine": "contemporary",
+    "price": 4,
+    "lat": 40.7384555,
+    "lng": -73.98850639999999,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Rezdôra",
+    "cuisine": "italian",
+    "price": 4,
+    "lat": 40.739083,
+    "lng": -73.98904399999999,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Noda",
+    "cuisine": "japanese",
+    "price": 4,
+    "lat": 40.7407505,
+    "lng": -73.9931495,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Noz 17",
+    "cuisine": "japanese",
+    "price": 4,
+    "lat": 40.7438296,
+    "lng": -74.0065518,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Cote",
+    "cuisine": "korean",
+    "price": 4,
+    "lat": 40.7413041,
+    "lng": -73.99125269999999,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Jua",
+    "cuisine": "korean",
+    "price": 4,
+    "lat": 40.7396779,
+    "lng": -73.9878514,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Nōksu",
+    "cuisine": "contemporary",
+    "price": 4,
+    "lat": 40.7483485,
+    "lng": -73.98780889999999,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Tempura Matsui",
+    "cuisine": "japanese",
+    "price": 4,
+    "lat": 40.7482048,
+    "lng": -73.9749241,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Le Pavillon",
+    "cuisine": "french",
+    "price": 4,
+    "lat": 40.7528047,
+    "lng": -73.9784677,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Jōji",
+    "cuisine": "japanese",
+    "price": 4,
+    "lat": 40.7530825,
+    "lng": -73.9786543,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Kochi",
+    "cuisine": "korean",
+    "price": 4,
+    "lat": 40.7619926,
+    "lng": -73.99346919999999,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Mari",
+    "cuisine": "korean",
+    "price": 4,
+    "lat": 40.761534,
+    "lng": -73.9906541,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "YingTao",
+    "cuisine": "contemporary",
+    "price": 4,
+    "lat": 40.7657219,
+    "lng": -73.987724,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Café Boulud",
+    "cuisine": "french",
+    "price": 4,
+    "lat": 40.7650665,
+    "lng": -73.9676538,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Daniel",
+    "cuisine": "french",
+    "price": 4,
+    "lat": 40.7668083,
+    "lng": -73.9675769,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Essential by Christophe",
+    "cuisine": "french contemporary",
+    "price": 4,
+    "lat": 40.7809576,
+    "lng": -73.9766017,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Shota Omakase",
+    "cuisine": "japanese",
+    "price": 4,
+    "lat": 40.71352,
+    "lng": -73.96615729999999,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Francie",
+    "cuisine": "contemporary",
+    "price": 4,
+    "lat": 40.7101876,
+    "lng": -73.9640308,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "The Four Horsemen",
+    "cuisine": "american",
+    "price": 4,
+    "lat": 40.7130584,
+    "lng": -73.9573216,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Oxomoco",
+    "cuisine": "mexican",
+    "price": 3,
+    "lat": 40.7298214,
+    "lng": -73.95547599999999,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Restaurant Yuu",
+    "cuisine": "french contemporary",
+    "price": 4,
+    "lat": 40.723456,
+    "lng": -73.9524875,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Meju",
+    "cuisine": "korean",
+    "price": 4,
+    "lat": 40.7435222,
+    "lng": -73.9552482,
+    "michelin_stars": 1,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Atera",
+    "cuisine": "contemporary",
+    "price": 4,
+    "lat": 40.7169003,
+    "lng": -74.0055631,
+    "michelin_stars": 2,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Saga",
+    "cuisine": "contemporary",
+    "price": 4,
+    "lat": 40.7065047,
+    "lng": -74.00777149999999,
+    "michelin_stars": 2,
+    "bib_gourmand": false
+  },
+  {
+    "name": "César",
+    "cuisine": "contemporary",
+    "price": 4,
+    "lat": 40.727177,
+    "lng": -74.0077026,
+    "michelin_stars": 2,
+    "bib_gourmand": false
+  },
+  {
+    "name": "odo",
+    "cuisine": "japanese",
+    "price": 4,
+    "lat": 40.7403982,
+    "lng": -73.9921624,
+    "michelin_stars": 2,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Atomix",
+    "cuisine": "korean",
+    "price": 4,
+    "lat": 40.7442317,
+    "lng": -73.9828502,
+    "michelin_stars": 2,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Joo Ok",
+    "cuisine": "korean",
+    "price": 4,
+    "lat": 40.7475891,
+    "lng": -73.986913,
+    "michelin_stars": 2,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Chef's Table at Brooklyn Fare",
+    "cuisine": "contemporary",
+    "price": 4,
+    "lat": 40.7561219,
+    "lng": -73.99652569999999,
+    "michelin_stars": 2,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Gabriel Kreuther",
+    "cuisine": "french",
+    "price": 4,
+    "lat": 40.7545381,
+    "lng": -73.98250260000002,
+    "michelin_stars": 2,
+    "bib_gourmand": false
+  },
+  {
+    "name": "The Modern",
+    "cuisine": "contemporary",
+    "price": 4,
+    "lat": 40.761081,
+    "lng": -73.976753,
+    "michelin_stars": 2,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Aquavit",
+    "cuisine": "scandinavian",
+    "price": 4,
+    "lat": 40.7608694,
+    "lng": -73.97227769999999,
+    "michelin_stars": 2,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Masa",
+    "cuisine": "japanese",
+    "price": 4,
+    "lat": 40.7688151,
+    "lng": -73.9827737,
+    "michelin_stars": 2,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Jean-Georges",
+    "cuisine": "contemporary",
+    "price": 4,
+    "lat": 40.7690255,
+    "lng": -73.98162549999999,
+    "michelin_stars": 2,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Sushi Noz",
+    "cuisine": "japanese",
+    "price": 4,
+    "lat": 40.7738781,
+    "lng": -73.9581262,
+    "michelin_stars": 2,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Aska",
+    "cuisine": "scandinavian",
+    "price": 4,
+    "lat": 40.7124154,
+    "lng": -73.96652449999999,
+    "michelin_stars": 2,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Jungsik New York",
+    "cuisine": "korean",
+    "price": 4,
+    "lat": 40.7188267,
+    "lng": -74.00907509999999,
+    "michelin_stars": 3,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Eleven Madison Park",
+    "cuisine": "contemporary",
+    "price": 4,
+    "lat": 40.7416519,
+    "lng": -73.9872353,
+    "michelin_stars": 3,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Sushi Sho",
+    "cuisine": "japanese",
+    "price": 4,
+    "lat": 40.7526643,
+    "lng": -73.9807136,
+    "michelin_stars": 3,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Le Bernardin",
+    "cuisine": "seafood",
+    "price": 4,
+    "lat": 40.7614218,
+    "lng": -73.9817558,
+    "michelin_stars": 3,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Per Se",
+    "cuisine": "contemporary",
+    "price": 4,
+    "lat": 40.7682178,
+    "lng": -73.9828988,
+    "michelin_stars": 3,
+    "bib_gourmand": false
+  },
+  {
+    "name": "Dim Sum Go Go",
+    "cuisine": "chinese",
+    "price": 2,
+    "lat": 40.7132926,
+    "lng": -73.9977449,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Nyonya",
+    "cuisine": "malaysian",
+    "price": 1,
+    "lat": 40.7190568,
+    "lng": -73.9969181,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Thai Diner",
+    "cuisine": "thai",
+    "price": 2,
+    "lat": 40.7207143,
+    "lng": -73.99565,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Cervo's",
+    "cuisine": "spanish",
+    "price": 3,
+    "lat": 40.7148624,
+    "lng": -73.99134459999999,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Potluck Club",
+    "cuisine": "chinese",
+    "price": 2,
+    "lat": 40.71960199999999,
+    "lng": -73.9935919,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Tolo",
+    "cuisine": "chinese",
+    "price": 2,
+    "lat": 40.7143377,
+    "lng": -73.99050989999999,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Pinch Chinese",
+    "cuisine": "chinese",
+    "price": 2,
+    "lat": 40.7264492,
+    "lng": -74.001798,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Russ & Daughters Cafe",
+    "cuisine": "american",
+    "price": 2,
+    "lat": 40.7196181,
+    "lng": -73.9895779,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Dhamaka",
+    "cuisine": "indian",
+    "price": 2,
+    "lat": 40.7182426,
+    "lng": -73.9879902,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": 8282,
+    "cuisine": "korean",
+    "price": 2,
+    "lat": 40.7216663,
+    "lng": -73.988781,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Laliko",
+    "cuisine": "central asian",
+    "price": 2,
+    "lat": 40.7294493,
+    "lng": -74.00494379999999,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "C as in Charlie",
+    "cuisine": "fusion",
+    "price": 2,
+    "lat": 40.7255039,
+    "lng": -73.99270179999999,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Una Pizza Napoletana",
+    "cuisine": "italian",
+    "price": 2,
+    "lat": 40.7217573,
+    "lng": -73.9886214,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Sami & Susu",
+    "cuisine": "mediterranean cuisine",
+    "price": 2,
+    "lat": 40.7220866,
+    "lng": -73.9879939,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Atla",
+    "cuisine": "mexican",
+    "price": 3,
+    "lat": 40.72721689999999,
+    "lng": -73.99396879999999,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Nami Nori",
+    "cuisine": "japanese",
+    "price": 1,
+    "lat": 40.7190985,
+    "lng": -73.9528709,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Katz's",
+    "cuisine": "deli",
+    "price": 1,
+    "lat": 40.722233,
+    "lng": -73.98742899999999,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Bungalow",
+    "cuisine": "indian",
+    "price": 3,
+    "lat": 40.7236675,
+    "lng": -73.98797429999999,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Little Myanmar",
+    "cuisine": "burmese",
+    "price": 2,
+    "lat": 40.7229873,
+    "lng": -73.98551929999999,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "CheLi",
+    "cuisine": "chinese",
+    "price": 2,
+    "lat": 40.7594897,
+    "lng": -73.83260229999999,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Soda Club",
+    "cuisine": "italian-american",
+    "price": 2,
+    "lat": 40.7256613,
+    "lng": -73.98408189999999,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "MáLà Project",
+    "cuisine": "chinese",
+    "price": 2,
+    "lat": 40.7127753,
+    "lng": -74.0059728,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Ruffian",
+    "cuisine": "contemporary",
+    "price": 2,
+    "lat": 40.7264264,
+    "lng": -73.9841019,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Noreetuh",
+    "cuisine": "fusion",
+    "price": 2,
+    "lat": 40.7273295,
+    "lng": -73.9852902,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Sobaya",
+    "cuisine": "japanese",
+    "price": 1,
+    "lat": 40.7296064,
+    "lng": -73.9879383,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Superiority Burger",
+    "cuisine": "contemporary",
+    "price": 2,
+    "lat": 40.726484,
+    "lng": -73.983509,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Pranakhon",
+    "cuisine": "thai",
+    "price": 3,
+    "lat": 40.733751,
+    "lng": -73.9932623,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Momofuku Noodle Bar",
+    "cuisine": "asian",
+    "price": 2,
+    "lat": 40.7292083,
+    "lng": -73.98441500000001,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Bánh Anh Em",
+    "cuisine": "vietnamese",
+    "price": 2,
+    "lat": 40.73226349999999,
+    "lng": -73.9876172,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Yellow Rose",
+    "cuisine": "tex-mex",
+    "price": 2,
+    "lat": 40.7325214,
+    "lng": -73.9879752,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Odre",
+    "cuisine": "korean",
+    "price": 2,
+    "lat": 40.7314067,
+    "lng": -73.98588629999999,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Ishq",
+    "cuisine": "indian",
+    "price": 3,
+    "lat": 40.7293646,
+    "lng": -73.98086620000001,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "La Dong",
+    "cuisine": "vietnamese",
+    "price": 2,
+    "lat": 40.7377201,
+    "lng": -73.9912047,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Coqodaq",
+    "cuisine": "korean",
+    "price": 2,
+    "lat": 40.7400559,
+    "lng": -73.9887467,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Norma Gastronomia Siciliana",
+    "cuisine": "italian",
+    "price": 2,
+    "lat": 40.743523,
+    "lng": -73.9799614,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "HanGawi",
+    "cuisine": "korean",
+    "price": 2,
+    "lat": 40.7466013,
+    "lng": -73.98476169999999,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Cho Dang Gol",
+    "cuisine": "korean",
+    "price": 2,
+    "lat": 40.75016249999999,
+    "lng": -73.9863713,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Tonchin",
+    "cuisine": "japanese",
+    "price": 2,
+    "lat": 40.7502712,
+    "lng": -73.9845225,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Little Alley",
+    "cuisine": "chinese",
+    "price": 1,
+    "lat": 40.7474165,
+    "lng": -73.9772212,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Peppercorn Station",
+    "cuisine": "chinese",
+    "price": 2,
+    "lat": 40.7526861,
+    "lng": -73.9851157,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Kung Fu Little Steaned Buns Ramen",
+    "cuisine": "chinese",
+    "price": 1,
+    "lat": 40.7592053,
+    "lng": -73.9695124,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Chalong",
+    "cuisine": "thai",
+    "price": 2,
+    "lat": 40.7639556,
+    "lng": -73.98899449999999,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Lungi",
+    "cuisine": "sri lankan",
+    "price": 3,
+    "lat": 40.7616823,
+    "lng": -73.9601642,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Bayon",
+    "cuisine": "cambodian",
+    "price": 1,
+    "lat": 40.76229980000001,
+    "lng": -73.9591276,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Bohemian Spirit",
+    "cuisine": "czech",
+    "price": 2,
+    "lat": 40.769081,
+    "lng": -73.95648,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Covacha",
+    "cuisine": "mexican",
+    "price": 2,
+    "lat": 40.7809766,
+    "lng": -73.97646399999999,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Tha Phraya",
+    "cuisine": "thai contemporary",
+    "price": 2,
+    "lat": 40.7745281,
+    "lng": -73.9545117,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Oso",
+    "cuisine": "mexican",
+    "price": 2,
+    "lat": 40.821993,
+    "lng": -73.95026,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Sal Tang's",
+    "cuisine": "chinese contemporary",
+    "price": 2,
+    "lat": 40.685317,
+    "lng": -74.000428,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Untable",
+    "cuisine": "thai",
+    "price": 2,
+    "lat": 40.6835757,
+    "lng": -73.9994403,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Miss Ada",
+    "cuisine": "israeli",
+    "price": 2,
+    "lat": 40.689425,
+    "lng": -73.9723664,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Hometown Bar B Que New York",
+    "cuisine": "barbecue",
+    "price": 2,
+    "lat": 40.6749167,
+    "lng": -74.0161583,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Café Mars",
+    "cuisine": "contemporary",
+    "price": 3,
+    "lat": 40.6778855,
+    "lng": -73.9859784,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Shalom Japan",
+    "cuisine": "fusion",
+    "price": 2,
+    "lat": 40.7091733,
+    "lng": -73.9557774,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Haenyeo",
+    "cuisine": "korean",
+    "price": 2,
+    "lat": 40.6751935,
+    "lng": -73.9811059,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Speedy Romeo",
+    "cuisine": "pizza",
+    "price": 2,
+    "lat": 40.7127753,
+    "lng": -74.0059728,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Taqueria El Chato",
+    "cuisine": "mexican",
+    "price": 1,
+    "lat": 40.7235891,
+    "lng": -73.9505516,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Alta Calidad",
+    "cuisine": "mexican",
+    "price": 2,
+    "lat": 40.6801337,
+    "lng": -73.96823239999999,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Pierozek",
+    "cuisine": "polish",
+    "price": 2,
+    "lat": 40.7230109,
+    "lng": -73.9502255,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Bonnie's",
+    "cuisine": "cantonese",
+    "price": 3,
+    "lat": 40.7178057,
+    "lng": -73.9464373,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Win Son",
+    "cuisine": "chinese",
+    "price": 3,
+    "lat": 40.7074661,
+    "lng": -73.9434952,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Hupo",
+    "cuisine": "chinese",
+    "price": 2,
+    "lat": 40.7427366,
+    "lng": -73.953636,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Runner Up",
+    "cuisine": "american",
+    "price": 2,
+    "lat": 40.6656903,
+    "lng": -73.9823104,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "LORE",
+    "cuisine": "contemporary",
+    "price": 2,
+    "lat": 40.663082,
+    "lng": -73.9844024,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Chavela's",
+    "cuisine": "mexican",
+    "price": 2,
+    "lat": 40.6734559,
+    "lng": -73.9572247,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Roberta's",
+    "cuisine": "pizza",
+    "price": 2,
+    "lat": 40.7161965,
+    "lng": -73.96656759999999,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Agi's Counter",
+    "cuisine": "creative",
+    "price": 2,
+    "lat": 40.6700133,
+    "lng": -73.9583818,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Sobre Masa",
+    "cuisine": "mexican",
+    "price": 2,
+    "lat": 40.7062811,
+    "lng": -73.9313702,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Gordo's Cantina",
+    "cuisine": "mexican",
+    "price": 2,
+    "lat": 40.7049645,
+    "lng": -73.91757179999999,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Cardamom",
+    "cuisine": "indian",
+    "price": 2,
+    "lat": 40.7438763,
+    "lng": -73.9212182,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Chuan Tian Xia",
+    "cuisine": "chinese",
+    "price": 2,
+    "lat": 40.6396357,
+    "lng": -74.0091003,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Olmo",
+    "cuisine": "mexican",
+    "price": 3,
+    "lat": 40.6831458,
+    "lng": -73.9170735,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Rolo's",
+    "cuisine": "american",
+    "price": 2,
+    "lat": 40.7019431,
+    "lng": -73.903537,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Tanoreen",
+    "cuisine": "middle eastern",
+    "price": 2,
+    "lat": 40.63079159999999,
+    "lng": -74.02778649999999,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Yemenat",
+    "cuisine": "middle eastern",
+    "price": 1,
+    "lat": 40.6273279,
+    "lng": -74.0233464,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Sagara",
+    "cuisine": "sri lankan",
+    "price": 1,
+    "lat": 14.1670402,
+    "lng": 75.0403,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Phayul",
+    "cuisine": "tibetan",
+    "price": 2,
+    "lat": 40.7471617,
+    "lng": -73.89134899999999,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Zaab Zaab",
+    "cuisine": "thai",
+    "price": 2,
+    "lat": 40.7432642,
+    "lng": -73.8886608,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "SaRanRom Thai",
+    "cuisine": "thai",
+    "price": 2,
+    "lat": 40.7430963,
+    "lng": -73.8836867,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Caleta 111 Cevicheria",
+    "cuisine": "peruvian",
+    "price": 2,
+    "lat": 40.6974924,
+    "lng": -73.8366454,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Jiang Nan",
+    "cuisine": "chinese",
+    "price": 2,
+    "lat": 40.7175581,
+    "lng": -73.9949693,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Alley 41",
+    "cuisine": "chinese",
+    "price": 2,
+    "lat": 40.7591123,
+    "lng": -73.8280121,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Tong Sam Gyup Goo Yi",
+    "cuisine": "korean",
+    "price": 2,
+    "lat": 40.7621369,
+    "lng": -73.8030132,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  },
+  {
+    "name": "Legend of Taste",
+    "cuisine": "chinese",
+    "price": 2,
+    "lat": 40.779595,
+    "lng": -73.794179,
+    "michelin_stars": 0,
+    "bib_gourmand": true
+  }
+
+];
