@@ -412,15 +412,20 @@ class PassportCard extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-      // 🛡 FIX: Forces 'Light Mode' inside this widget so text is always dark/black
-      // even if the app's main theme is Dark (which makes text white).
       child: Theme(
         data: ThemeData.light(),
         child: VisaDocument(
-          cuisine: pageIndex == 0 ? "Global" : visaTitle.replaceAll('OFFICIAL ', '').replaceAll(' VISA', ''),
+          // 🛠 FIX: logic was forcing Page 0 to be "Global".
+          // We must allow Single Page passports to show their specific cuisine on Page 0.
+          cuisine: (pageIndex == 0 && passportSku != 'single_page') 
+              ? "Global" 
+              : visaTitle.replaceAll('OFFICIAL ', '').replaceAll(' VISA', ''),
+              
           userName: userName,
           dateIssued: visaDate ?? "EST. 2026", 
-          mainColor: pageIndex == 0 ? const Color(0xFF1A237E) : mainColor, 
+          mainColor: (pageIndex == 0 && passportSku != 'single_page')
+              ? const Color(0xFF1A237E) 
+              : mainColor, 
           photoUrl: photoUrl ?? "", 
           gender: gender,
           age: age,

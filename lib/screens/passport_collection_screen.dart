@@ -32,11 +32,13 @@ class _PassportCollectionScreenState extends State<PassportCollectionScreen> {
   bool _hideStatusPill = false; // 👈 NEW STATE VAR
   // 📨 HANDOFF STATE
   Restaurant? _pendingStampRestaurant;
+  Restaurant? _activeStampRestaurant; // 👈 NEW: A mutable copy of the payload we can destroy
 
   @override
   void initState() {
     super.initState();
     debugPrint("🚀 INIT STATE STARTED");
+    _activeStampRestaurant = widget.incomingRestaurant; // 👈 Initialize it here
     _loadLibrary();
   }
 
@@ -344,17 +346,16 @@ class _PassportCollectionScreenState extends State<PassportCollectionScreen> {
 
   void _switchToBook(String bookId, {Restaurant? stampPayload}) async {
     // 1. ⚡️ ACTIVATE THE TARGET BOOK LEGALLY
-    // This removes "Up Next" and makes it "Primary"
-    setState(() => _isLoading = true);
+    // ✂️ REMOVED: setState(() => _isLoading = true); -> This caused the black screen glitch!
     await PassportService.activateBook(bookId);
     
-    // 2. 🔄 REFRESH LIBRARY (to reflect the new status)
-    await _loadLibrary(); 
+    // 2. 🔄 REFRESH LIBRARY 
+    // Pass preservePage: true so the UI stays rock solid while data loads
+    await _loadLibrary(preservePage: true); 
     
     // 3. 🎬 FLIP THE PAGE
     final index = _library.indexWhere((b) => b['id'] == bookId);
     if (index != -1) {
-      // Set the pending stamp so the next screen knows what to do
       if (stampPayload != null) {
          _pendingStampRestaurant = stampPayload;
       }
@@ -435,37 +436,36 @@ class _PassportCollectionScreenState extends State<PassportCollectionScreen> {
                     bookId: book['id'],
                     skuType: book['sku_type'] ?? 'free_tier',
                     isReadOnly: book['status'] != 'active',
-                    incomingRestaurant: (book['status'] == 'active')
-                        ? widget.incomingRestaurant
+                    // 1. Swap widget.incomingRestaurant for our destructible version
+                    incomingRestaurant: (bookIndex == (_currentIndex - 1))
+                        ? _activeStampRestaurant 
                         : null,
 
-                    // 📨 HANDOFF: PASS THE PENDING STAMP
-                    // If this is the book we switched to, pass the restaurant payload immediately.
                     autoTriggerRestaurant: isTargetBook ? _pendingStampRestaurant : null,
-
-                    // 🧹 CLEANUP: RESET STATE
-                    // Once the stack screen fires the stamp, we clear our pending variable.
                     onAutoTriggerComplete: () {
                        _pendingStampRestaurant = null;
                     },
 
-                    // 🆕 RELOAD WHEN STAMPED
-                    onStampComplete: () => _loadLibrary(preservePage: true),
+                    // 2. Destroy the payload when stamping finishes
+                    onStampComplete: () {
+                       _activeStampRestaurant = null; // 👈 NUKE IT
+                       _loadLibrary(preservePage: true);
+                    },
 
-                    // 🔌 UI WIRING
                     onButtonVisibilityChanged: (isVisible) {
                       if (_hideStatusPill != isVisible) {
                         setState(() => _hideStatusPill = isVisible);
                       }
                     },
 
-                    // 👇 UPDATED: CARRY THE PAYLOAD
-                    // When the stack asks to switch, we pass the current restaurant along
-                    // so the next book knows what to stamp.
-                    onRequestBookSwitch: (targetId) => _switchToBook(
-                      targetId,
-                      stampPayload: widget.incomingRestaurant
-                    ),
+                    // 3. Destroy the payload before handing it off to the next book
+                    onRequestBookSwitch: (targetId) {
+                      _activeStampRestaurant = null; // 👈 NUKE IT
+                      _switchToBook(
+                        targetId,
+                        stampPayload: widget.incomingRestaurant
+                      );
+                    },
                   ),
                 );
               },

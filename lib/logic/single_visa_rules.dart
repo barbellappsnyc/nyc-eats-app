@@ -20,8 +20,9 @@ class SingleVisaRules implements PassportRules {
 
   @override
   int findTargetPageIndex(Map<String, dynamic> book, String targetCuisine) {
-    // Single Visa is ALWAYS Page 1. No math needed.
-    return 1;
+    // 🛠 FIX: For a single page book, the target is ALWAYS index 0.
+    // This prevents the "Flip away" behavior.
+    return 0; 
   }
 
   @override

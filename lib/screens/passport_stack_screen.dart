@@ -16,6 +16,7 @@ import '../services/passport_service.dart';
 // import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/passport_full_dialog.dart'; 
 import 'paywall_screen.dart';
+import '../logic/passport_brain.dart';
 
 class PassportStackScreen extends StatefulWidget {
   final Restaurant? incomingRestaurant;
@@ -93,6 +94,8 @@ class _PassportStackScreenState extends State<PassportStackScreen>
   Offset _targetStampOffset = Offset.zero;
   Size _targetSlotSize = Size.zero;
   bool _protocolRunning = false;
+
+  bool _hasConsumedIncoming = false; // 👈 NEW: Tracks if we've already handled the payload
 
   @override
   void initState() {
@@ -199,9 +202,12 @@ class _PassportStackScreenState extends State<PassportStackScreen>
       }
       
       int activePages = 1 + visasList.length;
-      int dbMaxPages = bookData['max_pages'] ?? 20; 
+      // 🛡️ PHYSICAL CAPACITY CAP
+      // Instead of letting the book grow (1 + visas), we lock it to the DB's max_pages.
+      int dbMaxPages = bookData['max_pages'] ?? 1; 
       
-      final int newTotal = (activePages > dbMaxPages) ? activePages : dbMaxPages;
+      // Standard (6), Diplomat (21), Single (1), Wildcard (1)
+      final int newTotal = dbMaxPages;
       final int newActiveIndex = bookData['last_page_index'] ?? 0;
       
       final rawStamps = bookData['stamps'] ?? [];
@@ -248,7 +254,8 @@ class _PassportStackScreenState extends State<PassportStackScreen>
         _isLoading = false; // ✅ SUCCESS PATH
       });
 
-      if (widget.incomingRestaurant != null) {
+      if (widget.incomingRestaurant != null && !_hasConsumedIncoming) {
+         _hasConsumedIncoming = true; // 👈 Mark it as eaten!
          WidgetsBinding.instance.addPostFrameCallback((_) {
             _initiateImmigrationProtocol();
          });
@@ -357,134 +364,123 @@ class _PassportStackScreenState extends State<PassportStackScreen>
 
   // 2. 🤖 AUTOMATIC STAMPING (The "Flying Stamp")
   Future<void> _initiateImmigrationProtocol() async {
-    // 🛑 READ-ONLY CHECK
-    // Logic: If it's archived, we usually stop. 
-    // Exception: Wildcards (`free_tier`) are allowed to act as "Sidearms" even if inactive.
-    if (widget.isReadOnly && _passportSku != 'free_tier') {
-       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("This volume is archived.")));
-       return;
-    }
-
     if (_protocolRunning || _showStampButton || _isStampingSequence) return;
     
     setState(() { _protocolRunning = true; });
 
     final userId = Supabase.instance.client.auth.currentUser?.id;
 
-    // 1. DETERMINE TARGET CUISINE
+    // 1. ANALYZE CUISINE
     String rawTag = widget.incomingRestaurant!.cuisine;
     String primaryTag = rawTag.split(';').first.trim();
     String targetCuisine = 'Global';
 
     try {
       final mappingResponse = await Supabase.instance.client.from('cuisine_mappings').select('target_cuisine').ilike('raw_tag', primaryTag).maybeSingle();
-      if (mappingResponse != null) {
-        targetCuisine = mappingResponse['target_cuisine'];
-      } else {
+      if (mappingResponse != null) targetCuisine = mappingResponse['target_cuisine'];
+      else {
         final visaCheck = await Supabase.instance.client.from('visa_types').select('cuisine').ilike('cuisine', primaryTag).maybeSingle();
         if (visaCheck != null) targetCuisine = visaCheck['cuisine'];
       }
-    } catch (e) {
-      debugPrint("Error analyzing cuisine: $e");
-    }
+    } catch (e) { debugPrint("Cuisine analysis error: $e"); }
 
-    // 🎨 STEP 1.5: FETCH COLOR
     String targetColor = '#1A237E'; 
     try {
-      final colorResponse = await Supabase.instance.client
-          .from('visa_types')
-          .select('color_hex')
-          .eq('cuisine', targetCuisine)
-          .maybeSingle();
-      
-      if (colorResponse != null && colorResponse['color_hex'] != null) {
-        targetColor = colorResponse['color_hex'];
+       final colorResponse = await Supabase.instance.client.from('visa_types').select('color_hex').eq('cuisine', targetCuisine).maybeSingle();
+       if (colorResponse != null) targetColor = colorResponse['color_hex'];
+    } catch (e) {}
+
+    // 2. CONSULT BRAIN
+    final library = await PassportService.fetchUserLibrary(forceRefresh: true);
+    PassportBrain.instance.syncLibrary(library);
+
+    // 👇 --- THE BRAIN-POWERED INTERCEPTOR MOVES HERE --- 👇
+    if (widget.incomingRestaurant != null) {
+      final bool isDuplicate = PassportBrain.instance.hasDuplicateStamp(widget.incomingRestaurant!.name);
+
+      if (isDuplicate) {
+        final bool? shouldProceed = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => Dialog(
+            backgroundColor: const Color(0xFFFFFDF7),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: const BoxDecoration(color: Color(0xFFFFF0F0), shape: BoxShape.circle),
+                    child: const Icon(Icons.history, size: 40, color: Color(0xFFD32F2F)),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text("ALREADY STAMPED!", textAlign: TextAlign.center, style: TextStyle(fontFamily: 'Courier', fontSize: 22, fontWeight: FontWeight.w900, color: Colors.black87, letterSpacing: -0.5)),
+                  const SizedBox(height: 12),
+                  Text("You've already got a stamp for\n'${widget.incomingRestaurant!.name}'.\n\nWant to double dip?", textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, color: Colors.black54, height: 1.4, fontWeight: FontWeight.w500)),
+                  const SizedBox(height: 28),
+                  Row(
+                    children: [
+                      Expanded(child: TextButton(onPressed: () => Navigator.pop(context, false), style: TextButton.styleFrom(foregroundColor: Colors.grey, padding: const EdgeInsets.symmetric(vertical: 16), shape: const StadiumBorder()), child: const Text("NAH, CANCEL", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)))),
+                      const SizedBox(width: 12),
+                      Expanded(child: ElevatedButton(onPressed: () => Navigator.pop(context, true), style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFD32F2F), foregroundColor: Colors.white, elevation: 0, padding: const EdgeInsets.symmetric(vertical: 16), shape: const StadiumBorder()), child: const Text("YEP, STAMP IT!", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)))),
+                    ],
+                  )
+                ],
+              ),
+            ),
+          ),
+        );
+
+        if (shouldProceed != true) {
+          setState(() { _protocolRunning = false; });
+          return; 
+        }
       }
-    } catch (e) {
-      debugPrint("Could not fetch visa color: $e");
     }
+    // ☝️ --- END BRAIN-POWERED INTERCEPTOR --- ☝️
 
-    // 🧠 STEP 2: CONSULT THE RULES ENGINE (The Fix)
-    // We fetch the entire library to let the Service make the decision
-    final library = await PassportService.fetchUserLibrary(forceRefresh: false);
+    final decision = await PassportBrain.instance.processStampRequest(widget.incomingRestaurant!);
     
-    final decision = PassportService.determineStampAction(
-      targetCuisine: targetCuisine, 
-      library: library
-    );
+    debugPrint("🧠 DECISION: ${decision.action}");
 
-    final String action = decision['action'];
-
-    // 🔀 ACTION: SWITCH BOOK (Smart Auto-Switch)
-    if (action == 'SWITCH_BOOK') {
-      final String targetId = decision['targetBookId'];
+    // 🛑 SCENARIO A: UPGRADE REQUIRED
+    if (decision.action == BrainAction.upgrade) {
       setState(() { _protocolRunning = false; });
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Switching to a passport with space for $targetCuisine..."),
-          backgroundColor: const Color(0xFF1A237E), // Navy
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(milliseconds: 1500),
-        )
-      );
-
-      // Trigger the flip in the parent screen
-      widget.onRequestBookSwitch?.call(targetId);
-      return; 
-    }
-
-    // 🛑 ACTION: VIOLATION (Show Dialog)
-    if (action.startsWith('VIOLATION')) {
-      setState(() { _protocolRunning = false; });
-      
-      if (action == 'VIOLATION_FULL' && _passportSku == 'free_tier') {
+      if (_passportSku == 'free_tier') {
          showDialog(context: context, builder: (_) => const PassportFullDialog());
          return;
       }
-
-      // For Single Visa or other violations, ask to upgrade
       bool wantsUpgrade = await _showSingleVisaViolationDialog(targetCuisine);
-      
-      // ... inside _initiateImmigrationProtocol ...
       if (wantsUpgrade) {
          if (mounted) {
-           await Navigator.push(
-             context, 
-             MaterialPageRoute(builder: (_) => const PaywallScreen())
-           );
-           
-           // 🧹 CLEAN UP GHOSTS
-           // Force reload data from DB to ensure no local 'ghost pages' persist
+           await Navigator.push(context, MaterialPageRoute(builder: (_) => const PaywallScreen()));
            await _fetchBookData(forceRefresh: true);
-           
-           // Re-run the protocol from scratch to see if we can proceed now
            if (mounted) _initiateImmigrationProtocol(); 
          }
       }
       return;
     }
 
-    // 2. CALCULATE TARGET PAGE (Derived from Rules)
-    int targetPageIndex = 0;
+    // 🔀 SCENARIO B: SWITCH BOOK
+    if (decision.action == BrainAction.switchAndStamp) {
+      setState(() { _protocolRunning = false; });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Switching passport..."), backgroundColor: const Color(0xFF1A237E), duration: const Duration(milliseconds: 1500))
+      );
+      widget.onRequestBookSwitch?.call(decision.targetBookId ?? "");
+      return; 
+    }
 
-    // ✅ ACTION: PROCEED
-    if (action == 'PROCEED') {
-      targetPageIndex = decision['pageIndex'];
-      
-      // 🛡️ SAFETY: Free Tier always stays on Page 0 (The Cover/Global Page)
-      if (_passportSku == 'free_tier') targetPageIndex = 0;
+    // ✅ SCENARIO C: STAY AND STAMP
+    if (decision.action == BrainAction.stayAndStamp) {
 
-      bool requiresNewRow = decision['requiresNewRow'];
-      
-      // If we need a new row (physically new Visa in DB), we must ask the user first.
-      if (requiresNewRow && userId != null) {
-        
-        // Decide which dialog to show (New Visa vs Extension)
-        // We check our local list to see if we already have this cuisine
+      // 1. DO WE NEED A NEW VISA ROW?
+      if (decision.requiresNewVisa && userId != null) {
         bool hasCuisine = userVisas.any((v) => v['cuisine'].toString().toLowerCase() == targetCuisine.toLowerCase());
-        
         bool createNew = false;
+        
         if (!hasCuisine) {
           createNew = await _showVisaApplicationDialog(targetCuisine, widget.incomingRestaurant!.name);
         } else {
@@ -496,7 +492,7 @@ class _PassportStackScreenState extends State<PassportStackScreen>
           return;
         }
 
-        // 🚀 OPTIMISTIC UPDATE (VISA)
+        // 🚀 Optimistic Update
         final newVisa = {
           'id': 'temp_${DateTime.now().millisecondsSinceEpoch}', 
           'user_id': userId,
@@ -508,34 +504,32 @@ class _PassportStackScreenState extends State<PassportStackScreen>
 
         setState(() {
           userVisas.add(newVisa);
-          _totalCards++; 
+          if (_passportSku != 'single_page') _totalCards++; 
         });
         
         PassportService.addVisaToCache(widget.bookId!, newVisa);
-
-        // Sync to DB
         Supabase.instance.client.from('user_visas').insert({
-          'user_id': userId,
-          'book_id': widget.bookId,
-          'cuisine': targetCuisine,
-          'created_at': DateTime.now().toIso8601String(),
-        }).then((_) {
-           debugPrint("Visa saved to DB successfully.");
-        }).catchError((e) {
-           debugPrint("Background Save Error: $e");
-        });
+          'user_id': userId, 'book_id': widget.bookId, 'cuisine': targetCuisine, 'created_at': DateTime.now().toIso8601String(),
+        }).catchError((e) {});
       }
+
+      // 2. NAVIGATION
+      final currentBook = library.firstWhere((b) => b['id'] == widget.bookId, orElse: () => {});
+      int targetPageIndex = PassportBrain.instance.calculateTargetPageIndex(currentBook, targetCuisine);
+      if (_passportSku == 'free_tier') targetPageIndex = 0;
+
+      while (_activeIndex < targetPageIndex) {
+         await _programmaticPageFlip();
+         if (_activeIndex < targetPageIndex) await Future.delayed(const Duration(milliseconds: 50)); 
+      }
+
+      // 3. EXECUTE
+      setState(() { _protocolRunning = false; });
+      _executeStampSequence();
+      return;
     }
 
-    // 3. 🎬 FLIP TO THE TARGET
-    while (_activeIndex < targetPageIndex) {
-       await _programmaticPageFlip();
-       if (_activeIndex < targetPageIndex) await Future.delayed(const Duration(milliseconds: 50)); 
-    }
-
-    // 4. FINISH
     setState(() { _protocolRunning = false; });
-    await _handleIncomingStampTrigger();
   }
 
   // --- 🎬 ACT 3: THE IMPACT (Zoom -> Target -> Thud) ---
@@ -546,17 +540,30 @@ class _PassportStackScreenState extends State<PassportStackScreen>
     final Restaurant? restaurantToStamp = manualRestaurant ?? widget.incomingRestaurant;
     if (restaurantToStamp == null) return;
 
-    // ... (Keep Duplicate Check if you have it) ...
+    // ✂️ DELETE ANY DUPLICATE CHECKS / DIALOGS HERE ✂️
 
     setState(() {
       _isStampActionPending = true;
       _stampingName = restaurantToStamp.name;
     });
 
+    // 🛠 FIX: Determine the correct cuisine logic
+    // 1. Default to Global (Safe fallback)
     String targetCuisine = 'Global'; 
-    if (userVisas.isNotEmpty && _activeIndex > 0) targetCuisine = userVisas[_activeIndex - 1]['cuisine'];
 
+    // 2. CHECK: Is this a Single Visa? (It sits on Page 0 but has a specific cuisine)
+    if (_passportSku == 'single_page' && userVisas.isNotEmpty) {
+       targetCuisine = userVisas[0]['cuisine'];
+    } 
+    // 3. CHECK: Is this a Standard/Diplomat on a Visa Page (Index > 0)?
+    else if (userVisas.isNotEmpty && _activeIndex > 0) {
+       targetCuisine = userVisas[_activeIndex - 1]['cuisine'];
+    }
+
+    // Determine slot index for animation
     int currentStampCount = collectedStamps.where((s) => s['cuisine'] == targetCuisine).length;
+    
+    // Wildcards just count total stamps since they don't filter by cuisine
     if (_passportSku == 'free_tier') currentStampCount = collectedStamps.length;
 
     _targetSlotIndex = currentStampCount % 4; 
@@ -571,24 +578,21 @@ class _PassportStackScreenState extends State<PassportStackScreen>
     widget.onButtonVisibilityChanged?.call(false);
 
     // 🔊 AUDIO SYNC
-    // The animation takes 800ms. 
-    // The "Impact" of ElasticOut happens around 30% in.
     await Future.delayed(const Duration(milliseconds: 540));
         
     HapticFeedback.heavyImpact();
     try {
-      // Re-init player to ensure low latency
       await _player.stop();
       await _player.setSource(AssetSource('sounds/thud.mp3'));
       await _player.resume();
     } catch (e) { /* ignore audio errors */ }
 
-    // 💾 SAVE DATA (The Fix)
+    // 💾 SAVE DATA
     final newStamp = {
-      'id': restaurantToStamp.id.toString(), // 👈 FIX: Convert to String to satisfy the Map<String, String> type
+      'id': restaurantToStamp.id.toString(), 
       'name': restaurantToStamp.name,
       'date': DateFormat('MMM d, yyyy').format(DateTime.now()),
-      'cuisine': targetCuisine,
+      'cuisine': targetCuisine, // 👈 NOW THIS WILL BE CORRECT (e.g., 'Indian')
     };
 
     // This handles the decision: Guest -> Disk, User -> Cloud
@@ -597,7 +601,7 @@ class _PassportStackScreenState extends State<PassportStackScreen>
       stampData: newStamp
     );
 
-    // Wait for the rest of the animation (800ms total - 540ms elapsed = ~260ms left)
+    // Wait for the rest of the animation
     await Future.delayed(const Duration(milliseconds: 400));
 
     if (mounted) {
@@ -607,7 +611,6 @@ class _PassportStackScreenState extends State<PassportStackScreen>
         _isStampActionPending = false; 
       });
       // 🆕 NEW: NOTIFY PARENT TO RELOAD
-      // This triggers the check for "Did I just fill the book?"
       widget.onStampComplete?.call();
     }
   }
@@ -858,15 +861,16 @@ class _PassportStackScreenState extends State<PassportStackScreen>
 
   void _onCardTap() {
     // 🛑 1. BOUNCER: PREVENT COVER TAP
-    // If we are currently viewing the Cover Page (Index 0) of a Paid Book,
-    // we do NOT open the detail screen. Covers are just for show.
     if (_activeIndex == 0 && (_passportSku == 'diplomat_book' || _passportSku == 'standard_book')) {
       return; 
     }
 
     if (_showStampButton || _isStampingSequence) return; 
 
+    // 🛠 FIX 1: Enforce Capacity
     int filledPagesCount = 1 + userVisas.length; 
+    if (_passportSku == 'single_page') filledPagesCount = 1; // Single Visa = 1 Page Max
+
     bool isAssigned = _activeIndex < filledPagesCount;
 
     String title = "VACANT PAGE";
@@ -876,30 +880,55 @@ class _PassportStackScreenState extends State<PassportStackScreen>
 
     if (isAssigned) {
       if (_activeIndex == 0) { 
-        title = _passportSku == 'free_tier' ? "TEMP VISA" : "GLOBAL VISA";
-        stamps = collectedStamps.where((s) => s['cuisine'] == 'Global').toList();
-        if (_passportSku == 'free_tier') stamps = collectedStamps;
-      } else {
-        final visa = userVisas[_activeIndex - 1]; 
-        title = visa['cuisine'].toString().toUpperCase();
-        
-        if (visa['visa_types'] != null && visa['visa_types']['color_hex'] != null) {
-          color = _parseColor(visa['visa_types']['color_hex']);
-        }
-        if (visa['created_at'] != null) {
-           dateIssued = DateFormat('MMM d, yyyy').format(DateTime.parse(visa['created_at']));
-        }
+        // 🛠 FIX 2: TRANSFORM PAGE 0 FOR SINGLE VISA
+        if (_passportSku == 'single_page' && userVisas.isNotEmpty) {
+           final visa = userVisas[0];
+           
+           // A. Use Specific Cuisine Title
+           title = visa['cuisine'].toString().toUpperCase();
+           
+           // B. Use Specific Color
+           if (visa['visa_types'] != null && visa['visa_types']['color_hex'] != null) {
+             color = _parseColor(visa['visa_types']['color_hex']);
+           }
+           
+           // C. Use Date
+           if (visa['created_at'] != null) {
+              dateIssued = DateFormat('MMM d, yyyy').format(DateTime.parse(visa['created_at']));
+           }
 
-        final allCuisineStamps = collectedStamps.where((s) => s['cuisine'] == visa['cuisine']).toList();
-        
-        int cuisinePageOrder = 0;
-        for (int i = 0; i < _activeIndex - 1; i++) {
-          if (userVisas[i]['cuisine'] == visa['cuisine']) {
-            cuisinePageOrder++;
-          }
+           // D. Show ALL stamps (It's the only page)
+           stamps = collectedStamps; 
+        } else {
+           // --- STANDARD BEHAVIOR ---
+           title = _passportSku == 'free_tier' ? "TEMP VISA" : "GLOBAL VISA";
+           stamps = collectedStamps.where((s) => s['cuisine'] == 'Global').toList();
+           if (_passportSku == 'free_tier') stamps = collectedStamps;
         }
-        final int skipCount = cuisinePageOrder * 4;
-        stamps = allCuisineStamps.skip(skipCount).take(4).toList();
+      } else {
+        // --- PAGES 1+ BEHAVIOR ---
+        if (userVisas.length > _activeIndex - 1) {
+          final visa = userVisas[_activeIndex - 1];
+          title = visa['cuisine'].toString().toUpperCase();
+          
+          if (visa['visa_types'] != null && visa['visa_types']['color_hex'] != null) {
+            color = _parseColor(visa['visa_types']['color_hex']);
+          }
+          if (visa['created_at'] != null) {
+             dateIssued = DateFormat('MMM d, yyyy').format(DateTime.parse(visa['created_at']));
+          }
+
+          final allCuisineStamps = collectedStamps.where((s) => s['cuisine'] == visa['cuisine']).toList();
+          
+          int cuisinePageOrder = 0;
+          for (int i = 0; i < _activeIndex - 1; i++) {
+            if (userVisas[i]['cuisine'] == visa['cuisine']) {
+              cuisinePageOrder++;
+            }
+          }
+          final int skipCount = cuisinePageOrder * 4;
+          stamps = allCuisineStamps.skip(skipCount).take(4).toList();
+        }
       }
     }
 
@@ -987,42 +1016,110 @@ class _PassportStackScreenState extends State<PassportStackScreen>
   }
   
   Widget _buildCardContent(int index, {required bool useKeys, bool isFlyingStamp = false}) {
-    int filledPagesCount = 1 + userVisas.length; 
-    bool isAssigned = index < filledPagesCount;
+    // =========================================================================
+    // 🎚️ FAILSAFE SWITCH: CHOOSE YOUR LOGIC
+    // =========================================================================
 
-    String title = "VACANT PAGE";
+    // -------------------------------------------------------------------------
+    // 🔴 OPTION A: OLD DISTRIBUTED LOGIC (Current)
+    // -------------------------------------------------------------------------
+
+    // int filledPagesCount = 1 + userVisas.length; 
+    // if (_passportSku == 'single_page') filledPagesCount = 1;
+
+    // bool isAssigned = index < filledPagesCount;
+
+    // String title = "VACANT PAGE";
+    // Color? color;
+    // String? dateIssued;
+    // List<Map<String, String>> stamps = [];
+
+    // if (isAssigned) {
+    //   if (index == 0) {
+    //     if (_passportSku == 'single_page' && userVisas.isNotEmpty) {
+    //        final visa = userVisas[0];
+    //        title = visa['cuisine'].toString().toUpperCase();
+    //        if (visa['visa_types'] != null && visa['visa_types']['color_hex'] != null) {
+    //          color = _parseColor(visa['visa_types']['color_hex']);
+    //        }
+    //        if (visa['created_at'] != null) {
+    //           dateIssued = DateFormat('MMM d, yyyy').format(DateTime.parse(visa['created_at']));
+    //        }
+    //        stamps = collectedStamps; 
+    //     } else {
+    //        title = _passportSku == 'free_tier' ? "TEMP VISA" : "GLOBAL VISA";
+    //        stamps = collectedStamps.where((s) => s['cuisine'] == 'Global').toList();
+    //        if (_passportSku == 'free_tier') stamps = collectedStamps;
+    //     }
+    //   } else {
+    //     if (userVisas.length > index - 1) {
+    //       final visa = userVisas[index - 1];
+    //       title = visa['cuisine'].toString().toUpperCase();
+    //       if (visa['visa_types'] != null && visa['visa_types']['color_hex'] != null) {
+    //         color = _parseColor(visa['visa_types']['color_hex']);
+    //       }
+    //       if (visa['created_at'] != null) {
+    //          dateIssued = DateFormat('MMM d, yyyy').format(DateTime.parse(visa['created_at']));
+    //       }
+    //       final allCuisineStamps = collectedStamps.where((s) => s['cuisine'] == visa['cuisine']).toList();
+    //       int cuisinePageOrder = 0;
+    //       for (int i = 0; i < index - 1; i++) {
+    //         if (userVisas[i]['cuisine'] == visa['cuisine']) {
+    //           cuisinePageOrder++;
+    //         }
+    //       }
+    //       final int skipCount = cuisinePageOrder * 4;
+    //       stamps = allCuisineStamps.skip(skipCount).take(4).toList();
+    //     }
+    //   }
+    // }
+    
+    // -------------------------------------------------------------------------
+    // 🟢 OPTION B: NEW BRAIN LOGIC 
+    // -------------------------------------------------------------------------
+
+    // 🛡️ THE FIX: We build the book object from our stable local state.
+    // This prevents the UI from flickering to the 'free_tier' default if the 
+    // Service cache is temporarily wiped during a database sync.
+    final Map<String, dynamic> fullBook = {
+      'sku_type': _passportSku,
+      'visas': userVisas,
+      'stamps': collectedStamps,
+    };
+    final ctx = PassportBrain.instance.resolvePageContext(fullBook, index);
+
+    bool isAssigned = !ctx.isVacant;
+    String title = ctx.title;
+    List<Map<String, String>> stamps = ctx.stamps;
+    
+    // For colors/dates, we still need a quick lookup since Context is purely data
     Color? color;
     String? dateIssued;
-    List<Map<String, String>> stamps = [];
-
-    if (isAssigned) {
-      if (index == 0) {
-        title = _passportSku == 'free_tier' ? "TEMP VISA" : "GLOBAL VISA";
-        stamps = collectedStamps.where((s) => s['cuisine'] == 'Global').toList();
-        if (_passportSku == 'free_tier') stamps = collectedStamps;
-      } else {
-        final visa = userVisas[index - 1];
-        title = visa['cuisine'].toString().toUpperCase();
-        
-        if (visa['visa_types'] != null && visa['visa_types']['color_hex'] != null) {
-          color = _parseColor(visa['visa_types']['color_hex']);
-        }
-        if (visa['created_at'] != null) {
-           dateIssued = DateFormat('MMM d, yyyy').format(DateTime.parse(visa['created_at']));
-        }
-        final allCuisineStamps = collectedStamps.where((s) => s['cuisine'] == visa['cuisine']).toList();
-        int cuisinePageOrder = 0;
-        for (int i = 0; i < index - 1; i++) {
-          if (userVisas[i]['cuisine'] == visa['cuisine']) {
-            cuisinePageOrder++;
+    
+    // Quick helper to match the context back to our local styling data
+    // (We can move this to Brain later, but keeping it simple for now)
+    if (!ctx.isGlobalPage && !ctx.isVacant) {
+       final matchingVisa = userVisas.firstWhere(
+         (v) => v['cuisine'].toString().toLowerCase() == ctx.targetCuisine.toLowerCase(),
+         orElse: () => {}
+       );
+       if (matchingVisa.isNotEmpty) {
+          if (matchingVisa['visa_types'] != null && matchingVisa['visa_types']['color_hex'] != null) {
+             color = _parseColor(matchingVisa['visa_types']['color_hex']);
           }
-        }
-        final int skipCount = cuisinePageOrder * 4;
-        stamps = allCuisineStamps.skip(skipCount).take(4).toList();
-      }
+          if (matchingVisa['created_at'] != null) {
+             dateIssued = DateFormat('MMM d, yyyy').format(DateTime.parse(matchingVisa['created_at']));
+          }
+       }
     }
 
+    // */
+    // =========================================================================
+
     return PassportCard(
+      // 🛠 FIX: Still need the Key fix from before!
+      key: ValueKey('card_${index}_$title'), 
+      
       pageIndex: index,
       passportSku: _passportSku,
       userName: _userName,
@@ -1042,7 +1139,6 @@ class _PassportStackScreenState extends State<PassportStackScreen>
       photoUrl: _photoUrl,
       gender: _gender,
       age: _age,
-      // ✈️ NEW PROPS: Pass the state down
       isFlying: isFlyingStamp,
       flyingSlotIndex: _targetSlotIndex,
       flyingStampName: _stampingName,

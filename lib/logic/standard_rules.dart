@@ -14,10 +14,11 @@ class StandardRules implements PassportRules {
     }
 
     // Rule 2: Do we have a blank slot available?
-    if (visas.length < maxCapacity) {
-      return null; // ✅ ALLOW: "Claim Blank Page 4."
+    // 🛠 FIX: We subtract 1 to account for the physical Cover Page.
+    if (visas.length < (maxCapacity - 1)) {
+      return null; // ✅ ALLOW
     }
-
+    
     // Rule 3: No room.
     return 'violation_full'; // 🛑 BLOCK: "Book is full."
   }

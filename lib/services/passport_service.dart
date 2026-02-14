@@ -520,7 +520,7 @@ class PassportService {
     
     if (sku.contains('diplomat')) {
       dbSku = 'diplomat_book';
-      maxPages = 20;
+      maxPages = 21; // 🛠 Updated from 20
       coverColor = 'navy_gold';
     } else if (sku.contains('standard')) {
       dbSku = 'standard_book'; 
@@ -528,6 +528,7 @@ class PassportService {
       coverColor = 'standard_blue';
     } else if (sku.contains('single')) {
       dbSku = 'single_page'; 
+      maxPages = 1;
     }
 
     debugPrint("📖 Creating Book: Store SKU='$sku' -> DB SKU='$dbSku'");
