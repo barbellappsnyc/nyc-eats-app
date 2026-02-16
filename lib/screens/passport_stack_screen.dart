@@ -452,10 +452,17 @@ class _PassportStackScreenState extends State<PassportStackScreen>
          showDialog(context: context, builder: (_) => const PassportFullDialog());
          return;
       }
-      bool wantsUpgrade = await _showSingleVisaViolationDialog(targetCuisine);
+      
+      // 🛠 FIX: Call the new Dynamic Dialog
+      final reason = decision.reason ?? "No available space.";
+      bool wantsUpgrade = await _showDynamicUpgradeDialog(targetCuisine, reason);
+      
       if (wantsUpgrade) {
          if (mounted) {
-           await Navigator.push(context, MaterialPageRoute(builder: (_) => const PaywallScreen()));
+           // 👇 PASS THE BATON INTO THE PAYWALL
+           await Navigator.push(context, MaterialPageRoute(builder: (_) => PaywallScreen(
+             incomingRestaurant: widget.incomingRestaurant 
+           )));
            await _fetchBookData(forceRefresh: true);
            if (mounted) _initiateImmigrationProtocol(); 
          }
@@ -467,7 +474,7 @@ class _PassportStackScreenState extends State<PassportStackScreen>
     if (decision.action == BrainAction.switchAndStamp) {
       setState(() { _protocolRunning = false; });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Switching passport..."), backgroundColor: const Color(0xFF1A237E), duration: const Duration(milliseconds: 1500))
+        const SnackBar(content: Text("Switching passport..."), backgroundColor: Color(0xFF1A237E), duration: Duration(milliseconds: 1500))
       );
       widget.onRequestBookSwitch?.call(decision.targetBookId ?? "");
       return; 
@@ -525,7 +532,9 @@ class _PassportStackScreenState extends State<PassportStackScreen>
 
       // 3. EXECUTE
       setState(() { _protocolRunning = false; });
-      _executeStampSequence();
+      
+      // 🛠 FIX: Restore the satisfying button pause!
+      _showButton();
       return;
     }
 
@@ -763,7 +772,22 @@ class _PassportStackScreenState extends State<PassportStackScreen>
     ) ?? false;
   }
 
-  Future<bool> _showSingleVisaViolationDialog(String targetCuisine) async {
+  // 🛠 NEW: Dynamic dialog that reads the Brain's reason
+  Future<bool> _showDynamicUpgradeDialog(String targetCuisine, String reason) async {
+    
+    // Determine the text based on the Brain's context
+    String title = "NO SPACE AVAILABLE";
+    String message = "You have no available pages for a $targetCuisine visa in your current library.\n\nExpand your collection to continue stamping!";
+    IconData icon = Icons.library_books;
+    Color iconColor = Colors.blue[900]!;
+
+    if (reason.toLowerCase().contains("single visa") || reason.toLowerCase().contains("monogamy")) {
+       title = "SINGLE VISA LIMIT";
+       message = "This passport can only hold one country's visa at a time.\n\nYou are trying to collect a $targetCuisine stamp, but this Single Visa is already assigned to another country.";
+       icon = Icons.lock_clock;
+       iconColor = Colors.orange[900]!;
+    }
+
     return await showDialog<bool>(
       context: context,
       barrierDismissible: false,
@@ -777,14 +801,14 @@ class _PassportStackScreenState extends State<PassportStackScreen>
             children: [
               Container(
                 padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(color: Colors.orange[50], shape: BoxShape.circle),
-                child: Icon(Icons.lock_clock, size: 40, color: Colors.orange[900]),
+                decoration: BoxDecoration(color: iconColor.withOpacity(0.1), shape: BoxShape.circle),
+                child: Icon(icon, size: 40, color: iconColor),
               ),
               const SizedBox(height: 20),
               
-              const Text(
-                "SINGLE VISA LIMIT", 
-                style: TextStyle(
+              Text(
+                title, 
+                style: const TextStyle(
                   fontFamily: 'Courier', 
                   fontWeight: FontWeight.w900, 
                   fontSize: 20, 
@@ -795,7 +819,7 @@ class _PassportStackScreenState extends State<PassportStackScreen>
               const SizedBox(height: 12),
               
               Text(
-                "This passport can only hold one country's visa at a time.\n\nYou are trying to collect a $targetCuisine stamp, but this Single Visa is already assigned to another country.",
+                message,
                 textAlign: TextAlign.center,
                 style: const TextStyle(fontSize: 15, height: 1.5, color: Colors.black54),
               ),

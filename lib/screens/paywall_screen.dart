@@ -7,10 +7,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/passport_service.dart';
 import 'passport_collection_screen.dart';
+import '../models/restaurant.dart'; // 👈 NEW IMPORT
 
 
 class PaywallScreen extends StatefulWidget {
-  const PaywallScreen({super.key});
+
+  final Restaurant? incomingRestaurant; // 👈 NEW: Catching the baton
+  
+  const PaywallScreen({super.key, this.incomingRestaurant});
 
   @override
   State<PaywallScreen> createState() => _PaywallScreenState();
@@ -67,18 +71,24 @@ class _PaywallScreenState extends State<PaywallScreen> {
           await PassportService.prewarmCache(); // Refresh data
 
           if (mounted) {
-            // Go to Collection to see the new book
+            // Go to Collection to see the new book AND pass the baton!
             Navigator.of(context).pushReplacement(
                MaterialPageRoute(
-                 builder: (_) => PassportCollectionScreen(initialBookId: 'newly_created_book'),
+                 builder: (_) => PassportCollectionScreen(
+                   initialBookId: 'newly_created_book',
+                   incomingRestaurant: widget.incomingRestaurant, // 👈 PASS THE BATON!
+                 ),
                ),
             );
           }
         } else {
-          // 🔴 GUEST: Go to Auth to "Claim" the purchase
+          // 🔴 GUEST: Go to Auth to "Claim" the purchase AND pass the baton!
           Navigator.of(context).push(
              MaterialPageRoute(
-               builder: (_) => AuthScreen(purchasedSku: sku),
+               builder: (_) => AuthScreen(
+                 purchasedSku: sku,
+                 incomingRestaurant: widget.incomingRestaurant, // 👈 PASS THE BATON!
+               ),
              ),
           );
         }

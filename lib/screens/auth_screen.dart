@@ -4,16 +4,19 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../screens/passport_collection_screen.dart';
 import '../services/passport_service.dart';
+import '../models/restaurant.dart'; // 👈 NEW IMPORT
 
 class AuthScreen extends StatefulWidget {
   final String? purchasedSku;
   // 👇 Flag to determine navigation behavior
   final bool isRedirectingBack;
+  final Restaurant? incomingRestaurant; // 👈 NEW: Holding the baton
 
   const AuthScreen({
     super.key,
     this.purchasedSku,
     this.isRedirectingBack = false, // Default to false (Old behavior)
+    this.incomingRestaurant, // 👈 NEW: Holding the baton
   });
 
   @override
@@ -145,6 +148,7 @@ class _AuthScreenState extends State<AuthScreen> {
                           (widget.purchasedSku != null)
                               ? 'newly_created_book'
                               : null,
+                              incomingRestaurant: widget.incomingRestaurant, // 👈 PASS THE BATON!
                     ),
               ),
             );

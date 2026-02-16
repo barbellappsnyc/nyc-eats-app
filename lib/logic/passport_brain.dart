@@ -34,7 +34,7 @@ class PassportBrain {
     _library = library;
     _applyJustInTimeIndexing();
     debugPrint("🧠 BRAIN: Library synced from Service. ${_library.length} books.");
-  }
+    }
 
   /// 🛠 JIT INDEXING: Sorts visas by date and assigns page numbers in memory.
   void _applyJustInTimeIndexing() {
@@ -60,76 +60,97 @@ class PassportBrain {
   // 2. 🤖 THE DECISION ENGINE
   // ---------------------------------------------------------------------------
 
+  /// 🧠 THE MASTER ROUTING ENGINE (The Waterfall)
+  /// Determines exactly which book receives the incoming stamp.
   Future<BrainDecision> processStampRequest(Restaurant restaurant) async {
-    if (_isProcessing) return BrainDecision.ignore(); 
+    if (_isProcessing) return BrainDecision.ignore();
     _isProcessing = true;
 
     try {
       final String rawCuisine = await _determineCuisine(restaurant);
       final String targetCuisine = _capitalize(rawCuisine);
-      
+
       debugPrint("🧠 BRAIN: Analyzing stamp for '${restaurant.name}' ($targetCuisine)...");
 
-      // 👇 MOVE THIS UP: We need to know what book we are holding right now
-      final activeBook = _findActiveBook();
-
-      // 1. CHECK PRIORITY: Existing Visa with Space?
-      final existingMatch = _findBookWithAvailableVisa(targetCuisine);
-      if (existingMatch != null) {
-        
-        // 🧠 THE FIX: Is the match the exact book we are already holding?
-        if (activeBook != null && existingMatch['id'] == activeBook['id']) {
-           debugPrint("🧠 BRAIN: Match is the active book. Staying put.");
-           return BrainDecision.stayAndStamp(
-             bookId: activeBook['id'],
-             requiresNewVisa: false, // It already exists!
-             visaCuisine: targetCuisine
-           );
-        }
-        
-        // It's a different book. Proceed with the switch.
-        debugPrint("🧠 BRAIN: Match is in storage. Switching books.");
-        return BrainDecision.switchAndStamp(
-          targetBookId: existingMatch['id'],
-          reason: "Found existing $targetCuisine visa.",
-          requiresNewVisa: false,
-          visaCuisine: targetCuisine
-        );
+      // ---------------------------------------------------------
+      // 🛫 PRE-FLIGHT CHECKS
+      // ---------------------------------------------------------
+      
+      // 1. Filter the Library (The Premium Bypass)
+      // If the user owns ANY paid book, the Wildcard ('free_tier') becomes invisible.
+      final List<Map<String, dynamic>> eligibleBooks = _getEligibleBooks();
+      
+      if (eligibleBooks.isEmpty) {
+        // Should theoretically never happen if a guest book exists, but safety first.
+        return BrainDecision.upgradeRequired(reason: "No valid passport found.");
       }
 
-      // 2. CHECK ACTIVE: Can the current Active Book take a NEW visa?
-      if (activeBook != null) {
-        // We have an active book, but is it allowed to take this stamp?
-        if (_canBookAcceptNewVisa(activeBook, targetCuisine)) {
+      // ---------------------------------------------------------
+      // 🌊 THE DECISION WATERFALL
+      // ---------------------------------------------------------
+
+      // PHASE 1: THE MAGNET PROTOCOL (Group Cuisines)
+      // Do we have an existing OPEN visa for this exact cuisine?
+      final magnetBook = _findBookWithExistingVisa(eligibleBooks, targetCuisine);
+      if (magnetBook != null) {
+        final activeBook = _findActiveBook();
+        final bool isCurrentBook = activeBook != null && activeBook['id'] == magnetBook['id'];
+
+        if (isCurrentBook) {
+           debugPrint("🧠 BRAIN: Magnet Protocol -> Stay in active book.");
            return BrainDecision.stayAndStamp(
-             bookId: activeBook['id'],
-             requiresNewVisa: true,
+             bookId: magnetBook['id'],
+             requiresNewVisa: false,
              visaCuisine: targetCuisine
            );
         } else {
-           debugPrint("🧠 BRAIN: Active book ${activeBook['id']} REJECTED the stamp (Full or Monogamy).");
+           debugPrint("🧠 BRAIN: Magnet Protocol -> Switching to Book ${magnetBook['id']}");
+           return BrainDecision.switchAndStamp(
+             targetBookId: magnetBook['id'],
+             reason: "Found existing $targetCuisine visa.",
+             requiresNewVisa: false,
+             visaCuisine: targetCuisine
+           );
         }
-      } else {
-         debugPrint("🧠 BRAIN: No Active Book found (All full or archived).");
       }
 
-      // 3. CHECK ARCHIVE: Is there an empty book sitting in storage?
-      final emptyBook = _findFirstEmptyBook();
-      if (emptyBook != null) {
-        return BrainDecision.switchAndStamp(
-          targetBookId: emptyBook['id'],
-          reason: "Active passport is full. Switching to fresh book.",
-          requiresNewVisa: true,
-          visaCuisine: targetCuisine
-        );
+      // PHASE 2 & 3: THE BLANK CANVAS / LONE WOLF PROTOCOL
+      // We need a new slot. Find the OLDEST eligible book that has space.
+      // (This handles Standard pages, empty Single Visas, and the Wildcard all in one)
+      final candidateBook = _findOldestBookWithSpace(eligibleBooks, targetCuisine);
+      
+      if (candidateBook != null) {
+        final activeBook = _findActiveBook();
+        final bool isCurrentBook = activeBook != null && activeBook['id'] == candidateBook['id'];
+        
+        // Check if we need to create a new visa (Standard) or just stamp (Wildcard/Single)
+        // For Standard/Diplomat, we always 'requireNewVisa' if it's a new cuisine.
+        // For Single/Wildcard, the 'visa' is the book itself.
+        final sku = candidateBook['sku_type'] ?? 'free_tier';
+        final bool isMultiPage = sku.contains('standard') || sku.contains('diplomat');
+        
+        if (isCurrentBook) {
+           debugPrint("🧠 BRAIN: Blank Canvas -> Using active book.");
+           return BrainDecision.stayAndStamp(
+             bookId: candidateBook['id'],
+             requiresNewVisa: isMultiPage, 
+             visaCuisine: targetCuisine
+           );
+        } else {
+           debugPrint("🧠 BRAIN: Blank Canvas -> Switching to Book ${candidateBook['id']}");
+           return BrainDecision.switchAndStamp(
+             targetBookId: candidateBook['id'],
+             reason: "Found available space in inventory.",
+             requiresNewVisa: isMultiPage,
+             visaCuisine: targetCuisine
+           );
+        }
       }
 
-      // 4. DEAD END: No space anywhere.
-      // This will trigger the "Upgrade Dialog" in the UI.
+      // PHASE 4: DEAD END (The Paywall)
+      debugPrint("🧠 BRAIN: Dead End. Upgrade required.");
       return BrainDecision.upgradeRequired(
-        reason: activeBook != null 
-            ? "Your current passport is full." 
-            : "No valid passport found."
+        reason: "No available space for $targetCuisine."
       );
 
     } catch (e) {
@@ -138,6 +159,113 @@ class PassportBrain {
     } finally {
       _isProcessing = false;
     }
+  }
+
+  // ---------------------------------------------------------
+  // 🕵️ NEW INTELLIGENCE HELPERS
+  // ---------------------------------------------------------
+
+  /// Returns the list of books the Brain is allowed to touch.
+  /// If user has PAID books, the 'free_tier' is excluded.
+  List<Map<String, dynamic>> _getEligibleBooks() {
+    final hasPaidBooks = _library.any((b) => (b['sku_type'] ?? 'free_tier') != 'free_tier');
+    
+    if (hasPaidBooks) {
+      // 🛡️ Premium Bypass: Hide the Wildcard
+      return _library.where((b) => (b['sku_type'] ?? 'free_tier') != 'free_tier').toList();
+    } else {
+      // Free User: Can only use what they have (likely just the Wildcard)
+      return _library;
+    }
+  }
+
+  /// Phase 1 Helper: Finds the oldest book that ALREADY has this cuisine active
+  Map<String, dynamic>? _findBookWithExistingVisa(List<Map<String, dynamic>> books, String cuisine) {
+    final sorted = List<Map<String, dynamic>>.from(books);
+    sorted.sort((a, b) {
+       final tA = DateTime.tryParse(a['created_at'] ?? '') ?? DateTime.now();
+       final tB = DateTime.tryParse(b['created_at'] ?? '') ?? DateTime.now();
+       return tA.compareTo(tB);
+    });
+
+    final targetLower = cuisine.toLowerCase();
+
+    for (var book in sorted) {
+      final sku = book['sku_type'] ?? 'free_tier';
+      final stamps = book['stamps'] as List? ?? [];
+      final visas = book['visas'] as List? ?? []; // 👈 We must check the visas array
+
+      if (sku == 'free_tier') continue;
+
+      // Single Visa Logic
+      if (sku.contains('single')) {
+        String? assignedCuisine;
+        if (visas.isNotEmpty) {
+           assignedCuisine = visas.first['cuisine']?.toString().toLowerCase();
+        } else if (stamps.isNotEmpty) {
+           assignedCuisine = stamps.first['cuisine']?.toString().toLowerCase();
+        }
+
+        if (assignedCuisine == targetLower && stamps.length < 4) {
+          return book;
+        }
+      }
+
+      // Standard/Diplomat Logic
+      if (sku.contains('standard') || sku.contains('diplomat')) {
+        // Do we have a visa issued for this cuisine?
+        final hasVisa = visas.any((v) => (v['cuisine'] ?? '').toString().toLowerCase() == targetLower);
+        
+        if (hasVisa) {
+           // Ensure the page isn't full
+           final cuisineStamps = stamps.where((s) => (s['cuisine'] ?? '').toString().toLowerCase() == targetLower).toList();
+           if (cuisineStamps.length < 4) {
+             return book;
+           }
+        }
+      }
+    }
+    return null;
+  }
+
+  /// Phase 2/3 Helper: Finds the oldest book that CAN take a new stamp/visa
+  Map<String, dynamic>? _findOldestBookWithSpace(List<Map<String, dynamic>> books, String cuisine) {
+    final sorted = List<Map<String, dynamic>>.from(books);
+    sorted.sort((a, b) {
+       final tA = DateTime.tryParse(a['created_at'] ?? '') ?? DateTime.now();
+       final tB = DateTime.tryParse(b['created_at'] ?? '') ?? DateTime.now();
+       return tA.compareTo(tB);
+    });
+
+    for (var book in sorted) {
+      final sku = book['sku_type'] ?? 'free_tier';
+      final stamps = book['stamps'] as List? ?? [];
+      final visas = book['visas'] as List? ?? [];
+      
+      // Smart Capacity Check
+      int maxPages = 1;
+      if (sku.contains('standard')) maxPages = 6;
+      if (sku.contains('diplomat')) maxPages = 21;
+
+      if (book['status'] == 'archived') continue;
+      if (stamps.length >= (maxPages * 4)) continue;
+
+      if (sku == 'free_tier') {
+        return book;
+      }
+      else if (sku.contains('single')) {
+        // Single Visa is ONLY a blank canvas if it has zero visas and zero stamps
+        if (visas.isEmpty && stamps.isEmpty) return book;
+      }
+      else {
+        // Standard/Diplomat: Can we add a new page?
+        // We check if the number of issued visas is less than the book's page limit
+        if (visas.length < maxPages) {
+          return book; 
+        }
+      }
+    }
+    return null;
   }
 
   // ---------------------------------------------------------------------------

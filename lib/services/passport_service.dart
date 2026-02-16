@@ -269,11 +269,6 @@ class PassportService {
   }
 
   // 🚦 THE ROUTER
-  // Replaces 'determineStampTarget' with strict logic flow.
-  // Returns:
-  // - { 'action': 'PROCEED', 'bookId': ..., 'pageIndex': ..., 'requiresNewRow': ... }
-  // - { 'action': 'SWITCH_BOOK', 'targetBookId': ... }
-  // - { 'action': 'VIOLATION_MONOGAMY' | 'VIOLATION_FULL' ... }
   static Map<String, dynamic> determineStampAction({
     required String targetCuisine,
     required List<Map<String, dynamic>> library,
@@ -316,19 +311,16 @@ class PassportService {
     }
 
     // 🛑 SCENARIO B: VIOLATION DETECTED
-    // Can we "Auto-Switch" to another book?
     if (violation == 'violation_monogamy' || violation == 'violation_full') {
       // Scan the library for a Savior Book
       for (var book in library) {
-        if (book['id'] == activeBook['id']) continue; // Skip the failed one
+        if (book['id'] == activeBook['id']) continue; 
         
-        // Only look at "Upgrade" books (Standard/Diplomat)
         final String altSku = book['sku_type'] ?? 'free_tier';
         if (altSku == 'single_page' || altSku == 'free_tier') continue;
 
         final altRules = StandardRules();
         if (altRules.validateStampAttempt(book, targetCuisine) == null) {
-          // 🎉 FOUND A SAVIOR!
           return {
             'action': 'SWITCH_BOOK',
             'targetBookId': book['id'],
@@ -339,7 +331,6 @@ class PassportService {
     }
 
     // ❌ SCENARIO C: DEAD END
-    // We couldn't fix it. Return the error to the UI (triggers Upgrade Dialog).
     return {'action': violation.toUpperCase()};
   }
 
@@ -393,23 +384,17 @@ class PassportService {
   static Future<void> saveGuestStamp(Map<String, dynamic> uiStamp) async {
     final prefs = await SharedPreferences.getInstance();
     
-    // 1. Get existing
     String? existingJson = prefs.getString('guest_stamps');
     List<dynamic> currentList = existingJson != null ? jsonDecode(existingJson) : [];
     
-    // 🛡️ PREVENT DUPLICATES
     final String newName = uiStamp['name'] ?? uiStamp['restaurant_name'];
     final bool alreadyExists = currentList.any((s) {
       final existingName = s['restaurant_name'] ?? s['name'];
       return existingName == newName;
     });
 
-    if (alreadyExists) {
-      debugPrint("⚠️ Stamp for $newName already exists. Skipping save.");
-      return; 
-    }
+    if (alreadyExists) return; 
 
-    // 2. 🔄 CONVERT TO CLOUD FORMAT
     final cloudFormatStamp = {
       'restaurant_name': newName,
       'country_cuisine': uiStamp['cuisine'],
@@ -417,11 +402,7 @@ class PassportService {
     };
     
     currentList.add(cloudFormatStamp);
-    
-    // 3. Save to Disk
     await prefs.setString('guest_stamps', jsonEncode(currentList));
-    
-    // 4. Update RAM Cache
     addStampToCache('guest_book_local', uiStamp);
   }
 
@@ -434,8 +415,6 @@ class PassportService {
     
     List<dynamic> localStamps = jsonDecode(existingJson);
     if (localStamps.isEmpty) return;
-
-    debugPrint("🚚 Migrating ${localStamps.length} guest stamps...");
 
     try {
       final bookResponse = await _client
@@ -474,7 +453,6 @@ class PassportService {
       const int MAX_CAPACITY = 4;
 
       if (currentFillLevel >= MAX_CAPACITY) {
-        debugPrint("🛑 Cloud book is full ($currentFillLevel/4). Discarding guest stamps.");
         await prefs.remove('guest_stamps');
         return;
       }
@@ -485,7 +463,6 @@ class PassportService {
         if (currentFillLevel >= MAX_CAPACITY) break;
 
         final String rName = stamp['restaurant_name'] ?? stamp['name'];
-
         if (existingNames.contains(rName)) continue; 
 
         rowsToInsert.add({
@@ -501,7 +478,6 @@ class PassportService {
 
       if (rowsToInsert.isNotEmpty) {
         await _client.from('collected_stamps').insert(rowsToInsert);
-        debugPrint("✅ Successfully migrated ${rowsToInsert.length} stamps.");
       }
 
       await prefs.remove('guest_stamps');
@@ -515,12 +491,11 @@ class PassportService {
   static Future<void> createBook({required String userId, required String sku}) async {
     int maxPages = 1;
     String coverColor = 'legacy';
-    
     String dbSku = 'free_tier'; 
     
     if (sku.contains('diplomat')) {
       dbSku = 'diplomat_book';
-      maxPages = 21; // 🛠 Updated from 20
+      maxPages = 21; 
       coverColor = 'navy_gold';
     } else if (sku.contains('standard')) {
       dbSku = 'standard_book'; 
@@ -530,8 +505,6 @@ class PassportService {
       dbSku = 'single_page'; 
       maxPages = 1;
     }
-
-    debugPrint("📖 Creating Book: Store SKU='$sku' -> DB SKU='$dbSku'");
 
     await _client.from('user_passport_books').insert({
       'user_id': userId,
@@ -569,7 +542,13 @@ class PassportService {
     if (book == null) return;
 
     final stamps = book['stamps'] as List? ?? [];
-    final maxPages = book['max_pages'] ?? 1;
+    
+    // 🧠 Smart Capacity Check
+    int maxPages = book['max_pages'] != null ? int.tryParse(book['max_pages'].toString()) ?? 1 : 1;
+    final sku = (book['sku_type'] ?? '').toString().toLowerCase();
+    if (sku.contains('standard')) maxPages = 6;
+    if (sku.contains('diplomat')) maxPages = 21;
+    
     final int capacity = maxPages * 4; 
 
     if (stamps.length >= capacity) {
@@ -583,52 +562,87 @@ class PassportService {
     }
   }
 
-  // 10. 👑 THE FIFO ENFORCER
+  // 10. 🧹 THE DBA: Archives full books and ensures exactly ONE living King exists.
   static Future<bool> validateLibraryIntegrity() async {
     final library = await fetchUserLibrary(forceRefresh: false);
-    
-    final successionLine = library.where((b) => (b['sku_type'] ?? 'free_tier') != 'free_tier').toList();
-
-    // SORT BY AGE (Oldest First = The King)
-    successionLine.sort((a, b) {
-      final tA = DateTime.tryParse(a['created_at'] ?? '') ?? DateTime.now();
-      final tB = DateTime.tryParse(b['created_at'] ?? '') ?? DateTime.now();
-      return tA.compareTo(tB); 
-    });
-
     bool madeChanges = false;
-    bool kingFound = false;
+    bool hasLivingKing = false;
 
-    for (var book in successionLine) {
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    if (userId == null) return false;
+
+    // We only manage paid books in the succession line
+    final paidBooks = library.where((b) => (b['sku_type'] ?? 'free_tier') != 'free_tier').toList();
+
+    // 1. JANITOR: Archive full books & check for a living King
+    for (var book in paidBooks) {
       final String bookId = book['id'];
       final String currentStatus = book['status'] ?? 'inactive';
       
       final stamps = book['stamps'] as List? ?? [];
-      final maxPages = book['max_pages'] ?? 1;
+      
+      // 🧠 Smart Capacity Check
+      int maxPages = book['max_pages'] != null ? int.tryParse(book['max_pages'].toString()) ?? 1 : 1;
+      final sku = (book['sku_type'] ?? '').toString().toLowerCase();
+      if (sku.contains('standard')) maxPages = 6;
+      if (sku.contains('diplomat')) maxPages = 21;
+      
       final bool isFull = stamps.length >= (maxPages * 4);
 
-      String targetStatus;
-
-      if (isFull) {
-        targetStatus = 'archived';
-      } else if (!kingFound) {
-        targetStatus = 'active';
-        kingFound = true;
-      } else {
-        targetStatus = 'inactive'; 
-      }
-
-      if (currentStatus != targetStatus) {
-        debugPrint("👑 FIFO Enforcer: Changing $bookId from '$currentStatus' to '$targetStatus'");
-        await _client.from('user_passport_books')
-            .update({'status': targetStatus})
+      if (isFull && currentStatus != 'archived') {
+        debugPrint("🧹 DBA: Book $bookId is full. Archiving.");
+        await Supabase.instance.client.from('user_passport_books')
+            .update({'status': 'archived'})
             .eq('id', bookId);
+        madeChanges = true;
+      } else if (!isFull && currentStatus == 'active') {
+        hasLivingKing = true; // We found a healthy King!
+      }
+    }
+
+    // 2. KINGMAKER: If all kings are dead or missing, crown the oldest heir
+    if (!hasLivingKing) {
+      final availableHeirs = paidBooks.where((b) {
+        final stamps = b['stamps'] as List? ?? [];
+        
+        // 🧠 Smart Capacity Check
+        int maxPages = b['max_pages'] != null ? int.tryParse(b['max_pages'].toString()) ?? 1 : 1;
+        final sku = (b['sku_type'] ?? '').toString().toLowerCase();
+        if (sku.contains('standard')) maxPages = 6;
+        if (sku.contains('diplomat')) maxPages = 21;
+        
+        return b['status'] != 'archived' && stamps.length < (maxPages * 4);
+      }).toList();
+
+      if (availableHeirs.isNotEmpty) {
+        // Sort by age (Oldest first)
+        availableHeirs.sort((a, b) {
+          final tA = DateTime.tryParse(a['created_at'] ?? '') ?? DateTime.now();
+          final tB = DateTime.tryParse(b['created_at'] ?? '') ?? DateTime.now();
+          return tA.compareTo(tB);
+        });
+
+        final newKingId = availableHeirs.first['id'];
+        debugPrint("👑 DBA: No active book found. Crowning oldest heir -> $newKingId");
+
+        // Force everyone else to be inactive (just in case of rogue states)
+        await Supabase.instance.client.from('user_passport_books')
+            .update({'status': 'inactive'})
+            .eq('user_id', userId)
+            .neq('sku_type', 'free_tier')
+            .neq('status', 'archived');
+
+        // Crown the new King
+        await Supabase.instance.client.from('user_passport_books')
+            .update({'status': 'active'})
+            .eq('id', newKingId);
+
         madeChanges = true;
       }
     }
 
     if (madeChanges) {
-      _libraryCache = null;
+      _libraryCache = null; // Flush cache so UI gets the perfect data
     }
     
     return madeChanges;
