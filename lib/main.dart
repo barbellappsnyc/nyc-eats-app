@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:purchases_flutter/purchases_flutter.dart'; // 👈 NEW: RevenueCat import
 import 'services/purchase_service.dart';
 import 'screens/map_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'services/revenuecat_service.dart'; // 👈 NEW: Import your new Zombie Catcher
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,6 +20,15 @@ Future<void> main() async {
 
   await PurchaseService().init();
 
+  // 👇 NEW: THE GLOBAL ZOMBIE WATCHDOG (Strike 3)
+  Purchases.addCustomerInfoUpdateListener((customerInfo) async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user != null) {
+      // If RevenueCat detects a crashed or delayed receipt in the background, run the catcher!
+      await RevenueCatService.catchZombiePurchases(user.id);
+    }
+  });
+
   runApp(const NycEatsApp());
 }
 
@@ -32,7 +43,7 @@ class NycEatsApp extends StatelessWidget {
       title: 'NYC Eats',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        brightness: Brightness.light, // 👈 FIXED: Changed to Light so text is visible
+        brightness: Brightness.light, 
         scaffoldBackgroundColor: Colors.black,
         useMaterial3: true,
       ),

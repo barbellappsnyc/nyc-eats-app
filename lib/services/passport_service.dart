@@ -487,8 +487,12 @@ class PassportService {
     }
   }
 
-  // 🔥 UPDATED: Create a specific book with SKU Translation
-  static Future<void> createBook({required String userId, required String sku}) async {
+  // 🔥 UPDATED: Create a specific book with SKU Translation & Transaction ID
+  static Future<void> createBook({
+    required String userId, 
+    required String sku,
+    String? transactionId, // 👈 NEW: Accepts the receipt number
+  }) async {
     int maxPages = 1;
     String coverColor = 'legacy';
     String dbSku = 'free_tier'; 
@@ -506,14 +510,21 @@ class PassportService {
       maxPages = 1;
     }
 
-    await _client.from('user_passport_books').insert({
+    final insertData = {
       'user_id': userId,
       'sku_type': dbSku,
       'status': 'active',
       'max_pages': maxPages,
       'cover_color': coverColor,
       'created_at': DateTime.now().toIso8601String(),
-    });
+    };
+
+    // 👈 NEW: Only save the transaction ID if it exists
+    if (transactionId != null) {
+      insertData['rc_transaction_id'] = transactionId;
+    }
+
+    await _client.from('user_passport_books').insert(insertData);
 
     _libraryCache = null; 
   }

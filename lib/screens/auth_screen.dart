@@ -5,6 +5,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../screens/passport_collection_screen.dart';
 import '../services/passport_service.dart';
 import '../models/restaurant.dart'; // 👈 NEW IMPORT
+import 'package:phosphor_flutter/phosphor_flutter.dart';
+import '../services/revenuecat_service.dart';
 
 class AuthScreen extends StatefulWidget {
   final String? purchasedSku;
@@ -26,6 +28,7 @@ class AuthScreen extends StatefulWidget {
 class _AuthScreenState extends State<AuthScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController(); // 👈 NEW
 
   // 🆕 NEW CONTROLLERS FOR SIGN UP
   final _nameController = TextEditingController();
@@ -35,10 +38,15 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _isLoading = false;
   bool _isLogin = true; // Toggle between Login and Sign Up
 
+  // 👇 NEW: Track whether passwords are hidden
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
+
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     _nameController.dispose();
     _ageController.dispose();
     super.dispose();
@@ -55,8 +63,13 @@ class _AuthScreenState extends State<AuthScreen> {
       return;
     }
 
-    // 🛑 VALIDATE SIGN UP FIELDS
     if (!_isLogin) {
+      if (password != _confirmPasswordController.text.trim()) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Passwords do not match.')),
+        );
+        return;
+      }
       if (_nameController.text.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Please enter your name.')),
@@ -71,18 +84,12 @@ class _AuthScreenState extends State<AuthScreen> {
       AuthResponse response;
 
       if (_isLogin) {
-        // 🔑 LOG IN
         response = await Supabase.instance.client.auth.signInWithPassword(
           email: email,
           password: password,
         );
       } else {
-        // 📝 SIGN UP (With Data Payload)
-        // We pass the meta_data so the SQL Trigger can grab it immediately
-        final String name =
-            _nameController.text.isNotEmpty
-                ? _nameController.text.toUpperCase()
-                : "TRAVELER";
+        final String name = _nameController.text.isNotEmpty ? _nameController.text.toUpperCase() : "TRAVELER";
         final int age = int.tryParse(_ageController.text) ?? 18;
 
         response = await Supabase.instance.client.auth.signUp(
@@ -92,89 +99,165 @@ class _AuthScreenState extends State<AuthScreen> {
             'display_name': name,
             'age': age,
             'gender': _selectedGender,
-            'full_name': name, // Redundant fallback for some triggers
+            'full_name': name,
           },
         );
       }
 
       if (response.user != null) {
-        final userId = response.user!.id;
-
-        // ---------------------------------------------------------
-        // 🧹 FRESH START STRATEGY
-        // ---------------------------------------------------------
-
-        // 1. Wipe Local Guest Stamps
-        // We delete the local stamps so the user starts fresh on their official account.
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.remove('guest_stamps');
-
-        // 2. Sync Profile Data (Guest -> Cloud)
-        // If they were a Guest before, we try to sync that data over.
-        // (Note: The SQL Trigger handles the *creation*, this handles *updates* from guest session)
-        await _syncLocalDataToCloud(userId);
-
-        // 3. Handle the Purchase (if any)
-        if (widget.purchasedSku != null) {
-          // They bought a specific book, so create THAT one.
-          // (The Trigger already created a Free Tier one, but that's fine, they can have both)
-          await PassportService.createBook(
-            userId: userId,
-            sku: widget.purchasedSku!,
-          );
-        } else {
-          // Normal Login/Signup:
-          // The SQL Trigger has ALREADY created the Free Tier book.
-          // We don't need to do anything here except load it.
+        // 🛑 NEW: TRIGGER THE SIGN UP OTP DIALOG
+        if (response.session == null && !_isLogin) {
+          if (mounted) {
+            setState(() => _isLoading = false);
+            _showSignUpOTPDialog(email); 
+          }
+          return; // Stop here until they verify the code
         }
 
-        // 4. Refresh Cache so the new book appears immediately
-        await PassportService.prewarmCache();
-
-        if (mounted) {
-          // 🚦 NAVIGATION LOGIC
-          // If we came from Profile (and didn't just buy a book), just go back.
-          if (widget.isRedirectingBack && widget.purchasedSku == null) {
-            Navigator.pop(context);
-          }
-          // Otherwise (Shop or Default), go to the Collection Screen
-          else {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder:
-                    (context) => PassportCollectionScreen(
-                      initialBookId:
-                          (widget.purchasedSku != null)
-                              ? 'newly_created_book'
-                              : null,
-                              incomingRestaurant: widget.incomingRestaurant, // 👈 PASS THE BATON!
-                    ),
-              ),
-            );
-          }
-        }
+        // 🟢 If we get past the waiting room, finalize the login!
+        await _finalizeLogin(response.user!.id);
       }
     } on AuthException catch (e) {
+      // 👇 FIX 3: Catch Auth errors specifically for plain English messages
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message), backgroundColor: Colors.red),
-        );
+        String errorMsg = e.message;
+        if (e.message.toLowerCase().contains('invalid credentials')) {
+          errorMsg = "Incorrect email or password. Please try again.";
+        }
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorMsg), backgroundColor: Colors.red));
       }
     } catch (e) {
-      debugPrint("🔴 CRITICAL AUTH ERROR: $e");
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 5),
-          ),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('An unexpected error occurred. Please try again.'), backgroundColor: Colors.red));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  // ---------------------------------------------------------
+  // 🧹 NEW HELPER: Finalize Login & Navigate
+  // ---------------------------------------------------------
+  Future<void> _finalizeLogin(String userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('guest_stamps');
+
+    await _syncLocalDataToCloud(userId);
+
+    if (widget.purchasedSku != null) {
+      await PassportService.createBook(userId: userId, sku: widget.purchasedSku!);
+    }
+
+    // 👇 NEW: Hunt for any crashed/missing purchases before letting them in!
+    await RevenueCatService.catchZombiePurchases(userId);
+
+    await PassportService.prewarmCache();
+
+    if (mounted) {
+      if (widget.isRedirectingBack && widget.purchasedSku == null) {
+        Navigator.pop(context);
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PassportCollectionScreen(
+              initialBookId: (widget.purchasedSku != null) ? 'newly_created_book' : null,
+              incomingRestaurant: widget.incomingRestaurant,
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  // ---------------------------------------------------------
+  // 🛑 NEW: Sign Up Verification OTP Dialog
+  // ---------------------------------------------------------
+  void _showSignUpOTPDialog(String email) {
+    final otpController = TextEditingController();
+    bool isDialogLoading = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setStateDialog) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          final textColor = isDark ? Colors.white : Colors.black;
+
+          return AlertDialog(
+            backgroundColor: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Text("Verify Your Email", style: TextStyle(fontWeight: FontWeight.bold, color: textColor)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  "We sent a 6-digit code to $email. Enter it below to activate your account.",
+                  style: TextStyle(color: textColor.withOpacity(0.8), height: 1.4),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: otpController,
+                  keyboardType: TextInputType.number,
+                  style: TextStyle(color: textColor),
+                  decoration: _inputDecoration("6-Digit Code", Icons.numbers),
+                ),
+                if (isDialogLoading) ...[
+                  const SizedBox(height: 16),
+                  const CircularProgressIndicator(),
+                ]
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: isDialogLoading ? null : () {
+                  Navigator.pop(ctx);
+                  setState(() => _isLogin = true); // Switch UI to login so they can verify later if they want
+                },
+                child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isDark ? Colors.white : Colors.black,
+                  foregroundColor: isDark ? Colors.black : Colors.white,
+                ),
+                onPressed: isDialogLoading ? null : () async {
+                  final code = otpController.text.trim();
+                  if (code.isEmpty) return;
+
+                  setStateDialog(() => isDialogLoading = true);
+                  try {
+                    final response = await Supabase.instance.client.auth.verifyOTP(
+                      email: email,
+                      token: code,
+                      type: OtpType.signup,
+                    );
+                    
+                    if (context.mounted && response.user != null) {
+                      Navigator.pop(ctx); // Close Dialog
+                      setState(() => _isLoading = true); // Turn on main loading curtain
+                      await _finalizeLogin(response.user!.id); // 🟢 Proceed to passports!
+                    }
+                  } on AuthException catch (e) {
+                    setStateDialog(() => isDialogLoading = false);
+                    String errorMsg = e.message;
+                    if (e.message.toLowerCase().contains('expired') || e.message.toLowerCase().contains('invalid')) {
+                      errorMsg = "The code you entered is incorrect or has expired.";
+                    }
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorMsg), backgroundColor: Colors.red));
+                  } catch (e) {
+                    setStateDialog(() => isDialogLoading = false);
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("An unexpected error occurred."), backgroundColor: Colors.red));
+                  }
+                },
+                child: const Text("Verify", style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 
   // ☁️ THE SYNC FUNCTION (Guest -> Cloud Merge)
@@ -232,77 +315,146 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
-  // 🔐 FORGOT PASSWORD DIALOG
-  Future<void> _showForgotPasswordDialog() async {
-    final resetEmailController = TextEditingController(text: _emailController.text);
-    bool isSending = false;
+  void _showForgotPasswordDialog() {
+    // 👇 FIX 2: Automatically grab the email if they already typed it!
+    final initialEmail = _emailController.text.trim();
+    final isValidEmail = initialEmail.contains('@') && initialEmail.contains('.');
+    
+    final resetEmailController = TextEditingController(text: isValidEmail ? initialEmail : '');
+    final otpController = TextEditingController();
+    final newPasswordController = TextEditingController();
+    
+    bool isCodeSent = false;
+    bool isDialogLoading = false;
 
-    await showDialog(
+    showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) {
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setStateDialog) {
           final isDark = Theme.of(context).brightness == Brightness.dark;
-          
+          final textColor = isDark ? Colors.white : Colors.black;
+
           return AlertDialog(
             backgroundColor: isDark ? const Color(0xFF2C2C2C) : Colors.white,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: const Text("Reset Password", style: TextStyle(fontWeight: FontWeight.bold)),
+            title: Text(
+              isCodeSent ? "Enter Reset Code" : "Reset Password", 
+              style: TextStyle(fontWeight: FontWeight.bold, color: textColor)
+            ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text("Enter your email and we'll send you a secure link to reset your password."),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: resetEmailController,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: _inputDecoration("Email Address", Icons.email_outlined),
-                ),
+                if (!isCodeSent) ...[
+                  Text(
+                    "Enter your email address and we'll send you a secure 6-digit reset code.",
+                    style: TextStyle(color: textColor.withOpacity(0.8), height: 1.4),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: resetEmailController,
+                    keyboardType: TextInputType.emailAddress,
+                    style: TextStyle(color: textColor),
+                    decoration: _inputDecoration("Email", Icons.email_outlined),
+                  ),
+                ] else ...[
+                  Text(
+                    "Enter the 6-digit code sent to ${resetEmailController.text}",
+                    style: TextStyle(color: textColor.withOpacity(0.8), height: 1.4),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: otpController,
+                    keyboardType: TextInputType.number,
+                    style: TextStyle(color: textColor),
+                    decoration: _inputDecoration("6-Digit Code", Icons.numbers),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: newPasswordController,
+                    obscureText: true,
+                    style: TextStyle(color: textColor),
+                    decoration: _inputDecoration("New Password", Icons.lock_reset),
+                  ),
+                ],
+                if (isDialogLoading) ...[
+                  const SizedBox(height: 16),
+                  const CircularProgressIndicator(),
+                ]
               ],
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text("CANCEL", style: TextStyle(color: Colors.grey)),
+                onPressed: isDialogLoading ? null : () => Navigator.pop(ctx),
+                child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
               ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: isDark ? Colors.white : Colors.black,
                   foregroundColor: isDark ? Colors.black : Colors.white,
                 ),
-                onPressed: isSending ? null : () async {
-                  final email = resetEmailController.text.trim();
-                  if (email.isEmpty) return;
-
-                  setDialogState(() => isSending = true);
-                  try {
-                    // 🚀 Trigger Supabase's built-in reset email
-                    await Supabase.instance.client.auth.resetPasswordForEmail(email);
+                onPressed: isDialogLoading ? null : () async {
+                  if (!isCodeSent) {
+                    final email = resetEmailController.text.trim();
+                    if (email.isEmpty) return;
                     
-                    if (context.mounted) {
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text("Reset link sent! Check your inbox."),
-                          backgroundColor: Colors.green,
-                        ),
-                      );
+                    setStateDialog(() => isDialogLoading = true);
+                    try {
+                      await Supabase.instance.client.auth.resetPasswordForEmail(email);
+                      setStateDialog(() {
+                        isCodeSent = true;
+                        isDialogLoading = false;
+                      });
+                    } on AuthException catch (e) {
+                      setStateDialog(() => isDialogLoading = false);
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message), backgroundColor: Colors.red));
+                    } catch (e) {
+                      setStateDialog(() => isDialogLoading = false);
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("An unexpected error occurred."), backgroundColor: Colors.red));
                     }
-                  } catch (e) {
-                    setDialogState(() => isSending = false);
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
+                  } 
+                  else {
+                    final code = otpController.text.trim();
+                    final newPass = newPasswordController.text.trim();
+                    if (code.isEmpty || newPass.isEmpty) return;
+
+                    setStateDialog(() => isDialogLoading = true);
+                    try {
+                      await Supabase.instance.client.auth.verifyOTP(
+                        email: resetEmailController.text.trim(),
+                        token: code,
+                        type: OtpType.recovery,
                       );
+                      
+                      await Supabase.instance.client.auth.updateUser(
+                        UserAttributes(password: newPass),
+                      );
+                      
+                      if (context.mounted) {
+                        Navigator.pop(ctx);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text("Password updated successfully! You can now log in."), backgroundColor: Colors.green),
+                        );
+                      }
+                    } on AuthException catch (e) {
+                      // 👇 FIX 3: Plain English Errors for the Code verification!
+                      setStateDialog(() => isDialogLoading = false);
+                      String errorMsg = e.message;
+                      if (e.message.toLowerCase().contains('expired') || e.message.toLowerCase().contains('invalid')) {
+                        errorMsg = "The code you entered is incorrect or has expired.";
+                      }
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(errorMsg), backgroundColor: Colors.red));
+                    } catch (e) {
+                      setStateDialog(() => isDialogLoading = false);
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("An unexpected error occurred."), backgroundColor: Colors.red));
                     }
                   }
                 },
-                child: isSending
-                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Text("SEND LINK", style: TextStyle(fontWeight: FontWeight.bold)),
+                child: Text(isCodeSent ? "Update Password" : "Send Code", style: const TextStyle(fontWeight: FontWeight.bold)),
               ),
             ],
           );
-        }
+        },
       ),
     );
   }
@@ -367,16 +519,28 @@ class _AuthScreenState extends State<AuthScreen> {
 
                   TextField(
                     controller: _passwordController,
-                    obscureText: true,
+                    obscureText: _obscurePassword, // 👈 Spot 1
                     style: TextStyle(color: textColor),
                     decoration: _inputDecoration(
                       "Password",
                       Icons.key_outlined,
+                    ).copyWith(
+                      suffixIcon: IconButton(
+                        splashRadius: 20, 
+                        icon: Icon(
+                          _obscurePassword // 👈 Spot 2
+                              ? PhosphorIconsRegular.eyeClosed 
+                              : PhosphorIconsRegular.eye,      
+                          color: hintColor!.withOpacity(0.7), 
+                          size: 22, 
+                        ),
+                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword), // 👈 Spot 3
+                      ),
                     ),
                   ),
                   const SizedBox(height: 4),
 
-                  // 👇 NEW: Forgot Password Button (Only visible on Login)
+                  // 👇 Forgot Password Button (Only visible on Login)
                   if (_isLogin)
                     Align(
                       alignment: Alignment.centerRight,
@@ -388,10 +552,31 @@ class _AuthScreenState extends State<AuthScreen> {
 
                   if (!_isLogin) const SizedBox(height: 16),
 
-                  // 👇 NEW SIGN UP FIELDS (Hidden during Login)
-
-                  // 👇 NEW SIGN UP FIELDS (Hidden during Login)
+                  // 👇 SIGN UP FIELDS (Hidden during Login)
                   if (!_isLogin) ...[
+                    TextField(
+                      controller: _confirmPasswordController,
+                      obscureText: _obscureConfirmPassword, // 👈 Spot 1
+                      style: TextStyle(color: textColor),
+                      decoration: _inputDecoration(
+                        "Confirm Password",
+                        Icons.lock_reset_outlined,
+                      ).copyWith(
+                        suffixIcon: IconButton(
+                          splashRadius: 20, 
+                          icon: Icon(
+                            _obscureConfirmPassword // 👈 Spot 2
+                                ? PhosphorIconsRegular.eyeClosed 
+                                : PhosphorIconsRegular.eye,      
+                            color: hintColor!.withOpacity(0.7), 
+                            size: 22, 
+                          ),
+                          onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword), // 👈 Spot 3
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
                     TextField(
                       controller: _nameController,
                       textCapitalization: TextCapitalization.characters,
