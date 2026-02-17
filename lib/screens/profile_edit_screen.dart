@@ -6,9 +6,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/passport_service.dart';
 import '../widgets/animated_background.dart'; 
 import 'passport_collection_screen.dart'; 
-import 'paywall_screen.dart'; 
 import 'auth_screen.dart'; 
 import 'package:path_provider/path_provider.dart'; 
+import '../screens/map_screen.dart'; // Adjust path if needed
 
 Future<bool?> openProfileScreen(BuildContext context, {
   String? name, String? photoUrl, String? gender, int? age
@@ -59,6 +59,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   
   List<Map<String, dynamic>> _myPassports = [];
 
+  // 👇 NEW: Track initial state
+  String _initialName = '';
+  String _initialAge = '';
+  String _initialGender = 'X';
+
   @override
   void initState() {
     super.initState();
@@ -77,6 +82,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     _fetchRealProfile(); 
     _loadMyPassports();
+
+    // 👇 NEW: Listen to text changes
+    _nameController.addListener(() => setState(() {}));
+    _ageController.addListener(() => setState(() {}));
   }
 
   Future<void> _fetchRealProfile() async {
@@ -86,12 +95,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() {
         if (profile['display_name'] != null) {
           _nameController.text = profile['display_name'];
+          _initialName = profile['display_name']; // 👈 Lock it in
         }
         if (profile['age'] != null) {
           _ageController.text = profile['age'].toString();
+          _initialAge = profile['age'].toString(); // 👈 Lock it in
         }
         if (profile['gender'] != null) {
           _selectedGender = profile['gender'];
+          _initialGender = profile['gender']; // 👈 Lock it in
         }
         _displayedPhotoUrl = profile['photo_url']; 
       });
@@ -134,7 +146,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _pickImage() async {
     final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery, maxWidth: 600, imageQuality: 80);
+    // 🗜️ SHRINK: Force max dimensions to 400x400 and quality to 70
+    final pickedFile = await picker.pickImage(
+      source: ImageSource.gallery, 
+      maxWidth: 400, 
+      maxHeight: 400, 
+      imageQuality: 70
+    );
     if (pickedFile != null) setState(() => _imageFile = File(pickedFile.path));
   }
 
@@ -185,8 +203,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         // 1. Upload Photo if a new one was picked
         if (_imageFile != null) {
+           
+           // 🗑️ THE ASSASSIN: Delete the old photo before uploading the new one
+           if (_displayedPhotoUrl != null && _displayedPhotoUrl!.contains('avatars')) {
+             try {
+                final uri = Uri.parse(_displayedPhotoUrl!);
+                final oldFileName = uri.pathSegments.last; 
+                await Supabase.instance.client.storage.from('avatars').remove([oldFileName]);
+                debugPrint("🗑️ Old avatar successfully deleted from bucket.");
+             } catch (e) {
+                debugPrint("⚠️ Could not delete old photo: $e");
+             }
+           }
+
+           // 🚀 THE UPLOAD
            final fileExt = _imageFile!.path.split('.').last;
-           // Create unique filename: userID_timestamp.jpg
+           // We keep the timestamp so the app's UI doesn't accidentally show a cached older image
            final fileName = '${user.id}_${DateTime.now().millisecondsSinceEpoch}.$fileExt';
 
            // A. Perform Upload
@@ -197,7 +229,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
            );
 
            // B. Get the Public URL
-           // (NOTE: Requires your 'avatars' bucket to be set to PUBLIC in Supabase Dashboard)
            finalPhotoUrl = Supabase.instance.client.storage.from('avatars').getPublicUrl(fileName);
         }
 
@@ -211,13 +242,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
             'photo_url': finalPhotoUrl,
             'updated_at': DateTime.now().toIso8601String(),
           },
-          onConflict: 'user_id', // 👈 THIS FIXES THE CRASH
+          onConflict: 'user_id', 
         );
         
+        // 🛠 FIX: Pass the new photo URL to the local cache so MapScreen sees it!
         await PassportService.updateLocalProfile({
           'display_name': name, 
           'age': age, 
           'gender': gender, 
+          'photo_url': finalPhotoUrl, // 👈 SAFELY IN SCOPE
         });
 
         if (mounted) {
@@ -231,6 +264,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  // 👇 NEW: Returns true ONLY if something actually changed
+  bool get _hasChanges {
+    return _nameController.text != _initialName ||
+           _ageController.text != _initialAge ||
+           _selectedGender != _initialGender ||
+           _imageFile != null; // 👈 Activates button if a new photo is picked
   }
 
   // 🗑️ APPLE COMPLIANCE: DELETE ACCOUNT
@@ -265,25 +306,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final user = Supabase.instance.client.auth.currentUser;
       
       if (user != null) {
-        // --- STEP 1: DELETE PHOTO FROM BUCKET (While we still have ID) ---
-        // We attempt to delete the photo file first.
-        // We only try this if the URL looks like it comes from our storage.
-        if (_displayedPhotoUrl != null && _displayedPhotoUrl!.contains('avatars')) {
-          try {
-             // Extract the filename from the URL (e.g. ".../avatars/userid_123.jpg")
-             // The URL structure usually ends with the filename.
-             final uri = Uri.parse(_displayedPhotoUrl!);
-             final fileName = uri.pathSegments.last; // Gets 'userid_123.jpg'
-             
-             await Supabase.instance.client.storage
-              .from('avatars')
-              .remove([fileName]);
+        // --- STEP 1: DELETE ALL PHOTOS FROM BUCKET (The Sweeper) ---
+        try {
+           // 1. Search the bucket for ANY file containing this user's ID
+           final files = await Supabase.instance.client.storage
+               .from('avatars')
+               .list(searchOptions: SearchOptions(search: user.id));
+           
+           // 2. Extract the filenames
+           final filesToDelete = files.map((f) => f.name).toList();
               
-             debugPrint("✅ Avatar file deleted.");
-          } catch (e) {
-             // Non-fatal error. We proceed to delete account even if photo delete fails.
-             debugPrint("⚠️ Could not delete photo (Bucket might be empty or file missing): $e");
-          }
+           // 3. Nuke them all at once
+           if (filesToDelete.isNotEmpty) {
+              await Supabase.instance.client.storage.from('avatars').remove(filesToDelete);
+              debugPrint("🧹 Sweeper successfully deleted ${filesToDelete.length} files.");
+           }
+        } catch (e) {
+           debugPrint("⚠️ Sweeper could not delete photos: $e");
         }
 
         // --- STEP 2: DELETE ACCOUNT & DATA (The Nuclear Option) ---
@@ -321,10 +360,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           )
         );
 
-        // Force Restart / Go to Auth
-        // We use pushAndRemoveUntil to clear the entire navigation stack so they can't go back.
+        // Force Restart / Go to Map Screen (NOT Auth Screen)
+        // This prevents the black screen bug because MapScreen doesn't have an empty back button!
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const AuthScreen()), 
+          MaterialPageRoute(builder: (_) => const MapScreen()), 
           (route) => false
         );
       }
@@ -499,9 +538,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           SizedBox(
                             width: double.infinity, height: 45,
                             child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                              onPressed: _isLoading ? null : _saveProfile,
-                              child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text("SAVE RECORDS", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                              style: ElevatedButton.styleFrom(
+                                // 👇 Dynamically change color
+                                backgroundColor: _hasChanges ? Colors.indigo : Colors.grey[400], 
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))
+                              ),
+                              // 👇 Disable button if no changes or loading
+                              onPressed: (!_hasChanges || _isLoading) ? null : _saveProfile,
+                              child: _isLoading 
+                                ? const CircularProgressIndicator(color: Colors.white) 
+                                : const Text("SAVE RECORDS", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                             ),
                           ),
                         ],

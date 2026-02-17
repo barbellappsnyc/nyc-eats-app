@@ -232,6 +232,81 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
+  // 🔐 FORGOT PASSWORD DIALOG
+  Future<void> _showForgotPasswordDialog() async {
+    final resetEmailController = TextEditingController(text: _emailController.text);
+    bool isSending = false;
+
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          
+          return AlertDialog(
+            backgroundColor: isDark ? const Color(0xFF2C2C2C) : Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Text("Reset Password", style: TextStyle(fontWeight: FontWeight.bold)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text("Enter your email and we'll send you a secure link to reset your password."),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: resetEmailController,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: _inputDecoration("Email Address", Icons.email_outlined),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("CANCEL", style: TextStyle(color: Colors.grey)),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isDark ? Colors.white : Colors.black,
+                  foregroundColor: isDark ? Colors.black : Colors.white,
+                ),
+                onPressed: isSending ? null : () async {
+                  final email = resetEmailController.text.trim();
+                  if (email.isEmpty) return;
+
+                  setDialogState(() => isSending = true);
+                  try {
+                    // 🚀 Trigger Supabase's built-in reset email
+                    await Supabase.instance.client.auth.resetPasswordForEmail(email);
+                    
+                    if (context.mounted) {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text("Reset link sent! Check your inbox."),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    setDialogState(() => isSending = false);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
+                      );
+                    }
+                  }
+                },
+                child: isSending
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text("SEND LINK", style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ],
+          );
+        }
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // 🎨 Theme Colors
@@ -299,7 +374,21 @@ class _AuthScreenState extends State<AuthScreen> {
                       Icons.key_outlined,
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 4),
+
+                  // 👇 NEW: Forgot Password Button (Only visible on Login)
+                  if (_isLogin)
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: _showForgotPasswordDialog,
+                        child: Text("Forgot Password?", style: TextStyle(color: hintColor, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+
+                  if (!_isLogin) const SizedBox(height: 16),
+
+                  // 👇 NEW SIGN UP FIELDS (Hidden during Login)
 
                   // 👇 NEW SIGN UP FIELDS (Hidden during Login)
                   if (!_isLogin) ...[

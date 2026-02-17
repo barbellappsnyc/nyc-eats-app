@@ -409,9 +409,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
     }
   }
 
-  Future<void> _fetchUserProfile() async {
-    // 1. Try to get data (Disk will return instantly, Network later)
-    final data = await PassportService.fetchUserProfile();
+  // 🛠 FIX: Add forceRefresh parameter
+  Future<void> _fetchUserProfile({bool forceRefresh = false}) async {
+    final data = await PassportService.fetchUserProfile(forceRefresh: forceRefresh);
     
     if (mounted && data != null) {
       setState(() {
@@ -809,10 +809,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
                                   age: _userAge
                                 );
                                 
-                                // 🛠 FIX: Always refresh when returning.
-                                // We don't check for 'true' anymore because a Logout 
-                                // might not return a value, but we still need to update the icon.
-                                _fetchUserProfile();
+                                // 🛠 FIX: Aggressively force a fresh pull from the DB/Cache
+                                await _fetchUserProfile(forceRefresh: true);
                               },
                               child: Container(
                                 width: 32,
