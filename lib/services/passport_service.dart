@@ -43,7 +43,7 @@ class PassportService {
           .select('''
             *,
             user_visas ( *, visa_types (color_hex) ),
-            collected_stamps ( * )
+            collected_stamps ( *, restaurants ( lat, lng ) )
           ''')
           .eq('user_id', userId)
           .order('created_at', ascending: false)

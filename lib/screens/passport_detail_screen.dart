@@ -1,16 +1,35 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../widgets/coordinate_collage_background.dart';
+
+
+// 🗺️ FAST & FREE BOROUGH CALCULATOR
+String getBorough(double lat, double lng) {
+  // Rough bounding boxes for NYC Boroughs
+  if (lat > 40.70 && lat < 40.88 && lng > -74.02 && lng < -73.91) return "MANHATTAN";
+  if (lat > 40.57 && lat < 40.74 && lng > -74.04 && lng < -73.85) return "BROOKLYN";
+  if (lat > 40.69 && lat < 40.80 && lng > -73.96 && lng < -73.70) return "QUEENS";
+  if (lat > 40.80 && lat < 40.92 && lng > -73.93 && lng < -73.78) return "BRONX";
+  if (lat > 40.50 && lat < 40.65 && lng > -74.26 && lng < -74.05) return "STATEN ISLAND";
+  return "NEW YORK"; // Fallback
+}
 
 class PassportDetailScreen extends StatefulWidget {
   final String heroTag; 
   final Widget cardWidget;
   final Color backgroundColor;
 
+  // 👇 NEW: The Brains!
+  final String cuisine;
+  final List<Map<String, String>> stamps;
+
   const PassportDetailScreen({
     super.key,
     required this.heroTag,
     required this.cardWidget,
     required this.backgroundColor,
+    required this.cuisine,
+    required this.stamps,
   });
 
   @override
@@ -30,21 +49,25 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
   late AnimationController _squishController;
   late Animation<double> _squishAnimation;
   
+  // 1. Change the variable type at the top of the State class:
   int _currentBgIndex = 0;
-  late List<Color> _bgDesigns;
+  late List<Widget> _bgDesigns; // 👈 CHANGED to Widget
+  late List<bool> _bgIsLight;   // 👈 NEW: To track status bar color manually
 
+  // 2. Replace the old _bgDesigns inside initState() with this:
   @override
   void initState() {
     super.initState();
     
     _bgDesigns = [
-      widget.backgroundColor,
-      const Color(0xFF1E1E1E), 
-      const Color(0xFFEFEBE5), 
-      const Color(0xFF1B263B), 
-      const Color(0xFFFAF0E6), 
-      const Color(0xFF0D1B2A)  
+      Container(color: widget.backgroundColor), // 0: Default white
+      CoordinateCollageBackground(stamps: widget.stamps), // 1: 📍 THE NEW COLLAGE
+      Container(color: const Color(0xFF1B263B)), // 2: Placeholder for Language 
+      Container(color: const Color(0xFFEFEBE5)), // 3: Placeholder for Stamps
     ];
+
+    // We manually tell the app if the battery icon should be black (true) or white (false)
+    _bgIsLight = [true, false, false, true];
 
     _squishController = AnimationController(
       vsync: this,
@@ -72,10 +95,10 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
 
   @override
   Widget build(BuildContext context) {
-    Color currentBgColor = _bgDesigns[_currentBgIndex];
-    bool isLightBg = currentBgColor.computeLuminance() > 0.5;
+    // 🧠 THE NEW BRAIN: We check our manual list to see if the icons should be dark or light
+    bool isLightBg = _bgIsLight[_currentBgIndex];
 
-    // 👈 CHANGED: Bulletproof System UI overlay for both iOS and Android
+    // Bulletproof System UI overlay for both iOS and Android
     final overlayStyle = isLightBg 
         ? SystemUiOverlayStyle.dark.copyWith(statusBarColor: Colors.transparent)
         : SystemUiOverlayStyle.light.copyWith(statusBarColor: Colors.transparent);
@@ -103,9 +126,22 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
                     _currentBgIndex = (_currentBgIndex + 1) % _bgDesigns.length;
                   });
                 },
+                // 👇 THE UNIVERSAL DIMMER: Works on Colors, Images, and complex Widgets!
                 child: ScaleTransition(
                   scale: _squishAnimation,
-                  child: Container(color: currentBgColor),
+                  child: AnimatedBuilder(
+                    animation: _squishAnimation,
+                    builder: (context, child) {
+                      return ColorFiltered(
+                        colorFilter: ColorFilter.mode(
+                          // Dims whatever widget is currently showing by up to 30%
+                          Colors.black.withOpacity(_squishAnimation.value * 0.3), 
+                          BlendMode.darken
+                        ),
+                        child: _bgDesigns[_currentBgIndex], // Renders the actual Widget
+                      );
+                    },
+                  ),
                 ),
               ),
             ),

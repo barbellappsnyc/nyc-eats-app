@@ -233,10 +233,14 @@ class _PassportStackScreenState extends State<PassportStackScreen>
              dateStr = "Recent";
           }
 
+          // Inside _applyBookData -> cleanStamps map:
           return {
             'name': name.toString(),
             'date': dateStr,
             'cuisine': cuisine.toString(),
+            // 👇 Reaching inside the nested 'restaurants' object!
+            'lat': item['restaurants']?['lat']?.toString() ?? '0.0',
+            'lng': item['restaurants']?['lng']?.toString() ?? '0.0',
           };
         })
       );
@@ -989,6 +993,9 @@ class _PassportStackScreenState extends State<PassportStackScreen>
               heroTag: heroTag,
               cardWidget: cardWidget,
               backgroundColor: _detailBackgroundColor, 
+              // 👇 NEW: Hand the data to the detail screen
+              cuisine: title,
+              stamps: stamps,
             ),
           );
         },
