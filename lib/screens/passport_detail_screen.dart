@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../widgets/coordinate_collage_background.dart';
 import '../widgets/postage_stamp_background.dart';
+import '../widgets/language_collage_background.dart';
 
 
 // 🗺️ FAST & FREE BOROUGH CALCULATOR
@@ -52,23 +53,22 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
   
   // 1. Change the variable type at the top of the State class:
   int _currentBgIndex = 0;
+  
+  // 👇 NEW: The Font Engine variables hoisted to the main screen!
+  int _fontIndex = 0;
+  final List<String> _fonts = [
+    'Georgia', 'Helvetica', 'Courier', 'Times New Roman', 'Trebuchet MS'
+  ];
+
   late List<Widget> _bgDesigns; // 👈 CHANGED to Widget
   late List<bool> _bgIsLight;   // 👈 NEW: To track status bar color manually
 
   @override
   void initState() {
     super.initState();
-    
-    _bgDesigns = [
-      Container(color: widget.backgroundColor), 
-      CoordinateCollageBackground(stamps: widget.stamps), 
-      Container(color: const Color(0xFF1B263B)), 
-      // 👇 NEW: Inject the Postage Stamp Background
-      PostageStampBackground(cuisine: widget.cuisine), 
-    ];
 
-    // 👇 Ensure index 3 is marked as `true` (light UI) so the battery stays black!
-    _bgIsLight = [true, false, false, true]; 
+    // 👇 Change index 2 to `true` so the status bar icons turn black over our pastel backgrounds!
+    _bgIsLight = [true, false, true, true];
     
     // ... rest of initState
 
@@ -98,7 +98,14 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
 
   @override
   Widget build(BuildContext context) {
-    // 🧠 THE NEW BRAIN: We check our manual list to see if the icons should be dark or light
+    // 👇 NEW: Builds fresh every time, catching the latest font!
+    final List<Widget> bgDesigns = [
+      Container(color: widget.backgroundColor), 
+      CoordinateCollageBackground(stamps: widget.stamps), 
+      LanguageCollageBackground(cuisine: widget.cuisine, currentFont: _fonts[_fontIndex]), 
+      PostageStampBackground(cuisine: widget.cuisine), 
+    ];
+
     bool isLightBg = _bgIsLight[_currentBgIndex];
 
     // Bulletproof System UI overlay for both iOS and Android
@@ -126,14 +133,14 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
                 onTapUp: (_) {
                   _squishController.reverse();
                   setState(() {
-                    _currentBgIndex = (_currentBgIndex + 1) % _bgDesigns.length;
+                    _currentBgIndex = (_currentBgIndex + 1) % bgDesigns.length;
                   });
                 },
                 // 👈 CHANGED: Removed the ColorFiltered and AnimatedBuilder.
                 // Now it just directly scales the background widget without any dimming!
                 child: ScaleTransition(
                   scale: _squishAnimation,
-                  child: _bgDesigns[_currentBgIndex], // Renders the actual Widget directly
+                  child: bgDesigns[_currentBgIndex], // Renders the actual Widget directly
                 ),
               ),
             ),
@@ -202,7 +209,38 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
                       fontStyle: FontStyle.italic),
                 ),
               ),
-            )
+            ),
+
+            // 🔤 LAYER 5: THE FONT TOGGLE BUTTON (Completely Isolated!)
+            // Only renders if we are currently looking at the Language background (Index 2)
+            if (_currentBgIndex == 2)
+              Positioned(
+                bottom: 40 + MediaQuery.of(context).padding.bottom, 
+                right: 24, // Same horizontal plane as the Hint Text, but on the right edge
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _fontIndex = (_fontIndex + 1) % _fonts.length;
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.black87,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 5))
+                      ],
+                      border: Border.all(color: Colors.white24, width: 1),
+                    ),
+                    child: const Icon(
+                      Icons.text_format_rounded, 
+                      color: Colors.white,
+                      size: 26,
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
