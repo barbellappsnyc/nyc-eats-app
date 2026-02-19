@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../widgets/coordinate_collage_background.dart';
+import '../widgets/postage_stamp_background.dart';
 
 
 // 🗺️ FAST & FREE BOROUGH CALCULATOR
@@ -54,20 +55,22 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
   late List<Widget> _bgDesigns; // 👈 CHANGED to Widget
   late List<bool> _bgIsLight;   // 👈 NEW: To track status bar color manually
 
-  // 2. Replace the old _bgDesigns inside initState() with this:
   @override
   void initState() {
     super.initState();
     
     _bgDesigns = [
-      Container(color: widget.backgroundColor), // 0: Default white
-      CoordinateCollageBackground(stamps: widget.stamps), // 1: 📍 THE NEW COLLAGE
-      Container(color: const Color(0xFF1B263B)), // 2: Placeholder for Language 
-      Container(color: const Color(0xFFEFEBE5)), // 3: Placeholder for Stamps
+      Container(color: widget.backgroundColor), 
+      CoordinateCollageBackground(stamps: widget.stamps), 
+      Container(color: const Color(0xFF1B263B)), 
+      // 👇 NEW: Inject the Postage Stamp Background
+      PostageStampBackground(cuisine: widget.cuisine), 
     ];
 
-    // We manually tell the app if the battery icon should be black (true) or white (false)
-    _bgIsLight = [true, false, false, true];
+    // 👇 Ensure index 3 is marked as `true` (light UI) so the battery stays black!
+    _bgIsLight = [true, false, false, true]; 
+    
+    // ... rest of initState
 
     _squishController = AnimationController(
       vsync: this,
@@ -106,7 +109,7 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: overlayStyle,
       child: Scaffold(
-        backgroundColor: Colors.black, 
+        backgroundColor: Colors.white, 
         body: Stack(
           fit: StackFit.expand,
           children: [
@@ -126,22 +129,11 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
                     _currentBgIndex = (_currentBgIndex + 1) % _bgDesigns.length;
                   });
                 },
-                // 👇 THE UNIVERSAL DIMMER: Works on Colors, Images, and complex Widgets!
+                // 👈 CHANGED: Removed the ColorFiltered and AnimatedBuilder.
+                // Now it just directly scales the background widget without any dimming!
                 child: ScaleTransition(
                   scale: _squishAnimation,
-                  child: AnimatedBuilder(
-                    animation: _squishAnimation,
-                    builder: (context, child) {
-                      return ColorFiltered(
-                        colorFilter: ColorFilter.mode(
-                          // Dims whatever widget is currently showing by up to 30%
-                          Colors.black.withOpacity(_squishAnimation.value * 0.3), 
-                          BlendMode.darken
-                        ),
-                        child: _bgDesigns[_currentBgIndex], // Renders the actual Widget
-                      );
-                    },
-                  ),
+                  child: _bgDesigns[_currentBgIndex], // Renders the actual Widget directly
                 ),
               ),
             ),
