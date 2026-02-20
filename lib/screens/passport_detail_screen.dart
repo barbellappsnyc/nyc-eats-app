@@ -3,7 +3,15 @@ import 'package:flutter/services.dart';
 import '../widgets/coordinate_collage_background.dart';
 import '../widgets/postage_stamp_background.dart';
 import '../widgets/language_collage_background.dart';
+import 'package:screenshot/screenshot.dart';
+import '../widgets/checkered_background.dart'; // 👈 Your new widget!
 
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:path_provider/path_provider.dart';
+import 'package:gal/gal.dart';
+import 'package:share_plus/share_plus.dart';
+import 'dart:ui'; // 👈 Required for the ImageFilter.blur
 
 // 🗺️ FAST & FREE BOROUGH CALCULATOR
 String getBorough(double lat, double lng) {
@@ -62,13 +70,15 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
 
   late List<Widget> _bgDesigns; // 👈 CHANGED to Widget
   late List<bool> _bgIsLight;   // 👈 NEW: To track status bar color manually
+  final ScreenshotController _cardOnlyController = ScreenshotController();
+  final ScreenshotController _fullScreenController = ScreenshotController();
 
   @override
   void initState() {
     super.initState();
 
-    // 👇 Change index 2 to `true` so the status bar icons turn black over our pastel backgrounds!
-    _bgIsLight = [true, false, true, true];
+    // 👇 Added one more 'true' at the end for the light grey checkered background
+    _bgIsLight = [true, false, true, true, true];
     
     // ... rest of initState
 
@@ -90,6 +100,92 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
     });
   }
 
+  // 💾 SAVE TO CAMERA ROLL
+  Future<void> _saveToCameraRoll() async {
+    try {
+      Uint8List? imageBytes;
+
+      // 🧠 The Smart Check: Are we on the Checkered BG?
+      if (_currentBgIndex == 4) {
+        // Grab ONLY the card (transparent PNG style)
+        imageBytes = await _cardOnlyController.capture(pixelRatio: 3.0);
+      } else {
+        // Grab the Card + The Generative Background
+        imageBytes = await _fullScreenController.capture(pixelRatio: 3.0);
+      }
+
+      if (imageBytes == null) return;
+
+      // Request permission & save using `gal`
+      final bool hasAccess = await Gal.hasAccess();
+      if (!hasAccess) await Gal.requestAccess();
+
+      // Write to temporary file, then save to gallery
+      final directory = await getTemporaryDirectory();
+      final imagePath = '${directory.path}/nyceats_passport_${DateTime.now().millisecondsSinceEpoch}.png';
+      final imageFile = File(imagePath);
+      await imageFile.writeAsBytes(imageBytes);
+
+      await Gal.putImage(imagePath);
+
+      // Show a success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Saved to Camera Roll! 📸"),
+            backgroundColor: Color(0xFF1A237E),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint("Save error: $e");
+    }
+  }
+
+  // 📲 SHARE TO INSTAGRAM STORY
+  Future<void> _shareToStory() async {
+    print("🚀 1. Share button tapped!");
+    try {
+      // 1. Capture the image
+      final Uint8List? imageBytes = await _fullScreenController.capture(pixelRatio: 3.0);
+      print("📸 2. Image captured! Size: ${imageBytes?.length} bytes");
+      
+      if (imageBytes == null) {
+        print("❌ ERROR: Captured image is null!");
+        return;
+      }
+
+      // 2. Get temp directory
+      final directory = await getTemporaryDirectory();
+      print("📂 3. Temp directory found: ${directory.path}");
+      
+      // 3. Save to file
+      final imagePath = '${directory.path}/nyceats_story_${DateTime.now().millisecondsSinceEpoch}.png';
+      final imageFile = File(imagePath);
+      await imageFile.writeAsBytes(imageBytes);
+      print("💾 4. File successfully written to: $imagePath");
+
+      // 4. Get the screen coordinates for the iPad/Simulator popover
+      final box = context.findRenderObject() as RenderBox?;
+      final Rect? sharePosition = box != null 
+          ? box.localToGlobal(Offset.zero) & box.size 
+          : null;
+
+      // 5. Trigger Share Sheet with the required anchor
+      print("📤 5. Triggering native share sheet...");
+      await Share.shareXFiles(
+        [XFile(imagePath)],
+        text: 'My NYC Eats Passport! 🌎🍽️',
+        sharePositionOrigin: sharePosition, // 👈 THE FIX
+      );
+      print("✅ 6. Share sheet called successfully.");
+      
+    } catch (e) {
+      print("🚨 CRITICAL SHARE ERROR: $e");
+    }
+  }
+
   @override
   void dispose() {
     _squishController.dispose();
@@ -104,6 +200,7 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
       CoordinateCollageBackground(stamps: widget.stamps), 
       LanguageCollageBackground(cuisine: widget.cuisine, currentFont: _fonts[_fontIndex]), 
       PostageStampBackground(cuisine: widget.cuisine), 
+      const CheckeredBackground(), // 👈 NEW: The PNG export mode (Index 4)
     ];
 
     bool isLightBg = _bgIsLight[_currentBgIndex];
@@ -120,65 +217,77 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
         body: Stack(
           fit: StackFit.expand,
           children: [
-            // 🟩 LAYER 1: THE BACKGROUND (Oversized to hide edges while bouncing)
-            Positioned(
-              top: -100,
-              bottom: -100,
-              left: -100,
-              right: -100,
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTapDown: (_) => _squishController.forward(),
-                onTapCancel: () => _squishController.reverse(),
-                onTapUp: (_) {
-                  _squishController.reverse();
-                  setState(() {
-                    _currentBgIndex = (_currentBgIndex + 1) % bgDesigns.length;
-                  });
-                },
-                // 👈 CHANGED: Removed the ColorFiltered and AnimatedBuilder.
-                // Now it just directly scales the background widget without any dimming!
-                child: ScaleTransition(
-                  scale: _squishAnimation,
-                  child: bgDesigns[_currentBgIndex], // Renders the actual Widget directly
-                ),
-              ),
-            ),
-
-            // 🪪 LAYER 2: THE CARD (Completely isolated)
-            Positioned(
-              left: _cardPosition.dx - 170, 
-              top: _cardPosition.dy - 270,  
-              child: GestureDetector(
-                // Swallow taps so touching the card doesn't trigger the background
-                onTapDown: (_) {},
-                onTapUp: (_) {},
-                onTapCancel: () {},
-                onTap: () {},
-                onScaleStart: (details) {
-                  _baseCardPosition = _cardPosition;
-                  _startFocalPoint = details.focalPoint;
-                  _baseScale = _cardScale;
-                  _baseRotation = _cardRotation;
-                },
-                onScaleUpdate: (details) {
-                  setState(() {
-                    final Offset delta = details.focalPoint - _startFocalPoint;
-                    _cardPosition = _baseCardPosition + delta;
-                    _cardScale = (_baseScale * details.scale).clamp(0.4, 2.0);
-                    _cardRotation = _baseRotation + details.rotation;
-                  });
-                },
-                child: Transform(
-                  alignment: Alignment.center,
-                  transform: Matrix4.identity()
-                    ..scale(_cardScale)
-                    ..rotateZ(_cardRotation),
-                  child: Hero(
-                    tag: widget.heroTag,
-                    child: widget.cardWidget,
+            // 🖼️ THE CAPTURABLE ART (Background + Card)
+            Screenshot(
+              controller: _fullScreenController,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // 🟩 LAYER 1: THE BACKGROUND 
+                  Positioned(
+                    top: -100,
+                    bottom: -100,
+                    left: -100,
+                    right: -100,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTapDown: (_) => _squishController.forward(),
+                      onTapCancel: () => _squishController.reverse(),
+                      onTapUp: (_) {
+                        _squishController.reverse();
+                        setState(() {
+                          _currentBgIndex = (_currentBgIndex + 1) % bgDesigns.length;
+                        });
+                      },
+                      // 👈 CHANGED: Removed the ColorFiltered and AnimatedBuilder.
+                      // Now it just directly scales the background widget without any dimming!
+                      child: ScaleTransition(
+                        scale: _squishAnimation,
+                        child: bgDesigns[_currentBgIndex], // Renders the actual Widget directly
+                      ),
+                    ),
                   ),
-                ),
+
+                  // 🪪 LAYER 2: THE CARD
+                  Positioned(
+                    left: _cardPosition.dx - 170, 
+                    top: _cardPosition.dy - 270,  
+                    child: GestureDetector(
+                      // Swallow taps so touching the card doesn't trigger the background
+                      onTapDown: (_) {},
+                      onTapUp: (_) {},
+                      onTapCancel: () {},
+                      onTap: () {},
+                      onScaleStart: (details) {
+                        _baseCardPosition = _cardPosition;
+                        _startFocalPoint = details.focalPoint;
+                        _baseScale = _cardScale;
+                        _baseRotation = _cardRotation;
+                      },
+                      onScaleUpdate: (details) {
+                        setState(() {
+                          final Offset delta = details.focalPoint - _startFocalPoint;
+                          _cardPosition = _baseCardPosition + delta;
+                          _cardScale = (_baseScale * details.scale).clamp(0.4, 2.0);
+                          _cardRotation = _baseRotation + details.rotation;
+                        });
+                      },
+                      child: Transform(
+                        alignment: Alignment.center,
+                        transform: Matrix4.identity()
+                          ..scale(_cardScale)
+                          ..rotateZ(_cardRotation),
+                        child: Screenshot( // 👈 The Card-Only Capture Controller is safely inside!
+                          controller: _cardOnlyController,
+                          child: Hero(
+                            tag: widget.heroTag,
+                            child: widget.cardWidget,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
             
@@ -198,7 +307,7 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
 
             // 📝 LAYER 4: THE HINT TEXT (Isolated & Smart Color)
             Positioned(
-              bottom: 40,
+              bottom: 100,
               left: 0,
               right: 0,
               child: Center(
@@ -241,6 +350,58 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
                   ),
                 ),
               ),
+            // 📸 LAYER 6: EXPORT & SHARE BUTTONS (Frosted Glass Pill)
+            Positioned(
+              bottom: 40 + MediaQuery.of(context).padding.bottom,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(40),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20), // Heavy Apple-style blur
+                    child: AnimatedSize(
+                      duration: const Duration(milliseconds: 350),
+                      curve: Curves.easeOutCubic, // Smooth, spring-like curve
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.withOpacity(0.15), // Very subtle grey tint
+                          borderRadius: BorderRadius.circular(40),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.3), // Highlight rim
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // 📥 SAVE BUTTON 
+                            IconButton(
+                              onPressed: _saveToCameraRoll, 
+                              icon: const Icon(Icons.arrow_downward_rounded), // Clean downward arrow
+                              color: Colors.grey[800], // Understated dark grey
+                              iconSize: 28,
+                              padding: const EdgeInsets.all(12),
+                            ),
+                            
+                            // 📤 SHARE BUTTON (Disappears on Checkered BG)
+                            if (_currentBgIndex != 4)
+                              IconButton(
+                                onPressed: _shareToStory, 
+                                icon: const Icon(Icons.share_rounded), // Open triangle share node
+                                color: Colors.grey[800], // Matched dark grey
+                                iconSize: 28,
+                                padding: const EdgeInsets.all(12),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),
