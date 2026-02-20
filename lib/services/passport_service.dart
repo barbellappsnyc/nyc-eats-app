@@ -513,7 +513,7 @@ class PassportService {
     final insertData = {
       'user_id': userId,
       'sku_type': dbSku,
-      'status': 'active',
+      'status': 'inactive', // 👈 THE FIX: New books must wait their turn!
       'max_pages': maxPages,
       'cover_color': coverColor,
       'created_at': DateTime.now().toIso8601String(),
@@ -573,11 +573,10 @@ class PassportService {
     }
   }
 
-  // 10. 🧹 THE DBA: Archives full books and ensures exactly ONE living King exists.
+  // 10. 🧹 THE DBA: Archives full books and enforces the Highlander Rule (Only ONE Active King).
   static Future<bool> validateLibraryIntegrity() async {
     final library = await fetchUserLibrary(forceRefresh: false);
     bool madeChanges = false;
-    bool hasLivingKing = false;
 
     final userId = Supabase.instance.client.auth.currentUser?.id;
     if (userId == null) return false;
@@ -585,7 +584,9 @@ class PassportService {
     // We only manage paid books in the succession line
     final paidBooks = library.where((b) => (b['sku_type'] ?? 'free_tier') != 'free_tier').toList();
 
-    // 1. JANITOR: Archive full books & check for a living King
+    List<Map<String, dynamic>> healthyHeirs = [];
+
+    // 1. JANITOR: Archive full books & gather the healthy ones
     for (var book in paidBooks) {
       final String bookId = book['id'];
       final String currentStatus = book['status'] ?? 'inactive';
@@ -606,49 +607,44 @@ class PassportService {
             .update({'status': 'archived'})
             .eq('id', bookId);
         madeChanges = true;
-      } else if (!isFull && currentStatus == 'active') {
-        hasLivingKing = true; // We found a healthy King!
+      } else if (!isFull && currentStatus != 'archived') {
+        // This book has space and isn't dead yet!
+        healthyHeirs.add(book);
       }
     }
 
-    // 2. KINGMAKER: If all kings are dead or missing, crown the oldest heir
-    if (!hasLivingKing) {
-      final availableHeirs = paidBooks.where((b) {
-        final stamps = b['stamps'] as List? ?? [];
-        
-        // 🧠 Smart Capacity Check
-        int maxPages = b['max_pages'] != null ? int.tryParse(b['max_pages'].toString()) ?? 1 : 1;
-        final sku = (b['sku_type'] ?? '').toString().toLowerCase();
-        if (sku.contains('standard')) maxPages = 6;
-        if (sku.contains('diplomat')) maxPages = 21;
-        
-        return b['status'] != 'archived' && stamps.length < (maxPages * 4);
-      }).toList();
+    // 2. THE HIGHLANDER RULE: There can be only one Active King
+    if (healthyHeirs.isNotEmpty) {
+      // Sort by age (Oldest first) so the queue is always strict FIFO
+      healthyHeirs.sort((a, b) {
+        final tA = DateTime.tryParse(a['created_at'] ?? '') ?? DateTime.now();
+        final tB = DateTime.tryParse(b['created_at'] ?? '') ?? DateTime.now();
+        return tA.compareTo(tB);
+      });
 
-      if (availableHeirs.isNotEmpty) {
-        // Sort by age (Oldest first)
-        availableHeirs.sort((a, b) {
-          final tA = DateTime.tryParse(a['created_at'] ?? '') ?? DateTime.now();
-          final tB = DateTime.tryParse(b['created_at'] ?? '') ?? DateTime.now();
-          return tA.compareTo(tB);
-        });
+      // The True King is the oldest healthy book
+      final String trueKingId = healthyHeirs.first['id'];
+      
+      // Check if anyone else thinks they are King, or if the True King is asleep
+      for (var heir in healthyHeirs) {
+        final String heirId = heir['id'];
+        final String heirStatus = heir['status'] ?? 'inactive';
 
-        final newKingId = availableHeirs.first['id'];
-        debugPrint("👑 DBA: No active book found. Crowning oldest heir -> $newKingId");
-
-        // Force everyone else to be inactive (just in case of rogue states)
-        await Supabase.instance.client.from('user_passport_books')
-            .update({'status': 'inactive'})
-            .eq('user_id', userId)
-            .neq('sku_type', 'free_tier')
-            .neq('status', 'archived');
-
-        // Crown the new King
-        await Supabase.instance.client.from('user_passport_books')
-            .update({'status': 'active'})
-            .eq('id', newKingId);
-
-        madeChanges = true;
+        if (heirId == trueKingId && heirStatus != 'active') {
+          // Crown the True King
+          debugPrint("👑 DBA: Crowning True King -> $trueKingId");
+          await Supabase.instance.client.from('user_passport_books')
+              .update({'status': 'active'})
+              .eq('id', trueKingId);
+          madeChanges = true;
+        } else if (heirId != trueKingId && heirStatus == 'active') {
+          // Strip the false kings of their title
+          debugPrint("⚔️ DBA: Demoting False King -> $heirId");
+          await Supabase.instance.client.from('user_passport_books')
+              .update({'status': 'inactive'})
+              .eq('id', heirId);
+          madeChanges = true;
+        }
       }
     }
 

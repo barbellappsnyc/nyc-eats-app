@@ -1,5 +1,6 @@
 // ... imports ... (Same as before)
 import 'dart:async';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:audioplayers/audioplayers.dart';
@@ -255,9 +256,12 @@ class _PassportStackScreenState extends State<PassportStackScreen>
         _age = profileData?['age'];
         userVisas = visasList;
         collectedStamps = cleanStamps;
-        _isLoading = false; // ✅ SUCCESS PATH
+        
+        // 🌉 THE BRIDGE: Keep the loading screen up if we have a stamp to process!
+        if (widget.incomingRestaurant == null || _hasConsumedIncoming) {
+          _isLoading = false; 
+        }
       });
-
       if (widget.incomingRestaurant != null && !_hasConsumedIncoming) {
          _hasConsumedIncoming = true; // 👈 Mark it as eaten!
          WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -366,11 +370,11 @@ class _PassportStackScreenState extends State<PassportStackScreen>
   }
 
 
-  // 2. 🤖 AUTOMATIC STAMPING (The "Flying Stamp")
   Future<void> _initiateImmigrationProtocol() async {
     if (_protocolRunning || _showStampButton || _isStampingSequence) return;
     
-    setState(() { _protocolRunning = true; });
+    // 🌉 Keep the loading bridge active!
+    setState(() { _protocolRunning = true; _isLoading = true; });
 
     final userId = Supabase.instance.client.auth.currentUser?.id;
 
@@ -398,7 +402,6 @@ class _PassportStackScreenState extends State<PassportStackScreen>
     final library = await PassportService.fetchUserLibrary(forceRefresh: true);
     PassportBrain.instance.syncLibrary(library);
 
-    // 👇 --- THE BRAIN-POWERED INTERCEPTOR MOVES HERE --- 👇
     if (widget.incomingRestaurant != null) {
       final bool isDuplicate = PassportBrain.instance.hasDuplicateStamp(widget.incomingRestaurant!.name);
 
@@ -438,38 +441,38 @@ class _PassportStackScreenState extends State<PassportStackScreen>
         );
 
         if (shouldProceed != true) {
-          setState(() { _protocolRunning = false; });
+          // 🛑 User cancelled. Drop the bridge, reveal the book, and abort.
+          setState(() { _protocolRunning = false; _isLoading = false; });
           return; 
         }
       }
     }
-    // ☝️ --- END BRAIN-POWERED INTERCEPTOR --- ☝️
 
     final decision = await PassportBrain.instance.processStampRequest(widget.incomingRestaurant!);
     
-    debugPrint("🧠 DECISION: ${decision.action}");
-
     // 🛑 SCENARIO A: UPGRADE REQUIRED
     if (decision.action == BrainAction.upgrade) {
-      setState(() { _protocolRunning = false; });
       if (_passportSku == 'free_tier') {
+         // 🛑 Drop bridge to show the book behind the free-tier upgrade dialog
+         setState(() { _protocolRunning = false; _isLoading = false; });
          showDialog(context: context, builder: (_) => const PassportFullDialog());
          return;
       }
       
-      // 🛠 FIX: Call the new Dynamic Dialog
       final reason = decision.reason ?? "No available space.";
       bool wantsUpgrade = await _showDynamicUpgradeDialog(targetCuisine, reason);
       
       if (wantsUpgrade) {
          if (mounted) {
-           // 👇 PASS THE BATON INTO THE PAYWALL
            await Navigator.push(context, MaterialPageRoute(builder: (_) => PaywallScreen(
              incomingRestaurant: widget.incomingRestaurant 
            )));
            await _fetchBookData(forceRefresh: true);
            if (mounted) _initiateImmigrationProtocol(); 
          }
+      } else {
+         // 🛑 User cancelled upgrade. Drop the bridge.
+         setState(() { _protocolRunning = false; _isLoading = false; });
       }
       return;
     }
@@ -499,7 +502,8 @@ class _PassportStackScreenState extends State<PassportStackScreen>
         }
 
         if (!createNew) {
-          setState(() { _protocolRunning = false; });
+          // 🛑 User declined the visa. Drop the bridge.
+          setState(() { _protocolRunning = false; _isLoading = false; });
           return;
         }
 
@@ -524,10 +528,14 @@ class _PassportStackScreenState extends State<PassportStackScreen>
         }).catchError((e) {});
       }
 
-      // 2. NAVIGATION
+      // 2. NAVIGATION (Find Target Page)
       final currentBook = library.firstWhere((b) => b['id'] == widget.bookId, orElse: () => {});
       int targetPageIndex = PassportBrain.instance.calculateTargetPageIndex(currentBook, targetCuisine);
       if (_passportSku == 'free_tier') targetPageIndex = 0;
+
+      // 🎬 THE BIG REVEAL: All checks passed! Drop the bridge and show the physical book!
+      setState(() { _isLoading = false; });
+      await Future.delayed(const Duration(milliseconds: 100)); // Tiny pause to let Flutter paint the book
 
       while (_activeIndex < targetPageIndex) {
          await _programmaticPageFlip();
@@ -536,13 +544,11 @@ class _PassportStackScreenState extends State<PassportStackScreen>
 
       // 3. EXECUTE
       setState(() { _protocolRunning = false; });
-      
-      // 🛠 FIX: Restore the satisfying button pause!
       _showButton();
       return;
     }
 
-    setState(() { _protocolRunning = false; });
+    setState(() { _protocolRunning = false; _isLoading = false; });
   }
 
   // --- 🎬 ACT 3: THE IMPACT (Zoom -> Target -> Thud) ---
@@ -1246,8 +1252,9 @@ class _PassportStackScreenState extends State<PassportStackScreen>
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator(color: Colors.white));
+      return const Center(child: CupertinoActivityIndicator(color: Colors.white, radius: 16));
     }
+    // ... rest of the stack
 
     return SizedBox.expand(
       key: _stackKey, 
@@ -1410,7 +1417,7 @@ class _StampSearchModalState extends State<_StampSearchModal> {
             onChanged: _search,
           ),
           const SizedBox(height: 20),
-          if (_loading) const CircularProgressIndicator(),
+          if (_loading) const CupertinoActivityIndicator(radius: 14),
           Expanded(
             child: ListView.separated(
               itemCount: _results.length,

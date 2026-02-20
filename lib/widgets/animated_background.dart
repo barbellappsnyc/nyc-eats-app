@@ -65,6 +65,17 @@ class _AnimatedBackgroundState extends State<AnimatedBackground> with TickerProv
   // 🎨 RICH PALETTES (4 Colors for complexity)
   List<Color> _getThemeColors(String sku) {
     switch (sku) {
+
+      case 'paywall':
+        // 🌌 PAYWALL: Ultra-premium Deep Navy to Obsidian Black
+        // Keeps the bottom dark so the glass buttons and white text pop perfectly.
+        return [
+          const Color(0xFF14224A), // Rich Navy
+          const Color(0xFF0A1128), // Deep Space Blue
+          const Color(0xFF0B142F), // Darker Navy
+          const Color(0xFF03050A), // Almost Black (Anchors the bottom)
+        ];
+
       case 'profile': 
         // 👤 PROFILE: Deep Space (Midnight, Dark Purple, Obsidian)
         // This provides high contrast for the white Official Data card.
@@ -74,6 +85,7 @@ class _AnimatedBackgroundState extends State<AnimatedBackground> with TickerProv
           const Color(0xFF2C5364), 
           const Color(0xFF0F2027),
         ];
+
       case 'diplomat_book':
         // ✅ FIX: Platinum Navy (Deep Blue + Silver Light). No more creeping black shadow.
         return [
@@ -81,7 +93,8 @@ class _AnimatedBackgroundState extends State<AnimatedBackground> with TickerProv
           const Color(0xFF243B55), // Royal Navy
           const Color(0xFF4C669F), // Lighter Blue
           const Color(0xFFBDC3C7), // Platinum/Silver (The "Shine")
-        ]; 
+        ];
+
       case 'standard_book':
         // STANDARD: Navy, Teal, Deep Blue, Cyan
         return [
@@ -90,6 +103,7 @@ class _AnimatedBackgroundState extends State<AnimatedBackground> with TickerProv
           const Color(0xFF000046),
           const Color(0xFF1A2980),
         ];
+        
       case 'store':
       case 'shop':
         // STORE: Violet, Orange, Magenta, Deep Purple
@@ -99,6 +113,7 @@ class _AnimatedBackgroundState extends State<AnimatedBackground> with TickerProv
           const Color(0xFFD4145A),
           const Color(0xFF662D8C),
         ];
+        
       case 'free_tier':
       default:
         // WILDCARD: White, Sky Blue, Pale Pink, Cyan

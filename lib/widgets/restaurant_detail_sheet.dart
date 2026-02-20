@@ -35,6 +35,7 @@ class _RestaurantDetailSheetState extends State<RestaurantDetailSheet> {
   // 🌟 NEW: Scroll Controller & Visibility State
   final ScrollController _scrollController = ScrollController();
   bool _showScrollButton = false;
+  bool _isNavigatingToPassport = false;
 
   @override
   void initState() {
@@ -141,13 +142,12 @@ class _RestaurantDetailSheetState extends State<RestaurantDetailSheet> {
   }
 
   void _goToPassport() {
-    // ✅ NEW WAY: Go to Collection, carrying the restaurant
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => PassportCollectionScreen(
-          incomingRestaurant: widget.restaurant, // Pass it here
-          initialBookId: null, // Let it auto-find the active book
+          incomingRestaurant: widget.restaurant, 
+          initialBookId: null, 
         ),
       ),
     );

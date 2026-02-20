@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/passport_service.dart';
@@ -144,11 +145,10 @@ class _PassportCollectionScreenState extends State<PassportCollectionScreen> {
   Widget _buildStatusControl() {
     // 0. SHOP PAGE (Index 0)
     if (_currentIndex == 0) {
-      return _buildPill(
+      return _buildMorphingPill(
         text: "PASSPORT SHOP",
         color: Colors.blueAccent,
         icon: Icons.shopping_bag,
-        isButton: false,
       );
     }
 
@@ -168,38 +168,33 @@ class _PassportCollectionScreenState extends State<PassportCollectionScreen> {
     final int maxPages = book['max_pages'] ?? 1;
     final bool isFull = stamps.length >= (maxPages * 4);
 
-    // 3. 🧠 THE FIFO PILL LOGIC (Refined)
+    // 3. 🧠 THE FIFO PILL LOGIC
 
     // A. ARCHIVED (Dead & Buried)
-    // Applies to ANY book (Free or Paid) that is full.
     if (isFull) {
-      return _buildPill(
+      return _buildMorphingPill(
         text: "ARCHIVED",
         color: const Color(0xFF424242), // Graphite
         icon: Icons.inventory_2_outlined,
         textColor: Colors.white70,
-        isButton: false,
       );
     }
 
     // B. WILDCARD EXCEPTION (The Mercenary)
     if (sku == 'free_tier') {
-      // 🛠 FIX: Prioritize this specific book's status!
-      // Even if another book becomes 'active' globally, THIS book is still a Wildcard.
-      // If it is active (user clicked it), keep showing "WILDCARD ACTIVE".
       if (status == 'active') {
-        return _buildPill(
+        return _buildMorphingPill(
           text: "WILDCARD ACTIVE",
           color: Colors.white,
           icon: Icons.flash_on,
           textColor: Colors.black,
-          isButton: false,
         );
       } else {
-        // It's in storage, but available
-        return _buildInteractiveButton(
+        return _buildMorphingPill(
           text: "USE WILDCARD",
+          color: Colors.white,
           icon: Icons.handshake,
+          textColor: Colors.black,
           onTap: () async {
             setState(() => _isLoading = true);
             await PassportService.activateBook(bookId);
@@ -210,33 +205,34 @@ class _PassportCollectionScreenState extends State<PassportCollectionScreen> {
     }
 
     // C. PRIMARY PASSPORT (The King)
-    // The FIFO Enforcer has already decided this is the Active one.
     if (status == 'active') {
-      return _buildPill(
+      return _buildMorphingPill(
         text: "PRIMARY PASSPORT",
         color: const Color(0xFF69F0AE), // Posh Green
         icon: Icons.check_circle,
         textColor: Colors.black87,
-        isButton: false,
       );
     }
 
     // D. IN QUEUE (The Heir)
-    return _buildPill(
+    return _buildMorphingPill(
       text: "UP NEXT",
       color: const Color(0xFFFFB74D), // Soft Orange
       icon: Icons.hourglass_empty,
       textColor: Colors.black87,
-      isButton: false,
     );
   }
 
-  // 🛠 HELPER: Interactive Button (For Wildcards)
-  Widget _buildInteractiveButton({
+  // 🛠 THE UNIFIED MORPHING ENGINE (Glitch-Free Version)
+  Widget _buildMorphingPill({
     required String text,
+    required Color color,
     required IconData icon,
-    required VoidCallback onTap,
+    Color textColor = Colors.white,
+    VoidCallback? onTap, 
   }) {
+    final bool isInteractive = onTap != null;
+
     return Positioned(
       bottom: 50,
       left: 0,
@@ -249,93 +245,58 @@ class _PassportCollectionScreenState extends State<PassportCollectionScreen> {
             opacity: _hideStatusPill ? 0.0 : 1.0,
             child: GestureDetector(
               onTap: onTap,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 400),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: color,
                   borderRadius: BorderRadius.circular(30),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.3),
+                      color: isInteractive ? Colors.black.withOpacity(0.3) : color.withOpacity(0.4),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
                   ],
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(icon, size: 18, color: Colors.black),
-                    const SizedBox(width: 8),
-                    Text(
-                      text,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 12,
-                        letterSpacing: 1.2,
-                        color: Colors.black,
-                      ),
+                // 📏 1. ANIMATED SIZE: Forces the container width to stretch/shrink smoothly
+                child: AnimatedSize(
+                  duration: const Duration(milliseconds: 400),
+                  curve: Curves.easeOutBack,
+                  alignment: Alignment.center,
+                  // ✨ 2. ANIMATED SWITCHER: Handles the cross-fade of the text & icons
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    // 👇 THE MAGIC FIX: This stops the container from "jumping" to max width
+                    layoutBuilder: (currentChild, previousChildren) {
+                      return Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          // Forces old fading widgets to not affect the layout bounds
+                          ...previousChildren.map((child) => Positioned(child: child)), 
+                          if (currentChild != null) currentChild,
+                        ],
+                      );
+                    },
+                    child: Row(
+                      key: ValueKey(text), // 👈 Triggers the animation when text changes
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(icon, size: 18, color: textColor),
+                        const SizedBox(width: 8),
+                        Text(
+                          text,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                            letterSpacing: 1.2,
+                            color: textColor,
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPill({
-    required String text,
-    required Color color,
-    required IconData icon,
-    required bool isButton,
-    Color textColor = Colors.white,
-  }) {
-    return Positioned(
-      bottom: 50,
-      left: 0,
-      right: 0,
-      child: Center(
-        // 👻 GHOST MODE: Fade out and ignore clicks, but KEEP SIZE
-        child: IgnorePointer(
-          ignoring:
-              _hideStatusPill, // If hidden, let clicks pass through to the button below
-          child: AnimatedOpacity(
-            duration: const Duration(milliseconds: 200), // Smooth fade
-            opacity: _hideStatusPill ? 0.0 : 1.0, // Invisible vs Visible
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: color.withOpacity(isButton ? 1.0 : 0.9),
-                borderRadius: BorderRadius.circular(30),
-                boxShadow: [
-                  BoxShadow(
-                    color: color.withOpacity(0.4),
-                    blurRadius: 10,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(icon, size: 16, color: textColor),
-                  const SizedBox(width: 8),
-                  Text(
-                    text,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                      letterSpacing: 1.0,
-                      color: textColor,
-                    ),
-                  ),
-                ],
               ),
             ),
           ),
@@ -388,10 +349,9 @@ class _PassportCollectionScreenState extends State<PassportCollectionScreen> {
       // 🛡️ Use a color so you know it's loading, not crashed
       return const Scaffold(
         backgroundColor: Color(0xFF111111),
-        body: Center(child: CircularProgressIndicator(color: Colors.white)),
+        body: Center(child: CupertinoActivityIndicator(color: Colors.white, radius: 16)),
       );
     }
-
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: Stack(

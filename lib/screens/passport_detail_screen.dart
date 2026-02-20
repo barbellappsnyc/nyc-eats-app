@@ -12,6 +12,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:gal/gal.dart';
 import 'package:share_plus/share_plus.dart';
 import 'dart:ui'; // 👈 Required for the ImageFilter.blur
+import 'package:flutter/cupertino.dart';
 
 // 🗺️ FAST & FREE BOROUGH CALCULATOR
 String getBorough(double lat, double lng) {
@@ -343,7 +344,7 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
                       border: Border.all(color: Colors.white24, width: 1),
                     ),
                     child: const Icon(
-                      Icons.text_format_rounded, 
+                      CupertinoIcons.textformat, 
                       color: Colors.white,
                       size: 26,
                     ),
@@ -379,7 +380,7 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
                             // 📥 SAVE BUTTON 
                             IconButton(
                               onPressed: _saveToCameraRoll, 
-                              icon: const Icon(Icons.arrow_downward_rounded), // Clean downward arrow
+                              icon: const Icon(CupertinoIcons.arrow_down, size: 30, color: Colors.black), // Clean downward arrow
                               color: Colors.grey[800], // Understated dark grey
                               iconSize: 28,
                               padding: const EdgeInsets.all(12),
@@ -389,7 +390,7 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
                             if (_currentBgIndex != 4)
                               IconButton(
                                 onPressed: _shareToStory, 
-                                icon: const Icon(Icons.share_rounded), // Open triangle share node
+                                icon: const Icon(CupertinoIcons.share, size: 30, color: Colors.black),
                                 color: Colors.grey[800], // Matched dark grey
                                 iconSize: 28,
                                 padding: const EdgeInsets.all(12),

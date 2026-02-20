@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -49,6 +50,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Color _headerColor = Colors.white; 
 
   bool _isLoading = false;
+  bool _isLoadingPassports = true; // 👈 Starts true so we don't flash "No passports"
+  bool _isPickingImage = false;
   File? _imageFile;
 
   String? _displayedPhotoUrl;
@@ -126,6 +129,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (mounted) {
       setState(() {
         _myPassports = books;
+        _isLoadingPassports = false; // 🛑 Turn off passport spinner
       });
     }
   }
@@ -145,15 +149,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _pickImage() async {
-    final picker = ImagePicker();
-    // 🗜️ SHRINK: Force max dimensions to 400x400 and quality to 70
-    final pickedFile = await picker.pickImage(
-      source: ImageSource.gallery, 
-      maxWidth: 400, 
-      maxHeight: 400, 
-      imageQuality: 70
-    );
-    if (pickedFile != null) setState(() => _imageFile = File(pickedFile.path));
+    setState(() => _isPickingImage = true); // 🟢 Start image spinner
+    
+    try {
+      final picker = ImagePicker();
+      final pickedFile = await picker.pickImage(
+        source: ImageSource.gallery, 
+        maxWidth: 400, 
+        maxHeight: 400, 
+        imageQuality: 70
+      );
+      if (pickedFile != null) {
+        _imageFile = File(pickedFile.path);
+      }
+    } finally {
+      if (mounted) setState(() => _isPickingImage = false); // 🛑 Stop image spinner
+    }
   }
 
   Future<void> _saveProfile() async {
@@ -420,14 +431,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildProfileImageContent() {
-    if (_isLoading) {
+    // 👇 Now checks both general loading AND the specific image picking state
+    if (_isLoading || _isPickingImage) {
       return const Center(
-        child: SizedBox(
-          width: 24, height: 24,
-          child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.indigo),
-        ),
+        child: CupertinoActivityIndicator(color: Colors.indigo, radius: 12),
       );
     }
+    // ... rest of the function stays exactly the same
 
     if (_imageFile != null) {
       return Image.file(_imageFile!, fit: BoxFit.cover, errorBuilder: (ctx, err, stack) => const Icon(Icons.person, color: Colors.grey, size: 40));
@@ -546,7 +556,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               // 👇 Disable button if no changes or loading
                               onPressed: (!_hasChanges || _isLoading) ? null : _saveProfile,
                               child: _isLoading 
-                                ? const CircularProgressIndicator(color: Colors.white) 
+                                ? const CupertinoActivityIndicator(color: Colors.white, radius: 10) 
                                 : const Text("SAVE RECORDS", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                             ),
                           ),
@@ -563,10 +573,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     const SizedBox(height: 16),
                     
-                    if (_myPassports.isEmpty)
+                    if (_isLoadingPassports)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 40),
+                        child: Center(
+                          child: CupertinoActivityIndicator(color: Colors.white54, radius: 14),
+                        ),
+                      )
+                    else if (_myPassports.isEmpty)
                       const Padding(
                         padding: EdgeInsets.all(20.0),
-                        child: Center(child: Text("No passports found.", style: TextStyle(color: Colors.white30))),
+                        child: Center(
+                          child: Text("No passports found.", style: TextStyle(color: Colors.white30)),
+                        ),
                       )
                     else
                       ..._myPassports.map((book) {
@@ -574,8 +593,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           padding: const EdgeInsets.only(bottom: 12.0),
                           child: _buildPassportTile(book),
                         );
-                      }), 
-
+                      }),
                     const SizedBox(height: 40),
 
                     // --- LOG IN / LOG OUT ---
