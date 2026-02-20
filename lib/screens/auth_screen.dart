@@ -7,6 +7,9 @@ import '../services/passport_service.dart';
 import '../models/restaurant.dart'; // 👈 NEW IMPORT
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../services/revenuecat_service.dart';
+import 'package:flutter/services.dart';
+import 'dart:ui';
+import 'package:flutter/services.dart';
 
 class AuthScreen extends StatefulWidget {
   final String? purchasedSku;
@@ -461,50 +464,71 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // 🎨 Theme Colors
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final bgColor = isDarkMode ? const Color(0xFF1E1E1E) : Colors.white;
-    final textColor = isDarkMode ? Colors.white : Colors.black;
-    final hintColor = Colors.grey[600];
+    const Color navyBlue = Color(0xFF1A237E);
+    const Color passportRed = Color(0xFFD32F2F);
+    final Color hintColor = Colors.grey[600]!;
 
-    return Scaffold(
-      backgroundColor: bgColor,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.close, color: textColor),
-          onPressed: () => Navigator.pop(context),
-        ),
-      ),
-      body: Stack(
-        children: [
-          // 1. The Main Form
-          Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
+    // AnnotatedRegion forces the battery/wifi/time icons to be black
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.dark,
+      child: Scaffold(
+        backgroundColor: const Color(0xFFFDFBF7),
+        // ❌ AppBar is completely deleted!
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            // 📝 LAYER 1: The Scrolling Form
+            SingleChildScrollView(
+              // We add dynamic top padding so the form scrolls beautifully UNDER the notch/button
+              padding: EdgeInsets.only(
+                top: MediaQuery.of(context).padding.top + 60,
+                left: 32,
+                right: 32,
+                bottom: 24,
+              ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Icon(Icons.lock_outline, size: 60, color: textColor),
-                  const SizedBox(height: 20),
+                  // 🛡️ OFFICIAL CREST
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: navyBlue, width: 3),
+                    ),
+                    child: const Center(
+                      child: Icon(Icons.public, size: 50, color: navyBlue),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  
+                  // 🔤 WARMER HEADERS
                   Text(
-                    _isLogin ? 'Welcome Back' : 'Create Account',
+                    _isLogin ? 'WELCOME BACK' : 'GRAB YOUR PASSPORT',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: const TextStyle(
+                      fontFamily: 'Courier',
                       fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: textColor,
+                      fontWeight: FontWeight.w900,
+                      color: navyBlue,
+                      letterSpacing: 1.0,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     _isLogin
-                        ? 'Log in to access your Passport.'
-                        : 'Join the club. Start collecting.',
+                        ? 'LOG IN TO CONTINUE YOUR JOURNEY.'
+                        : 'LET\'S GET YOU READY TO EXPLORE NYC.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: hintColor, fontSize: 16),
+                    style: TextStyle(
+                      fontFamily: 'Courier', 
+                      color: hintColor, 
+                      fontSize: 12, 
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5
+                    ),
                   ),
                   const SizedBox(height: 40),
 
@@ -512,66 +536,62 @@ class _AuthScreenState extends State<AuthScreen> {
                   TextField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
-                    style: TextStyle(color: textColor),
-                    decoration: _inputDecoration("Email", Icons.email_outlined),
+                    style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
+                    decoration: _inputDecoration("EMAIL ADDRESS", Icons.email_outlined),
                   ),
                   const SizedBox(height: 16),
 
                   TextField(
                     controller: _passwordController,
-                    obscureText: _obscurePassword, // 👈 Spot 1
-                    style: TextStyle(color: textColor),
+                    obscureText: _obscurePassword, 
+                    style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
                     decoration: _inputDecoration(
-                      "Password",
+                      "PASSWORD",
                       Icons.key_outlined,
                     ).copyWith(
                       suffixIcon: IconButton(
                         splashRadius: 20, 
                         icon: Icon(
-                          _obscurePassword // 👈 Spot 2
-                              ? PhosphorIconsRegular.eyeClosed 
-                              : PhosphorIconsRegular.eye,      
-                          color: hintColor!.withOpacity(0.7), 
+                          _obscurePassword ? PhosphorIconsRegular.eyeClosed : PhosphorIconsRegular.eye,      
+                          color: hintColor.withOpacity(0.7), 
                           size: 22, 
                         ),
-                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword), // 👈 Spot 3
+                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword), 
                       ),
                     ),
                   ),
                   const SizedBox(height: 4),
 
-                  // 👇 Forgot Password Button (Only visible on Login)
+                  // 👇 Forgot Password Button
                   if (_isLogin)
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
                         onPressed: _showForgotPasswordDialog,
-                        child: Text("Forgot Password?", style: TextStyle(color: hintColor, fontWeight: FontWeight.bold)),
+                        child: Text("FORGOT PASSWORD?", style: TextStyle(color: hintColor, fontWeight: FontWeight.bold, fontFamily: 'Courier')),
                       ),
                     ),
 
                   if (!_isLogin) const SizedBox(height: 16),
 
-                  // 👇 SIGN UP FIELDS (Hidden during Login)
+                  // 👇 SIGN UP FIELDS
                   if (!_isLogin) ...[
                     TextField(
                       controller: _confirmPasswordController,
-                      obscureText: _obscureConfirmPassword, // 👈 Spot 1
-                      style: TextStyle(color: textColor),
+                      obscureText: _obscureConfirmPassword, 
+                      style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
                       decoration: _inputDecoration(
-                        "Confirm Password",
+                        "CONFIRM PASSWORD",
                         Icons.lock_reset_outlined,
                       ).copyWith(
                         suffixIcon: IconButton(
                           splashRadius: 20, 
                           icon: Icon(
-                            _obscureConfirmPassword // 👈 Spot 2
-                                ? PhosphorIconsRegular.eyeClosed 
-                                : PhosphorIconsRegular.eye,      
-                            color: hintColor!.withOpacity(0.7), 
+                            _obscureConfirmPassword ? PhosphorIconsRegular.eyeClosed : PhosphorIconsRegular.eye,      
+                            color: hintColor.withOpacity(0.7), 
                             size: 22, 
                           ),
-                          onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword), // 👈 Spot 3
+                          onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword), 
                         ),
                       ),
                     ),
@@ -580,9 +600,9 @@ class _AuthScreenState extends State<AuthScreen> {
                     TextField(
                       controller: _nameController,
                       textCapitalization: TextCapitalization.characters,
-                      style: TextStyle(color: textColor),
+                      style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
                       decoration: _inputDecoration(
-                        "Full Name (for ID)",
+                        "WHAT SHOULD WE CALL YOU?",
                         Icons.badge_outlined,
                       ),
                     ),
@@ -591,30 +611,27 @@ class _AuthScreenState extends State<AuthScreen> {
                     Row(
                       children: [
                         Expanded(
+                          flex: 3,
                           child: TextField(
                             controller: _ageController,
                             keyboardType: TextInputType.number,
-                            style: TextStyle(color: textColor),
-                            decoration: _inputDecoration(
-                              "Age",
-                              Icons.cake_outlined,
-                            ),
+                            style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
+                            decoration: _inputDecoration("AGE", Icons.cake_outlined),
                           ),
                         ),
-                        const SizedBox(width: 16),
+                        const SizedBox(width: 12),
                         Expanded(
+                          flex: 4,
                           child: DropdownButtonFormField<String>(
+                            isExpanded: true, 
                             value: _selectedGender,
-                            dropdownColor: isDarkMode ? Colors.grey[800] : Colors.white,
-                            style: TextStyle(color: textColor, fontSize: 16),
-                            decoration: _inputDecoration(
-                              "Gender",
-                              Icons.wc_outlined,
-                            ),
+                            dropdownColor: const Color(0xFFFDFBF7),
+                            style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 14),
+                            decoration: _inputDecoration("GENDER", Icons.wc_outlined),
                             items: const [
-                              DropdownMenuItem(value: 'M', child: Text("Male")),
-                              DropdownMenuItem(value: 'F', child: Text("Female")),
-                              DropdownMenuItem(value: 'X', child: Text("Neutral")),
+                              DropdownMenuItem(value: 'M', child: Text("MALE")),
+                              DropdownMenuItem(value: 'F', child: Text("FEMALE")),
+                              DropdownMenuItem(value: 'X', child: Text("OTHER")),
                             ],
                             onChanged: (val) => setState(() => _selectedGender = val!),
                           ),
@@ -626,48 +643,51 @@ class _AuthScreenState extends State<AuthScreen> {
 
                   const SizedBox(height: 20),
 
-                  // ACTION BUTTON
+                  // 🛑 MAIN ACTION BUTTON
                   SizedBox(
-                    height: 50,
+                    height: 56,
                     child: ElevatedButton(
                       onPressed: _isLoading ? null : _authenticate,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor:
-                            isDarkMode ? Colors.white : Colors.black,
-                        foregroundColor:
-                            isDarkMode ? Colors.black : Colors.white,
+                        backgroundColor: passportRed, 
+                        foregroundColor: Colors.white,
+                        elevation: 8,
+                        shadowColor: passportRed.withOpacity(0.5),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                       ),
                       child: Text(
-                        _isLogin ? 'Log In' : 'Sign Up & Create Passport',
+                        _isLogin ? 'START EXPLORING' : 'CREATE PASSPORT',
                         style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                          fontFamily: 'Courier',
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.0,
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 32),
 
-                  // TOGGLE LINK
+                  // 🔄 TOGGLE LINK
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        _isLogin
-                            ? "Don't have an account? "
-                            : "Already have an account? ",
-                        style: TextStyle(color: textColor),
+                        _isLogin ? "NEW TO NYC EATS? " : "ALREADY HAVE A PASSPORT? ",
+                        style: const TextStyle(color: Colors.black54, fontFamily: 'Courier', fontSize: 12, fontWeight: FontWeight.bold),
                       ),
                       GestureDetector(
                         onTap: () => setState(() => _isLogin = !_isLogin),
                         child: Text(
-                          _isLogin ? "Sign Up" : "Log In",
+                          _isLogin ? "SIGN UP" : "LOG IN",
                           style: const TextStyle(
-                            color: Colors.blue,
-                            fontWeight: FontWeight.bold,
+                            color: navyBlue,
+                            fontFamily: 'Courier',
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                            decoration: TextDecoration.underline,
                           ),
                         ),
                       ),
@@ -677,47 +697,77 @@ class _AuthScreenState extends State<AuthScreen> {
                 ],
               ),
             ),
-          ),
 
-          // 2. 🛡️ THE LOADING CURTAIN
-          if (_isLoading)
-            Container(
-              color: Colors.black.withOpacity(0.7),
-              child: const Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircularProgressIndicator(color: Colors.white),
-                    SizedBox(height: 20),
-                    Text(
-                      "Issuing Passport...",
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
+            // ✖️ LAYER 2: The Fixed Frosted Apple-Style Close Button
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 8, // Safely below the notch
+              left: 20,
+              child: ClipOval(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.grey.withOpacity(0.15), // Translucent grey
+                      border: Border.all(color: Colors.black.withOpacity(0.05)), // Subtle edge definition
                     ),
-                  ],
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      icon: const Icon(Icons.close, color: navyBlue, size: 24),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ),
                 ),
               ),
             ),
-        ],
+
+            // 🛡️ LAYER 3: THE LOADING CURTAIN
+            if (_isLoading)
+              Container(
+                color: navyBlue.withOpacity(0.9), 
+                child: const Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircularProgressIndicator(color: Colors.white),
+                      SizedBox(height: 24),
+                      Text(
+                        "ISSUING PASSPORT...",
+                        style: TextStyle(
+                          fontFamily: 'Courier',
+                          color: Colors.white,
+                          fontSize: 16,
+                          letterSpacing: 2.0,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
 
-  // Helper for cleaner code
+  // 📐 INPUT DECORATION HELPER
   InputDecoration _inputDecoration(String label, IconData icon) {
     return InputDecoration(
       labelText: label,
-      labelStyle: TextStyle(color: Colors.grey[600]),
-      prefixIcon: Icon(icon, color: Colors.grey),
+      labelStyle: const TextStyle(fontFamily: 'Courier', color: Colors.black54, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+      prefixIcon: Icon(icon, color: const Color(0xFF1A237E).withOpacity(0.7)),
+      filled: true,
+      fillColor: Colors.black.withOpacity(0.02), // 👈 Restored to a subtle, solid grey tint
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey[400]!),
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: Colors.black.withOpacity(0.1), width: 2),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.blue, width: 2),
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: Color(0xFF1A237E), width: 2), 
       ),
     );
   }
