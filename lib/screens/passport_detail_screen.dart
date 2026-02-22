@@ -13,6 +13,8 @@ import 'package:gal/gal.dart';
 import 'package:share_plus/share_plus.dart';
 import 'dart:ui'; // 👈 Required for the ImageFilter.blur
 import 'package:flutter/cupertino.dart';
+import '../widgets/mta_background.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 // 🗺️ FAST & FREE BOROUGH CALCULATOR
 String getBorough(double lat, double lng) {
@@ -74,13 +76,16 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
   final ScreenshotController _cardOnlyController = ScreenshotController();
   final ScreenshotController _fullScreenController = ScreenshotController();
 
+  // 🚇 NEW: MTA Station state variables
+  List<Map<String, dynamic>> _mtaStations = [];
+  bool _isLoadingStations = true;
+
   @override
   void initState() {
     super.initState();
 
-    // 👇 Added one more 'true' at the end for the light grey checkered background
-    _bgIsLight = [true, false, true, true, true];
-    
+    // Add one more 'true' for the MTA Background (it's light)
+    _bgIsLight = [true, false, true, true, true, true];    
     // ... rest of initState
 
     _squishController = AnimationController(
@@ -99,6 +104,8 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
             MediaQuery.of(context).size.height / 2);
       });
     });
+
+    _fetchMtaStations(); // 👈 Add this line here
   }
 
   // 💾 SAVE TO CAMERA ROLL
@@ -107,7 +114,8 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
       Uint8List? imageBytes;
 
       // 🧠 The Smart Check: Are we on the Checkered BG?
-      if (_currentBgIndex == 4) {
+      // Since we added the MTA Background, Checkered shifted to index 5
+      if (_currentBgIndex == 5) {
         // Grab ONLY the card (transparent PNG style)
         imageBytes = await _cardOnlyController.capture(pixelRatio: 3.0);
       } else {
@@ -187,6 +195,44 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
     }
   }
 
+  Future<void> _fetchMtaStations() async {
+  print("------- MTA FETCH START -------");
+  
+  final List<String> stationIds = widget.stamps
+      .map((stamp) => stamp['mta_station_id']?.toString())
+      .where((id) => id != null && id.isNotEmpty)
+      .cast<String>()
+      .toSet()
+      .toList();
+
+  print("Found Station IDs in Stamps: $stationIds");
+
+  if (stationIds.isEmpty) {
+    print("ABORTING: No Station IDs found in the stamps provided to this screen.");
+    setState(() => _isLoadingStations = false);
+    return;
+  }
+
+  try {
+    final supabase = Supabase.instance.client;
+    final response = await supabase
+        .from('mta_stations')
+        .select()
+        .inFilter('id', stationIds); 
+
+    print("Supabase Response Count: ${response.length}");
+
+    if (mounted) {
+      setState(() {
+        _mtaStations = List<Map<String, dynamic>>.from(response);
+        _isLoadingStations = false;
+      });
+    }
+  } catch (e) {
+    print("SUPABASE ERROR: $e");
+  }
+}
+
   @override
   void dispose() {
     _squishController.dispose();
@@ -201,7 +247,8 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
       CoordinateCollageBackground(stamps: widget.stamps), 
       LanguageCollageBackground(cuisine: widget.cuisine, currentFont: _fonts[_fontIndex]), 
       PostageStampBackground(cuisine: widget.cuisine), 
-      const CheckeredBackground(), // 👈 NEW: The PNG export mode (Index 4)
+      MtaBackground(stations: _mtaStations),
+      const CheckeredBackground(), 
     ];
 
     bool isLightBg = _bgIsLight[_currentBgIndex];
@@ -387,7 +434,7 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
                             ),
                             
                             // 📤 SHARE BUTTON (Disappears on Checkered BG)
-                            if (_currentBgIndex != 4)
+                              if (_currentBgIndex != 5) // 👈 Changed from 4 to 5
                               IconButton(
                                 onPressed: _shareToStory, 
                                 icon: const Icon(CupertinoIcons.share, size: 30, color: Colors.black),

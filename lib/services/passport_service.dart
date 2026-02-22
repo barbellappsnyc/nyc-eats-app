@@ -237,6 +237,7 @@ class PassportService {
         'restaurant_name': newStamp['name'] ?? newStamp['restaurant_name'],
         'stamped_at': DateTime.now().toIso8601String(),
         'country_cuisine': newStamp['cuisine'] ?? newStamp['country_cuisine'],
+        'mta_station_id': newStamp['mta_station_id'], // 👈 NEW: Keep the ID in memory
       };
       
       List stamps = List.from(_libraryCache![bookIndex]['stamps'] ?? []);

@@ -239,9 +239,11 @@ class _PassportStackScreenState extends State<PassportStackScreen>
             'name': name.toString(),
             'date': dateStr,
             'cuisine': cuisine.toString(),
-            // 👇 Reaching inside the nested 'restaurants' object!
             'lat': item['restaurants']?['lat']?.toString() ?? '0.0',
             'lng': item['restaurants']?['lng']?.toString() ?? '0.0',
+            
+            // 👇 ADD THIS ONE LINE RIGHT HERE:
+            'mta_station_id': item['mta_station_id']?.toString() ?? '', 
           };
         })
       );
@@ -611,7 +613,8 @@ class _PassportStackScreenState extends State<PassportStackScreen>
       'id': restaurantToStamp.id.toString(), 
       'name': restaurantToStamp.name,
       'date': DateFormat('MMM d, yyyy').format(DateTime.now()),
-      'cuisine': targetCuisine, // 👈 NOW THIS WILL BE CORRECT (e.g., 'Indian')
+      'cuisine': targetCuisine, 
+      'mta_station_id': '', // 👈 NEW: Add an empty string so the UI doesn't crash before the DB syncs
     };
 
     // This handles the decision: Guest -> Disk, User -> Cloud
