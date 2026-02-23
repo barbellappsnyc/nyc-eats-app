@@ -339,17 +339,31 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
               ),
             ),
             
-            // ❌ LAYER 3: THE CLOSE BUTTON (Isolated & Smart Color)
+            // 🔙 LAYER 3: THE BACK BUTTON (Premium Apple-style)
             Positioned(
               top: MediaQuery.of(context).padding.top + 10,
-              left: 10,
-              child: IconButton(
-                icon: Icon(
-                  Icons.close, 
-                  color: isLightBg ? Colors.black : Colors.white,
-                  size: 30,
+              left: 16,
+              child: GestureDetector(
+                onTap: () => Navigator.of(context).pop(),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(30),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.4), // Dark semi-transparent circle
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white.withOpacity(0.2), width: 1),
+                      ),
+                      child: const Icon(
+                        Icons.arrow_back_ios_new, // The classic '<' icon
+                        color: Colors.white, // Always crisp white
+                        size: 22,
+                      ),
+                    ),
+                  ),
                 ),
-                onPressed: () => Navigator.of(context).pop(),
               ),
             ),
 

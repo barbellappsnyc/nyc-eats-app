@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart'; // For the indeterminate circular progress indicator
+import 'package:flutter/cupertino.dart';
+import 'dart:ui'; // 👈 Required for the premium frosted glass blur
 
-// Note: Replace 'Station' with whatever your actual data model is called
 class MtaBackground extends StatelessWidget {
   final List<Map<String, dynamic>> stations;
-  
+
   const MtaBackground({
     Key? key, 
     required this.stations,
@@ -12,38 +12,34 @@ class MtaBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Elegant loading state while fetching
     if (stations.isEmpty) {
       return const Center(
-        child: CupertinoActivityIndicator(radius: 16.0), 
+        child: CupertinoActivityIndicator(radius: 16.0),
       );
     }
 
+    Widget gridLayout;
     int count = stations.length;
 
     if (count == 1) {
-      return _buildStationCard(stations[0]);
-      
+      gridLayout = _buildStationCard(stations[0]);
     } else if (count == 2) {
-      return Column(
+      gridLayout = Column(
         children: [
           Expanded(child: _buildStationCard(stations[0])),
           Expanded(child: _buildStationCard(stations[1])),
         ],
       );
-      
     } else if (count == 3) {
-      return Column(
+      gridLayout = Column(
         children: [
           Expanded(child: _buildStationCard(stations[0])),
           Expanded(child: _buildStationCard(stations[1])),
           Expanded(child: _buildStationCard(stations[2])),
         ],
       );
-      
     } else {
-      // 4 Stamps (or more, capped at 4 for the UI): 2x2 grid
-      return Column(
+      gridLayout = Column(
         children: [
           Expanded(
             child: Row(
@@ -64,32 +60,29 @@ class MtaBackground extends StatelessWidget {
         ],
       );
     }
-  }
 
-  // Maps the train line to its official MTA color
-  Color _getLineColor(String line) {
-    switch (line.toUpperCase()) {
-      case 'A': case 'C': case 'E': return const Color(0xFF0039A6); // Blue
-      case 'B': case 'D': case 'F': case 'M': return const Color(0xFFFF6319); // Orange
-      case 'G': return const Color(0xFF6CBE45); // Light Green
-      case 'J': case 'Z': return const Color(0xFF996633); // Brown
-      case 'L': return const Color(0xFFA7A9AC); // Light Grey
-      case 'N': case 'Q': case 'R': case 'W': return const Color(0xFFFCCC0A); // Yellow
-      case '1': case '2': case '3': return const Color(0xFFEE352E); // Red
-      case '4': case '5': case '6': return const Color(0xFF00933C); // Green
-      case '7': return const Color(0xFFB933AD); // Purple
-      case 'S': return const Color(0xFF808183); // Dark Grey
-      case 'SIR': return const Color(0xFF0039A6); // Staten Island Railway
-      default: return Colors.black87; // Fallback
-    }
-  }
+    return Stack(
+      fit: StackFit.expand, // Forces children to fill the space
+      children: [
+        // 🖼️ LAYER 1: The Background Image
+        Image.asset(
+          'assets/images/subway_blueprint.png', // Make sure this path matches your file
+          fit: BoxFit.cover, // 👈 The magic scaling fix
+          // Optional: Add a dark overlay so the white cards pop more
+          color: Colors.black.withOpacity(0.4), 
+          colorBlendMode: BlendMode.darken,
+        ),
 
-  // Yellow lines need dark text to be readable
-  Color _getTextColor(String line) {
-    if (['N', 'Q', 'R', 'W'].contains(line.toUpperCase())) {
-      return Colors.black;
-    }
-    return Colors.white;
+        // 🗂️ LAYER 2: Your existing grid of white cards
+        Padding(
+          padding: const EdgeInsets.all(100.0), 
+          child: SafeArea(
+            minimum: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 24.0), 
+            child: gridLayout,
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _buildStationCard(Map<String, dynamic> station) {
@@ -97,109 +90,206 @@ class MtaBackground extends StatelessWidget {
     final String linesString = station['lines'] ?? '';
     final String borough = station['borough'] ?? '';
     
-    // Aggressively clean up spaces to prevent invisible circles
     final List<String> lines = linesString.isNotEmpty 
         ? linesString.trim().split(RegExp(r'\s+')).where((l) => l.isNotEmpty).toList()
         : [];
 
     return Container(
-      margin: const EdgeInsets.all(8.0),
+      width: double.infinity,
+      height: double.infinity, 
+      margin: const EdgeInsets.all(8.0), 
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.85), 
-        borderRadius: BorderRadius.circular(24.0), 
+        borderRadius: BorderRadius.circular(28.0), // Slightly rounder Apple-style corners
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: Colors.black.withOpacity(0.08), // Richer, softer drop shadow
+            blurRadius: 24,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
-      // 🧠 THE FIX: LayoutBuilder measures the exact bounds of the card
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final double cardWidth = constraints.maxWidth;
-          
-          // Responsive Math: Shrink elements if we are in a tight 2x2 grid (<180px wide)
-          final double circleSize = cardWidth < 180 ? 22.0 : 34.0;
-          final double circleTextSize = cardWidth < 180 ? 12.0 : 18.0;
-          final double titleSize = cardWidth < 180 ? 15.0 : 20.0;
-          final double boroughSize = cardWidth < 180 ? 10.0 : 12.0;
-
-          return Padding(
-            padding: const EdgeInsets.all(12.0),
-            // Center + SingleChildScrollView ensures we never get a vertical overflow error
-            child: Center(
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min, // Keep column tight
-                  children: [
-                    // 🚇 THE COLORED CIRCLES
-                    if (lines.isNotEmpty)
-                      Wrap(
-                        spacing: 4.0, 
-                        runSpacing: 4.0,
-                        alignment: WrapAlignment.center,
-                        children: lines.map((line) {
-                          return Container(
-                            width: circleSize,
-                            height: circleSize,
-                            decoration: BoxDecoration(
-                              color: _getLineColor(line),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Center(
-                              child: Text(
-                                line,
-                                style: TextStyle(
-                                  color: _getTextColor(line),
-                                  fontSize: circleTextSize,
-                                  fontWeight: FontWeight.bold,
-                                  fontFamily: 'Helvetica', 
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    
-                    if (lines.isNotEmpty) const SizedBox(height: 12),
-                    
-                    // 📍 THE STATION NAME
-                    Text(
-                      stationName,
-                      style: TextStyle(
-                        fontSize: titleSize,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.5,
-                        color: Colors.black87,
-                      ),
-                      textAlign: TextAlign.center,
-                      maxLines: 3, // Wraps long names safely
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    
-                    // 🏙️ THE BOROUGH
-                    if (borough.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        borough.toUpperCase(),
-                        style: TextStyle(
-                          fontSize: boroughSize,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 1.2,
-                          color: Colors.black54,
-                        ),
-                      ),
-                    ]
-                  ],
-                ),
+      // 🧊 THE GLASSMORPHISM ENGINE
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(28.0),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25), // Stronger blur
+          child: Container(
+            decoration: BoxDecoration(
+              // 🧊 BRIGHTER WHITE GLASS
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.white.withOpacity(0.95), // Much brighter white!
+                  Colors.white.withOpacity(0.75), 
+                ],
+              ),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.9), // Crisp highlight edge
+                width: 1.5,
               ),
             ),
-          );
-        },
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final double cardWidth = constraints.maxWidth;
+                final bool isSmall = cardWidth < 160; 
+                
+                final double circleSize = isSmall ? 24.0 : 32.0;
+                final double circleText = isSmall ? 13.0 : 16.0;
+                final double titleSize = isSmall ? 18.0 : 22.0;
+                final double boroughSize = isSmall ? 10.0 : 12.0;
+
+                return Stack(
+                  children: [
+                    // 🚇 THE OVERSIZED WATERMARK
+                    Positioned(
+                      right: -25,
+                      bottom: -25,
+                      child: Icon(
+                        Icons.directions_subway_filled,
+                        size: isSmall ? 100 : 140,
+                        color: Colors.black.withOpacity(0.04), // Barely visible texture
+                      ),
+                    ),
+                    
+                    // 📝 THE MAIN CONTENT
+                    Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Center(
+                        child: SingleChildScrollView(
+                          physics: const NeverScrollableScrollPhysics(),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // 🏷️ OFFICIAL SIGNAGE HEADER
+                              Text(
+                                "NYC TRANSIT",
+                                style: TextStyle(
+                                  fontSize: isSmall ? 8 : 10,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 2.0,
+                                  color: Colors.black38,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+
+                              // 🚇 THE COLORED CIRCLES
+                              if (lines.isNotEmpty)
+                                Wrap(
+                                  spacing: 4.0, 
+                                  runSpacing: 4.0,
+                                  alignment: WrapAlignment.center,
+                                  children: lines.map((line) {
+                                    return Container(
+                                      width: circleSize,
+                                      height: circleSize,
+                                      decoration: BoxDecoration(
+                                        color: _getLineColor(line),
+                                        shape: BoxShape.circle,
+                                        // 🌟 NEW: THE SHADOW THAT MAKES IT POP
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(0.25),
+                                            blurRadius: 6,
+                                            offset: const Offset(0, 3),
+                                          ),
+                                          // Optional: Inner white rim to make the circle feel like a physical token
+                                          BoxShadow(
+                                            color: Colors.white.withOpacity(0.3),
+                                            blurRadius: 0,
+                                            spreadRadius: 0.5,
+                                            offset: const Offset(0, 0),
+                                          )
+                                        ]
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          line,
+                                          style: TextStyle(
+                                            color: _getTextColor(line),
+                                            fontSize: circleText,
+                                            fontWeight: FontWeight.bold,
+                                            fontFamily: 'Helvetica', 
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              
+                              if (lines.isNotEmpty) const SizedBox(height: 14),
+                              
+                              // 📍 THE STATION NAME
+                              Text(
+                                stationName,
+                                style: TextStyle(
+                                  fontSize: titleSize,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -0.5,
+                                  color: Colors.black87,
+                                  height: 1.1, 
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              
+                              // 🏙️ THE BOROUGH
+                              if (borough.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.location_on, size: boroughSize, color: Colors.black45),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      borough.toUpperCase(),
+                                      style: TextStyle(
+                                        fontSize: boroughSize,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: 1.5,
+                                        color: Colors.black54,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ]
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ),
       ),
     );
+  }
+
+  // --- COLOR HELPERS (Same as before) ---
+  Color _getLineColor(String line) {
+    switch (line.toUpperCase()) {
+      case 'A': case 'C': case 'E': return const Color(0xFF0039A6);
+      case 'B': case 'D': case 'F': case 'M': return const Color(0xFFFF6319);
+      case 'G': return const Color(0xFF6CBE45);
+      case 'J': case 'Z': return const Color(0xFF996633);
+      case 'L': return const Color(0xFFA7A9AC);
+      case 'N': case 'Q': case 'R': case 'W': return const Color(0xFFFCCC0A);
+      case '1': case '2': case '3': return const Color(0xFFEE352E);
+      case '4': case '5': case '6': return const Color(0xFF00933C);
+      case '7': return const Color(0xFFB933AD);
+      case 'S': return const Color(0xFF808183);
+      case 'SIR': return const Color(0xFF0039A6);
+      default: return Colors.black87;
+    }
+  }
+
+  Color _getTextColor(String line) {
+    if (['N', 'Q', 'R', 'W'].contains(line.toUpperCase())) {
+      return Colors.black;
+    }
+    return Colors.white;
   }
 }
