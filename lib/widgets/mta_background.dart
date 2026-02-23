@@ -99,34 +99,36 @@ class MtaBackground extends StatelessWidget {
       height: double.infinity, 
       margin: const EdgeInsets.all(8.0), 
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28.0), // Slightly rounder Apple-style corners
+        borderRadius: BorderRadius.circular(28.0), 
+        // 🌟 STRONGER DROP SHADOW: Pushes the card off the dark wall
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08), // Richer, softer drop shadow
-            blurRadius: 24,
-            offset: const Offset(0, 10),
+            color: Colors.black.withOpacity(0.3), // Darker shadow for high contrast
+            blurRadius: 30,
+            spreadRadius: 2,
+            offset: const Offset(0, 15),
           ),
         ],
       ),
-      // 🧊 THE GLASSMORPHISM ENGINE
+      // 🧊 THE BRIGHTER GLASSMORPHISM ENGINE
       child: ClipRRect(
         borderRadius: BorderRadius.circular(28.0),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25), // Stronger blur
+          filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25), 
           child: Container(
             decoration: BoxDecoration(
-              // 🧊 BRIGHTER WHITE GLASS
+              // 🌟 PURE WHITE GRADIENT: Stops the dark background from muddying the card
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  Colors.white.withOpacity(0.95), // Much brighter white!
-                  Colors.white.withOpacity(0.75), 
+                  Colors.white, // 100% Solid Bright White
+                  Colors.white.withOpacity(0.95), // 95% White (Barely translucent)
                 ],
               ),
               border: Border.all(
-                color: Colors.white.withOpacity(0.9), // Crisp highlight edge
-                width: 1.5,
+                color: Colors.white, // Solid crisp white border
+                width: 2.0, // Slightly thicker for a premium edge
               ),
             ),
             child: LayoutBuilder(
@@ -148,7 +150,7 @@ class MtaBackground extends StatelessWidget {
                       child: Icon(
                         Icons.directions_subway_filled,
                         size: isSmall ? 100 : 140,
-                        color: Colors.black.withOpacity(0.04), // Barely visible texture
+                        color: Colors.black.withOpacity(0.03), // Barely visible texture
                       ),
                     ),
                     
@@ -167,9 +169,9 @@ class MtaBackground extends StatelessWidget {
                                 "NYC TRANSIT",
                                 style: TextStyle(
                                   fontSize: isSmall ? 8 : 10,
-                                  fontWeight: FontWeight.w800,
+                                  fontWeight: FontWeight.w900, // Thicker font
                                   letterSpacing: 2.0,
-                                  color: Colors.black38,
+                                  color: Colors.black45, // Slightly darker to pop on bright white
                                 ),
                               ),
                               const SizedBox(height: 12),
@@ -187,16 +189,15 @@ class MtaBackground extends StatelessWidget {
                                       decoration: BoxDecoration(
                                         color: _getLineColor(line),
                                         shape: BoxShape.circle,
-                                        // 🌟 NEW: THE SHADOW THAT MAKES IT POP
+                                        // 🌟 POPPING CIRCLE SHADOW
                                         boxShadow: [
                                           BoxShadow(
-                                            color: Colors.black.withOpacity(0.25),
+                                            color: Colors.black.withOpacity(0.3),
                                             blurRadius: 6,
                                             offset: const Offset(0, 3),
                                           ),
-                                          // Optional: Inner white rim to make the circle feel like a physical token
                                           BoxShadow(
-                                            color: Colors.white.withOpacity(0.3),
+                                            color: Colors.white.withOpacity(0.5),
                                             blurRadius: 0,
                                             spreadRadius: 0.5,
                                             offset: const Offset(0, 0),
@@ -225,7 +226,7 @@ class MtaBackground extends StatelessWidget {
                                 stationName,
                                 style: TextStyle(
                                   fontSize: titleSize,
-                                  fontWeight: FontWeight.w700,
+                                  fontWeight: FontWeight.w800, // Bolder station name
                                   letterSpacing: -0.5,
                                   color: Colors.black87,
                                   height: 1.1, 
@@ -239,7 +240,7 @@ class MtaBackground extends StatelessWidget {
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Icon(Icons.location_on, size: boroughSize, color: Colors.black45),
+                                    Icon(Icons.location_on, size: boroughSize, color: Colors.black54),
                                     const SizedBox(width: 4),
                                     Text(
                                       borough.toUpperCase(),
