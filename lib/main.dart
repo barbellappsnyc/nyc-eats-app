@@ -5,6 +5,7 @@ import 'services/purchase_service.dart';
 import 'screens/map_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'services/revenuecat_service.dart'; // 👈 NEW: Import your new Zombie Catcher
+import 'package:flutter/services.dart'; // 👈 1. Import services
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
