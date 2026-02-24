@@ -15,6 +15,7 @@ import 'dart:ui';
 import 'package:flutter/cupertino.dart';
 import '../widgets/mta_background.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../widgets/warhol_background.dart';
 
 // 🗺️ FAST & FREE BOROUGH CALCULATOR
 String getBorough(double lat, double lng) {
@@ -78,7 +79,7 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
   void initState() {
     super.initState();
 
-    _bgIsLight = [true, false, true, true, false, true];    
+    _bgIsLight = [true, false, true, true, false, true, false];
 
     _squishController = AnimationController(
       vsync: this,
@@ -192,6 +193,59 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
     }
   }
 
+  // 💧 THE LIQUID GLASS BUTTON (iOS 18 / iPhone 17 Control Center Style)
+  Widget _buildGroovedButton({
+    required IconData icon,
+    required VoidCallback onTap,
+    Color color = Colors.white,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 6),
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          // A soft shadow to float the glass bead off the pill
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.15),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: ClipOval(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25), // Independent glass distortion
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                // 🧊 The Liquid Volume: Bright highlight top-left, fading to transparent
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Colors.white.withOpacity(0.45), // Specular light catch on the top-left
+                    Colors.white.withOpacity(0.10), // The milky center
+                    Colors.white.withOpacity(0.0),  // Deep transparency on the bottom-right
+                  ],
+                  stops: const [0.0, 0.4, 1.0],
+                ),
+                // ✨ The Glowing Edge
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.4), // Glossy rim
+                  width: 1.2, // Slightly thicker for that curved glass feel
+                ),
+              ),
+              child: Icon(icon, size: 26, color: color),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _squishController.dispose();
@@ -210,6 +264,8 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
         isDarkMode: _isMtaNightMode, 
       ),
       const CheckeredBackground(), 
+      // 🎨 NEW: THE WARHOL POP-ART BACKGROUND
+      WarholBackground(cuisine: widget.cuisine),
     ];
 
     bool isLightBg = _bgIsLight[_currentBgIndex];
@@ -338,65 +394,7 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
                 ),
               ),
             ),
-
-            // 🔤 LAYER 5A: THE FONT TOGGLE BUTTON (Index 2)
-            if (_currentBgIndex == 2)
-              Positioned(
-                bottom: 40 + MediaQuery.of(context).padding.bottom, 
-                right: 24, 
-                child: GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _fontIndex = (_fontIndex + 1) % _fonts.length;
-                    });
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: Colors.black87,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 5))
-                      ],
-                      border: Border.all(color: Colors.white24, width: 1),
-                    ),
-                    child: const Icon(CupertinoIcons.textformat, color: Colors.white, size: 26),
-                  ),
-                ),
-              ),
-
-            // 🌗 LAYER 5B: THE DAY/NIGHT TOGGLE BUTTON (Index 4)
-            if (_currentBgIndex == 4)
-              Positioned(
-                bottom: 40 + MediaQuery.of(context).padding.bottom, 
-                right: 24, 
-                child: GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _isMtaNightMode = !_isMtaNightMode;
-                      _bgIsLight[4] = !_isMtaNightMode; 
-                    });
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: Colors.black87,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 5))
-                      ],
-                      border: Border.all(color: Colors.white24, width: 1),
-                    ),
-                    child: Icon(
-                      _isMtaNightMode ? CupertinoIcons.moon_stars_fill : CupertinoIcons.sun_max_fill, 
-                      color: _isMtaNightMode ? Colors.indigo[300] : Colors.amber,
-                      size: 26,
-                    ),
-                  ),
-                ),
-              ),
-
-            // 📸 LAYER 6: EXPORT & SHARE BUTTONS
+            // 📸 LAYER 5: THE UNIFIED DYNAMIC CONTROL PILL
             Positioned(
               bottom: 40 + MediaQuery.of(context).padding.bottom,
               left: 0,
@@ -405,38 +403,59 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(40),
                   child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20), 
+                    filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30), 
                     child: AnimatedSize(
                       duration: const Duration(milliseconds: 350),
                       curve: Curves.easeOutCubic, 
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                         decoration: BoxDecoration(
-                          color: Colors.grey.withOpacity(0.15), 
+                          // A much softer, faint tray to let the liquid buttons pop
+                          color: Colors.black.withOpacity(0.15), 
                           borderRadius: BorderRadius.circular(40),
                           border: Border.all(
-                            color: Colors.white.withOpacity(0.3), 
-                            width: 1.5,
+                            color: Colors.white.withOpacity(0.15), // Very faint rim
+                            width: 0.5,
                           ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            IconButton(
-                              onPressed: _saveToCameraRoll, 
-                              icon: const Icon(CupertinoIcons.arrow_down, size: 30, color: Colors.black), 
-                              color: Colors.grey[800], 
-                              iconSize: 28,
-                              padding: const EdgeInsets.all(12),
+                            // ⬇️ ALWAYS VISIBLE: Download (Now on the Left)
+                            _buildGroovedButton(
+                              icon: CupertinoIcons.arrow_down,
+                              onTap: _saveToCameraRoll,
                             ),
                             
-                              if (_currentBgIndex != 5) 
-                              IconButton(
-                                onPressed: _shareToStory, 
-                                icon: const Icon(CupertinoIcons.share, size: 30, color: Colors.black),
-                                color: Colors.grey[800], 
-                                iconSize: 28,
-                                padding: const EdgeInsets.all(12),
+                            // ↗️ CONDITIONAL: Share (Now Middle-Left)
+                            if (_currentBgIndex != 5) 
+                              _buildGroovedButton(
+                                icon: CupertinoIcons.share,
+                                onTap: _shareToStory,
+                              ),
+
+                            // 🔤 CONDITIONAL: Font Toggle (Now on the Right)
+                            if (_currentBgIndex == 2)
+                              _buildGroovedButton(
+                                icon: CupertinoIcons.textformat,
+                                onTap: () {
+                                  setState(() {
+                                    _fontIndex = (_fontIndex + 1) % _fonts.length;
+                                  });
+                                },
+                              ),
+
+                            // 🌗 CONDITIONAL: Day/Night Toggle (Now on the Right)
+                            if (_currentBgIndex == 4)
+                              _buildGroovedButton(
+                                icon: _isMtaNightMode ? CupertinoIcons.moon_stars_fill : CupertinoIcons.sun_max_fill,
+                                color: _isMtaNightMode ? Colors.indigo[300]! : Colors.amber,
+                                onTap: () {
+                                  setState(() {
+                                    _isMtaNightMode = !_isMtaNightMode;
+                                    _bgIsLight[4] = !_isMtaNightMode; 
+                                  });
+                                },
                               ),
                           ],
                         ),

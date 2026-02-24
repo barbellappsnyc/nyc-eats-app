@@ -251,14 +251,23 @@ class MtaBackground extends StatelessWidget {
                                       )
                                   ]
                                 ),
+                                // ... inside the Container decoration for the line circle ...
                                 child: Center(
-                                  child: Text(
-                                    line,
-                                    style: TextStyle(
-                                      color: _getTextColor(line),
-                                      fontSize: circleText,
-                                      fontWeight: FontWeight.bold,
-                                      fontFamily: 'Helvetica', 
+                                  // 👇 THE FIX: Added padding and a FittedBox to shrink long text instead of wrapping
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(4.0), // Keeps text from touching the absolute edge
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Text(
+                                        line,
+                                        maxLines: 1, // Strictly forbids new lines
+                                        style: TextStyle(
+                                          color: _getTextColor(line),
+                                          fontSize: circleText,
+                                          fontWeight: FontWeight.bold,
+                                          fontFamily: 'Helvetica', 
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ),
