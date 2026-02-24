@@ -2,68 +2,89 @@ import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'dart:ui';
 
-class MtaBackground extends StatelessWidget {
+class MtaBackground extends StatefulWidget {
   final List<Map<String, dynamic>> stations;
-  final bool isDarkMode; // 👈 The Master Switch
+  final bool isDarkMode; 
+  final Offset passportPosition; 
+  final double passportScale;
 
   const MtaBackground({
     Key? key, 
     required this.stations,
     this.isDarkMode = true, 
+    this.passportPosition = Offset.zero, 
+    this.passportScale = 0.85,           
   }) : super(key: key);
 
   @override
+  State<MtaBackground> createState() => _MtaBackgroundState();
+}
+
+class _MtaBackgroundState extends State<MtaBackground> {
+  
+  // 📍 THE ORBITAL TRACK: 10 fixed anchor points around the bezel
+  final List<Alignment> orbitalAnchors = const [
+    Alignment(-1.0, -1.0),  // 0: Top-Left
+    Alignment( 0.0, -1.0),  // 1: Top-Center
+    Alignment( 1.0, -1.0),  // 2: Top-Right
+    Alignment( 1.0, -0.33), // 3: Right-Upper (1/3rd down the right wall)
+    Alignment( 1.0,  0.33), // 4: Right-Lower (2/3rds down the right wall)
+    Alignment( 1.0,  1.0),  // 5: Bottom-Right
+    Alignment( 0.0,  1.0),  // 6: Bottom-Center
+    Alignment(-1.0,  1.0),  // 7: Bottom-Left
+    Alignment(-1.0,  0.33), // 8: Left-Lower (2/3rds down the left wall)
+    Alignment(-1.0, -0.33), // 9: Left-Upper (1/3rd down the left wall)
+  ];
+
+  // 🧠 MEMORY: Tracks the current anchor index for each blob
+  late List<int> currentAnchors;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeDefaultAnchors();
+  }
+
+  // 📐 DEFAULT LAYOUTS: Places them in their starting spots based on the count
+  void _initializeDefaultAnchors() {
+    int count = widget.stations.length;
+    if (count == 1) {
+      currentAnchors = [1]; // Top-Center
+    } else if (count == 2) {
+      currentAnchors = [1, 6]; // Top-Center, Bottom-Center
+    } else if (count == 3) {
+      currentAnchors = [0, 1, 2]; // Top-Left, Top-Center, Top-Right
+    } else {
+      currentAnchors = [0, 2, 5, 7]; // Top-Left, Top-Right, Bottom-Right, Bottom-Left
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (stations.isEmpty) {
+    if (widget.stations.isEmpty) {
       return Center(
         child: CupertinoActivityIndicator(
           radius: 16.0, 
-          color: isDarkMode ? Colors.white : Colors.black,
+          color: widget.isDarkMode ? Colors.white : Colors.black,
         ),
       );
     }
 
-    Widget gridLayout;
-    int count = stations.length;
+    final Size screenSize = MediaQuery.of(context).size;
+    final int count = widget.stations.length;
 
-    if (count == 1) {
-      gridLayout = _buildStationCard(stations[0]);
-    } else if (count == 2) {
-      gridLayout = Column(
-        children: [
-          Expanded(child: _buildStationCard(stations[0])),
-          Expanded(child: _buildStationCard(stations[1])),
-        ],
-      );
+    // 📏 SHAPE LOGIC: Calculate sizes based on count
+    double defaultWidth;
+    double defaultHeight;
+    if (count == 1 || count == 2) {
+      defaultWidth = screenSize.width * 0.85;  // Wide rectangle
+      defaultHeight = screenSize.height * 0.22;
     } else if (count == 3) {
-      gridLayout = Column(
-        children: [
-          Expanded(child: _buildStationCard(stations[0])),
-          Expanded(child: _buildStationCard(stations[1])),
-          Expanded(child: _buildStationCard(stations[2])),
-        ],
-      );
+      defaultWidth = screenSize.width * 0.28;  // 3 narrow squircles across the top
+      defaultHeight = screenSize.height * 0.18;
     } else {
-      gridLayout = Column(
-        children: [
-          Expanded(
-            child: Row(
-              children: [
-                Expanded(child: _buildStationCard(stations[0])),
-                Expanded(child: _buildStationCard(stations[1])),
-              ],
-            ),
-          ),
-          Expanded(
-            child: Row(
-              children: [
-                Expanded(child: _buildStationCard(stations[2])),
-                Expanded(child: _buildStationCard(stations[3])),
-              ],
-            ),
-          ),
-        ],
-      );
+      defaultWidth = screenSize.width * 0.40;  // 4 squarish corner squircles
+      defaultHeight = screenSize.height * 0.20;
     }
 
     return Stack(
@@ -77,19 +98,37 @@ class MtaBackground extends StatelessWidget {
           colorBlendMode: BlendMode.darken,
         ),
 
-        // 🗂️ LAYER 2: THE DYNAMIC CARDS
+        // 🗂️ LAYER 2: THE FLOATING BLOBS
+        // 👇 THE FIX: The 100px padding is back to counteract the oversized squish canvas
         Padding(
-          padding: const EdgeInsets.all(100.0), 
+          padding: const EdgeInsets.all(100.0),
           child: SafeArea(
-            minimum: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 24.0), 
-            child: gridLayout,
+            minimum: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 32.0),
+            child: Stack(
+              children: List.generate(count, (index) {
+                // Grab the anchor alignment from memory
+                Alignment currentAlignment = orbitalAnchors[currentAnchors[index]];
+
+                return AnimatedAlign(
+                  duration: const Duration(milliseconds: 600),
+                  curve: Curves.elasticOut, 
+                  alignment: currentAlignment,
+                  child: _buildStationCard(
+                    widget.stations[index], 
+                    defaultWidth, 
+                    defaultHeight,
+                  ),
+                );
+              }),
+            ),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildStationCard(Map<String, dynamic> station) {
+  // 👇 ADDED cardWidth and cardHeight parameters
+  Widget _buildStationCard(Map<String, dynamic> station, double cardWidth, double cardHeight) {
     final String stationName = station['station_name'] ?? 'Unknown Station';
     final String linesString = station['lines'] ?? '';
     final String borough = station['borough'] ?? '';
@@ -98,41 +137,39 @@ class MtaBackground extends StatelessWidget {
         ? linesString.trim().split(RegExp(r'\s+')).where((l) => l.isNotEmpty).toList()
         : [];
 
-    // 🌟 THE MASTER ANIMATION: Only the outer shadow morphs
     return AnimatedContainer(
       duration: const Duration(milliseconds: 500),
       curve: Curves.easeInOutCubic,
-      width: double.infinity,
-      height: double.infinity, 
+      width: cardWidth,   // 👈 REPLACED double.infinity
+      height: cardHeight, // 👈 REPLACED double.infinity
       margin: const EdgeInsets.all(8.0), 
+      // ... the rest of the BoxDecoration and stack remains exactly the same ...
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28.0), 
         boxShadow: [
           BoxShadow(
-            color: isDarkMode ? Colors.black.withOpacity(0.4) : Colors.black.withOpacity(0.3), 
-            blurRadius: isDarkMode ? 24 : 30,
-            spreadRadius: isDarkMode ? 0 : 2,
-            offset: Offset(0, isDarkMode ? 10 : 15),
+            color: widget.isDarkMode ? Colors.black.withOpacity(0.4) : Colors.black.withOpacity(0.3), 
+            blurRadius: widget.isDarkMode ? 24 : 30,
+            spreadRadius: widget.isDarkMode ? 0 : 2,
+            offset: Offset(0, widget.isDarkMode ? 10 : 15),
           ),
         ],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(28.0),
-        // ONE single blur applied to the entire stack prevents double-blur performance issues
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
-          // 🎬 THE TRUE APPLE-STYLE DISSOLVE
           child: Stack(
             fit: StackFit.expand,
             children: [
-              // 🌙 BASE LAYER: The Night Card (Always rendered, sits underneath)
+              // 🌙 BASE LAYER: Night Card
               _buildCardContent(stationName, lines, borough, isDark: true),
 
-              // ☀️ TOP LAYER: The Day Card (Fades in over the Night card without transparency bleed)
+              // ☀️ TOP LAYER: Day Card
               AnimatedOpacity(
                 duration: const Duration(milliseconds: 500),
                 curve: Curves.easeInOutCubic,
-                opacity: isDarkMode ? 0.0 : 1.0,
+                opacity: widget.isDarkMode ? 0.0 : 1.0,
                 child: _buildCardContent(stationName, lines, borough, isDark: false),
               ),
             ],
@@ -142,7 +179,6 @@ class MtaBackground extends StatelessWidget {
     );
   }
 
-  // 🧱 THE STATIC CARD RENDERER (Clean, no animation mess inside)
   Widget _buildCardContent(String stationName, List<String> lines, String borough, {required bool isDark}) {
     final List<Color> stationColors = lines.map((l) => _getLineColor(l)).toSet().toList();
     List<Color> glassGradient;
@@ -251,16 +287,14 @@ class MtaBackground extends StatelessWidget {
                                       )
                                   ]
                                 ),
-                                // ... inside the Container decoration for the line circle ...
                                 child: Center(
-                                  // 👇 THE FIX: Added padding and a FittedBox to shrink long text instead of wrapping
                                   child: Padding(
-                                    padding: const EdgeInsets.all(4.0), // Keeps text from touching the absolute edge
+                                    padding: const EdgeInsets.all(4.0), 
                                     child: FittedBox(
                                       fit: BoxFit.scaleDown,
                                       child: Text(
                                         line,
-                                        maxLines: 1, // Strictly forbids new lines
+                                        maxLines: 1, 
                                         style: TextStyle(
                                           color: _getTextColor(line),
                                           fontSize: circleText,
@@ -335,7 +369,7 @@ class MtaBackground extends StatelessWidget {
       case '7': return const Color(0xFFB933AD);
       case 'S': return const Color(0xFF808183);
       case 'SIR': return const Color(0xFF0039A6);
-      default: return isDarkMode ? Colors.white70 : Colors.black54; 
+      default: return widget.isDarkMode ? Colors.white70 : Colors.black54; 
     }
   }
 

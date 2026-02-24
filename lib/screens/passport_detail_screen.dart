@@ -68,6 +68,9 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
     'Georgia', 'Helvetica', 'Courier', 'Times New Roman', 'Trebuchet MS'
   ];
 
+  // 🏎️ NEW: Tells the animation to turn off when your finger is actively dragging
+  bool _isDragging = false;
+  
   late List<bool> _bgIsLight;   
   final ScreenshotController _cardOnlyController = ScreenshotController();
   final ScreenshotController _fullScreenController = ScreenshotController();
@@ -90,14 +93,29 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
       CurvedAnimation(parent: _squishController, curve: Curves.easeInOut),
     );
 
+    // 👇 THE FIX: Call the smart positioner when the screen first loads
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      setState(() {
-        _cardPosition = Offset(MediaQuery.of(context).size.width / 2,
-            MediaQuery.of(context).size.height / 2);
-      });
+      _updateDefaultCardPosition();
     });
 
     _fetchMtaStations(); 
+  }
+
+  void _updateDefaultCardPosition() {
+    final size = MediaQuery.of(context).size;
+    
+    // 👇 THE FIX: Count the unique MTA blobs, not the raw stamps!
+    final int stationCount = _mtaStations.length; 
+    
+    double startingY = size.height / 2; 
+    
+    if (_currentBgIndex == 4 && (stationCount == 1 || stationCount == 3)) {
+      startingY = size.height * 0.65; 
+    }
+
+    setState(() {
+      _cardPosition = Offset(size.width / 2, startingY);
+    });
   }
 
   Future<void> _saveToCameraRoll() async {
@@ -182,11 +200,14 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
           .select()
           .inFilter('id', stationIds); 
 
+      // Inside your _fetchMtaStations() method, find the setState block and add this:
       if (mounted) {
         setState(() {
           _mtaStations = List<Map<String, dynamic>>.from(response);
           _isLoadingStations = false;
         });
+        // 👇 NEW: Fire the positioner once the data actually loads
+        _updateDefaultCardPosition(); 
       }
     } catch (e) {
       debugPrint("SUPABASE ERROR: $e");
@@ -262,6 +283,9 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
       MtaBackground(
         stations: _mtaStations, 
         isDarkMode: _isMtaNightMode, 
+        // 📡 NEW: Streaming the live gesture data down to the background
+        passportPosition: _cardPosition,
+        passportScale: _cardScale,
       ),
       const CheckeredBackground(), 
       // 🎨 NEW: THE WARHOL POP-ART BACKGROUND
@@ -302,6 +326,8 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
                         setState(() {
                           _currentBgIndex = (_currentBgIndex + 1) % bgDesigns.length;
                         });
+                        // 👇 THE FIX: Re-calculate and snap the card to its ideal spot for the new background
+                        _updateDefaultCardPosition();
                       },
                       child: ScaleTransition(
                         scale: _squishAnimation,
@@ -311,7 +337,10 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
                   ),
 
                   // 🪪 LAYER 2: THE CARD
-                  Positioned(
+                  AnimatedPositioned(
+                    // 🪄 THE GLIDE: 600ms smooth transition, unless you are actively dragging it
+                    duration: _isDragging ? Duration.zero : const Duration(milliseconds: 600),
+                    curve: Curves.easeOutExpo,
                     left: _cardPosition.dx - 170, 
                     top: _cardPosition.dy - 270,  
                     child: GestureDetector(
@@ -320,6 +349,7 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
                       onTapCancel: () {},
                       onTap: () {},
                       onScaleStart: (details) {
+                        setState(() => _isDragging = true); // Turn off glide
                         _baseCardPosition = _cardPosition;
                         _startFocalPoint = details.focalPoint;
                         _baseScale = _cardScale;
@@ -332,6 +362,9 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
                           _cardScale = (_baseScale * details.scale).clamp(0.4, 2.0);
                           _cardRotation = _baseRotation + details.rotation;
                         });
+                      },
+                      onScaleEnd: (details) {
+                        setState(() => _isDragging = false); // Turn glide back on
                       },
                       child: Transform(
                         alignment: Alignment.center,
