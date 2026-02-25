@@ -78,6 +78,8 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
   List<Map<String, dynamic>> _mtaStations = [];
   bool _isLoadingStations = true;
 
+  bool _isPositionInitialized = false; // 👈 NEW: Tracks the first frame
+
   @override
   void initState() {
     super.initState();
@@ -93,28 +95,31 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
       CurvedAnimation(parent: _squishController, curve: Curves.easeInOut),
     );
 
-    // 👇 THE FIX: Call the smart positioner when the screen first loads
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _updateDefaultCardPosition();
-    });
-
+    // 🛑 REMOVED: The post-frame callback that caused the Hero snap glitch
     _fetchMtaStations(); 
   }
 
+  // 🪄 FIX 2: This fires BEFORE the first frame paints, giving the Hero a perfect landing pad
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_isPositionInitialized) {
+      final size = MediaQuery.of(context).size;
+      _cardPosition = Offset(size.width / 2, size.height / 2);
+      _cardScale = 0.85; // Standard resting scale
+      _isPositionInitialized = true;
+    }
+  }
+
+  // 🪄 FIX 3: Only snap back to center/scale/rotation if entering the MTA Museum
   void _updateDefaultCardPosition() {
     final size = MediaQuery.of(context).size;
-    
-    // 👇 THE FIX: Count the unique MTA blobs, not the raw stamps!
-    final int stationCount = _mtaStations.length; 
-    
-    double startingY = size.height / 2; 
-    
-    if (_currentBgIndex == 4 && (stationCount == 1 || stationCount == 3)) {
-      startingY = size.height * 0.65; 
-    }
-
     setState(() {
-      _cardPosition = Offset(size.width / 2, startingY);
+      if (_currentBgIndex == 4) {
+        _cardPosition = Offset(size.width / 2, size.height / 2);
+        _cardScale = 1.0; 
+        _cardRotation = 0.0; // 👈 Forces the tilt to snap perfectly upright
+      }
     });
   }
 
@@ -275,18 +280,25 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
 
   @override
   Widget build(BuildContext context) {
+
+    // 1. ADD THIS AT THE TOP OF THE BUILD METHOD
+    final double cardWidth = (MediaQuery.of(context).size.width * 0.85).clamp(300.0, 400.0);
+    final double cardHeight = cardWidth * (540 / 340);
+
     final List<Widget> bgDesigns = [
       Container(color: widget.backgroundColor), 
       CoordinateCollageBackground(stamps: widget.stamps), 
       LanguageCollageBackground(cuisine: widget.cuisine, currentFont: _fonts[_fontIndex]), 
       PostageStampBackground(cuisine: widget.cuisine), 
+      // ... inside your bgDesigns array ...
       MtaBackground(
         stations: _mtaStations, 
         isDarkMode: _isMtaNightMode, 
-        // 📡 NEW: Streaming the live gesture data down to the background
         passportPosition: _cardPosition,
         passportScale: _cardScale,
+        isDragging: _isDragging, // 👈 NEW: Pass the state down!
       ),
+      // ...
       const CheckeredBackground(), 
       // 🎨 NEW: THE WARHOL POP-ART BACKGROUND
       WarholBackground(cuisine: widget.cuisine),
@@ -313,10 +325,11 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
                 children: [
                   // 🟩 LAYER 1: THE BACKGROUND 
                   Positioned(
-                    top: -100,
-                    bottom: -100,
-                    left: -100,
-                    right: -100,
+                    // 🪄 THE FIX: Remove the 100px overflow ONLY for the MTA screen
+                    top: _currentBgIndex == 4 ? 0 : -100,
+                    bottom: _currentBgIndex == 4 ? 0 : -100,
+                    left: _currentBgIndex == 4 ? 0 : -100,
+                    right: _currentBgIndex == 4 ? 0 : -100,
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTapDown: (_) => _squishController.forward(),
@@ -338,18 +351,20 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
 
                   // 🪪 LAYER 2: THE CARD
                   AnimatedPositioned(
-                    // 🪄 THE GLIDE: 600ms smooth transition, unless you are actively dragging it
                     duration: _isDragging ? Duration.zero : const Duration(milliseconds: 600),
                     curve: Curves.easeOutExpo,
-                    left: _cardPosition.dx - 170, 
-                    top: _cardPosition.dy - 270,  
+                    // Dynamic center math (fixing the hardcoded 170/270)
+                    left: _cardPosition.dx - (cardWidth / 2), 
+                    top: _cardPosition.dy - (cardHeight / 2),
+                    width: cardWidth,   // 👈 Explicit width for proper centering
+                    height: cardHeight, // 👈 Explicit height for proper centering
                     child: GestureDetector(
                       onTapDown: (_) {},
                       onTapUp: (_) {},
                       onTapCancel: () {},
                       onTap: () {},
                       onScaleStart: (details) {
-                        setState(() => _isDragging = true); // Turn off glide
+                        setState(() => _isDragging = true); 
                         _baseCardPosition = _cardPosition;
                         _startFocalPoint = details.focalPoint;
                         _baseScale = _cardScale;
@@ -364,10 +379,20 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
                         });
                       },
                       onScaleEnd: (details) {
-                        setState(() => _isDragging = false); // Turn glide back on
+                        setState(() {
+                           _isDragging = false; 
+                           // 🪄 THE SPRING-BACK: Re-added for the MTA background!
+                           if (_currentBgIndex == 4) {
+                              _updateDefaultCardPosition(); 
+                           }
+                        });
                       },
-                      child: Transform(
+                      // 🪄 FIX 1: Replaced Transform with AnimatedContainer
+                      child: AnimatedContainer(
+                        duration: _isDragging ? Duration.zero : const Duration(milliseconds: 600),
+                        curve: Curves.easeOutExpo,
                         alignment: Alignment.center,
+                        transformAlignment: Alignment.center, // 👈 CRITICAL: Rotates purely from the center
                         transform: Matrix4.identity()
                           ..scale(_cardScale)
                           ..rotateZ(_cardRotation),

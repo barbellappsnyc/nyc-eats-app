@@ -348,65 +348,67 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
     return [];
   }
 
-  // 🌟 OPTIMIZED: PARALLEL FETCHING
   Future<void> _fetchRestaurants() async {
     setState(() { isLoading = true; hasError = false; });
 
-    // 1. Try Cache First
-    final cachedData = await _loadFromCache();
-    if (cachedData.isNotEmpty) {
-      setState(() { allRestaurants = cachedData; isLoading = false; });
-    }
-
+    // 1. 🔍 TRY THE LOCAL CACHE FIRST
     try {
-      // 2. Fetch Fresh Data (Parallelized)
-      // First, fetch the COUNT to know how many pages we need
-      // ADD THIS:
-      final int totalCount = await Supabase.instance.client
-        .from('restaurants')
-        .count();
-      const int batchSize = 1000;
-      final int totalPages = (totalCount / batchSize).ceil();
-
-      // Create a list of Futures (requests) to fire simultaneously
-      List<Future<List<dynamic>>> futures = [];
-      for (int i = 0; i < totalPages; i++) {
-        final start = i * batchSize;
-        final end = start + batchSize - 1;
-        futures.add(
-          Supabase.instance.client
-              .from('restaurants')
-              .select()
-              .range(start, end)
-              .then((value) => value as List<dynamic>)
-        );
-      }
-
-      // Wait for ALL requests to finish (Parallel execution)
-      final List<List<dynamic>> results = await Future.wait(futures);
+      debugPrint("🔍 Checking local device cache...");
+      final cachedRestaurants = await _loadFromCache();
       
-      // Flatten the list
-      final List<dynamic> fullList = results.expand((x) => x).toList();
-
-      if (fullList.isNotEmpty) {
-        // Save to cache (raw JSON)
-        final file = await _localFile;
-        await file.writeAsString(jsonEncode(fullList));
-
-        // Parse in background
-        final parsed = await compute(_parseRestaurantsInBackground, jsonEncode(fullList));
-
+      if (cachedRestaurants.isNotEmpty) {
+        debugPrint("⚡ BOOM! Loaded ${cachedRestaurants.length} restaurants instantly from the hard drive!");
         if (mounted) {
           setState(() {
-            allRestaurants = parsed;
+            allRestaurants = cachedRestaurants;
             isLoading = false;
             hasError = false;
           });
         }
+        return; // 🛑 STOP HERE! Do not talk to Supabase!
       }
     } catch (e) {
-      debugPrint('Error fetching data: $e');
-      if (mounted && allRestaurants.isEmpty) setState(() { isLoading = false; hasError = true; });
+      debugPrint("⚠️ Cache miss or error: $e");
+    }
+
+    // 2. ☁️ CACHE EMPTY: FETCH FROM SUPABASE
+    try {
+      debugPrint("☁️ Cache empty. Fetching from Supabase sequentially...");
+      
+      final totalRecords = await Supabase.instance.client
+          .from('restaurants')
+          .count(CountOption.exact);
+          
+      final batchSize = 1000;
+      final totalPages = (totalRecords / batchSize).ceil();
+      List<dynamic> fullList = [];
+
+      for (int i = 0; i < totalPages; i++) {
+        final start = i * batchSize;
+        final end = start + batchSize - 1;
+        
+        final batch = await Supabase.instance.client
+            .from('restaurants')
+            .select() 
+            .range(start, end);
+            
+        fullList.addAll(batch as List<dynamic>);
+        debugPrint("✅ Fetched batch ${i + 1} of $totalPages");
+      }
+
+      // 3. 💾 SAVE THE FRESH DATA TO CACHE FOR NEXT TIME
+      await _saveToCache(fullList);
+
+      if (mounted) {
+        setState(() {
+          allRestaurants = fullList.map((json) => Restaurant.fromMap(json)).toList();
+          isLoading = false;
+          hasError = false;
+        });
+      }
+    } catch (e, stackTrace) {
+      debugPrint('🚨 ERROR FETCHING RESTAURANTS: $e');
+      if (mounted) setState(() { isLoading = false; hasError = true; });
     }
   }
 
@@ -655,6 +657,19 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
         ),
       ),
     );
+  }
+
+  // 💾 NEW: Save to Cache
+  Future<void> _saveToCache(List<dynamic> jsonList) async {
+    try {
+      final file = await _localFile;
+      // Convert the raw Supabase JSON list into a String and save it to the device
+      final jsonString = jsonEncode(jsonList);
+      await file.writeAsString(jsonString);
+      debugPrint("💾 SUCCESS: Saved ${jsonList.length} restaurants to local device storage!");
+    } catch (e) {
+      debugPrint("🚨 Error saving to cache: $e");
+    }
   }
 
   @override

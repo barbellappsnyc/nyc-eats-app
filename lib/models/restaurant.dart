@@ -71,7 +71,7 @@ class Restaurant {
       openingHours: map['opening_hours'],
       delivery: map['delivery'] ?? false,
       takeaway: map['takeaway'] ?? false,
-      reservations: map['reservations'] ?? false,
+      reservations: map['reservation'] ?? false,
       cocktails: map['cocktails'] ?? false,
 
       // NEW: Supabase might return null, so we default to false
@@ -102,7 +102,7 @@ class Restaurant {
       'opening_hours': openingHours,
       'delivery': delivery,
       'takeaway': takeaway,
-      'reservations': reservations,
+      'reservation': reservations,
       'cocktails': cocktails,
     };
   }
