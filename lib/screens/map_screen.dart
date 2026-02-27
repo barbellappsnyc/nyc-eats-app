@@ -749,7 +749,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
 
           // --- LOADING / ERROR ---
           if (hasError) Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(Icons.wifi_off, size: 64, color: Colors.grey), const SizedBox(height: 16), const Text("No Connection", style: TextStyle(fontSize: 20)), ElevatedButton(onPressed: _fetchRestaurants, child: const Text("Retry"))])),
-          if (isLoading) const Center(child: CircularProgressIndicator()),
+          if (isLoading) const Center(child: CupertinoActivityIndicator(radius: 16)),
 
           // --- UI: SEARCH & FILTER BAR ---
           if (!hasError)

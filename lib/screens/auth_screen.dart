@@ -10,6 +10,7 @@ import '../services/revenuecat_service.dart';
 import 'package:flutter/services.dart';
 import 'dart:ui';
 import 'package:flutter/services.dart';
+import 'package:flutter/cupertino.dart';
 
 class AuthScreen extends StatefulWidget {
   final String? purchasedSku;
@@ -38,6 +39,22 @@ class _AuthScreenState extends State<AuthScreen> {
   final _ageController = TextEditingController();
   String _selectedGender = 'X'; // Default
 
+  final _customGenderController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _customGenderController.addListener(() {
+      final text = _customGenderController.text.trim().toLowerCase();
+      // 🪤 The Trap: Snap back to standard if they type Male/Female
+      if (text == 'male') {
+        setState(() { _selectedGender = 'M'; _customGenderController.clear(); FocusManager.instance.primaryFocus?.unfocus(); });
+      } else if (text == 'female') {
+        setState(() { _selectedGender = 'F'; _customGenderController.clear(); FocusManager.instance.primaryFocus?.unfocus(); });
+      }
+    });
+  }
+
   bool _isLoading = false;
   bool _isLogin = true; // Toggle between Login and Sign Up
 
@@ -52,6 +69,7 @@ class _AuthScreenState extends State<AuthScreen> {
     _confirmPasswordController.dispose();
     _nameController.dispose();
     _ageController.dispose();
+    _customGenderController.dispose();
     super.dispose();
   }
 
@@ -101,7 +119,9 @@ class _AuthScreenState extends State<AuthScreen> {
           data: {
             'display_name': name,
             'age': age,
-            'gender': _selectedGender,
+            'gender': _selectedGender == 'CUSTOM' 
+                ? (_customGenderController.text.trim().isNotEmpty ? _customGenderController.text.trim() : 'X') 
+                : _selectedGender,
             'full_name': name,
           },
         );
@@ -622,19 +642,32 @@ class _AuthScreenState extends State<AuthScreen> {
                         const SizedBox(width: 12),
                         Expanded(
                           flex: 4,
-                          child: DropdownButtonFormField<String>(
-                            isExpanded: true, 
-                            value: _selectedGender,
-                            dropdownColor: const Color(0xFFFDFBF7),
-                            style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 14),
-                            decoration: _inputDecoration("GENDER", Icons.wc_outlined),
-                            items: const [
-                              DropdownMenuItem(value: 'M', child: Text("MALE")),
-                              DropdownMenuItem(value: 'F', child: Text("FEMALE")),
-                              DropdownMenuItem(value: 'X', child: Text("OTHER")),
-                            ],
-                            onChanged: (val) => setState(() => _selectedGender = val!),
-                          ),
+                          child: _selectedGender == 'CUSTOM'
+                            ? TextField(
+                                autofocus: true, // 👈 ADD THIS LINE
+                                controller: _customGenderController,
+                                textCapitalization: TextCapitalization.characters,
+                                style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 14),
+                                decoration: _inputDecoration("CUSTOM GENDER", Icons.wc_outlined).copyWith(
+                                  suffixIcon: IconButton(
+                                    icon: const Icon(Icons.close, size: 16),
+                                    onPressed: () => setState(() => _selectedGender = 'M'), 
+                                  ),
+                                ),
+                              )
+                            : DropdownButtonFormField<String>(
+                                isExpanded: true, 
+                                value: ['M', 'F'].contains(_selectedGender) ? _selectedGender : 'CUSTOM',
+                                dropdownColor: const Color(0xFFFDFBF7),
+                                style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 14),
+                                decoration: _inputDecoration("GENDER", Icons.wc_outlined),
+                                items: const [
+                                  DropdownMenuItem(value: 'M', child: Text("MALE")),
+                                  DropdownMenuItem(value: 'F', child: Text("FEMALE")),
+                                  DropdownMenuItem(value: 'CUSTOM', child: Text("CUSTOM...")),
+                                ],
+                                onChanged: (val) => setState(() => _selectedGender = val!),
+                              ),
                         ),
                       ],
                     ),
@@ -731,7 +764,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      CircularProgressIndicator(color: Colors.white),
+                      CupertinoActivityIndicator(color: Colors.white, radius: 16),
                       SizedBox(height: 24),
                       Text(
                         "ISSUING PASSPORT...",

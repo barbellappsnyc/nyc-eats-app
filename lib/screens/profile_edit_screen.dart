@@ -59,7 +59,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _ageController = TextEditingController();
   String _selectedGender = 'X'; 
-  
+  final TextEditingController _customGenderController = TextEditingController();
+  bool _isEditingCustomGender = false;
+
   List<Map<String, dynamic>> _myPassports = [];
 
   // 👇 NEW: Track initial state
@@ -89,6 +91,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     // 👇 NEW: Listen to text changes
     _nameController.addListener(() => setState(() {}));
     _ageController.addListener(() => setState(() {}));
+    _customGenderController.addListener(() {
+      setState(() {}); // Triggers the save button if changes exist
+      final text = _customGenderController.text.trim().toLowerCase();
+      if (text == 'male') {
+        setState(() { _selectedGender = 'M'; _isEditingCustomGender = false; _customGenderController.clear(); FocusManager.instance.primaryFocus?.unfocus(); });
+      } else if (text == 'female') {
+        setState(() { _selectedGender = 'F'; _isEditingCustomGender = false; _customGenderController.clear(); FocusManager.instance.primaryFocus?.unfocus(); });
+      }
+    });
   }
 
   Future<void> _fetchRealProfile() async {
@@ -105,8 +116,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _initialAge = profile['age'].toString(); // 👈 Lock it in
         }
         if (profile['gender'] != null) {
-          _selectedGender = profile['gender'];
-          _initialGender = profile['gender']; // 👈 Lock it in
+          final g = profile['gender'];
+          if (g == 'M' || g == 'F') {
+            _selectedGender = g;
+          } else {
+            _selectedGender = 'CUSTOM';
+            _customGenderController.text = g;
+          }
+          _initialGender = g; // Lock it in for the "has changes" check
         }
         _displayedPhotoUrl = profile['photo_url']; 
       });
@@ -137,6 +154,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void dispose() {
     _scrollController.dispose();
+    _customGenderController.dispose();
     super.dispose();
   }
 
@@ -172,7 +190,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     
     final String name = _nameController.text.toUpperCase();
     final int age = int.tryParse(_ageController.text) ?? 18;
-    final String gender = _selectedGender;
+    final String gender = _selectedGender == 'CUSTOM' 
+        ? (_customGenderController.text.trim().isNotEmpty ? _customGenderController.text.trim() : 'X') 
+        : _selectedGender;
     
     try {
       final user = Supabase.instance.client.auth.currentUser;
@@ -279,10 +299,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   // 👇 NEW: Returns true ONLY if something actually changed
   bool get _hasChanges {
+    final currentGender = _selectedGender == 'CUSTOM' ? _customGenderController.text.trim() : _selectedGender;
     return _nameController.text != _initialName ||
            _ageController.text != _initialAge ||
-           _selectedGender != _initialGender ||
-           _imageFile != null; // 👈 Activates button if a new photo is picked
+           currentGender != _initialGender ||
+           _imageFile != null; 
   }
 
   // 🗑️ APPLE COMPLIANCE: DELETE ACCOUNT
@@ -512,6 +533,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           
                           _buildTextField("FULL NAME", _nameController),
                           const SizedBox(height: 16),
+                          
+                          // 🛠 FIX: Clean Row without any duplicated columns or unbounded Expanded widgets!
                           Row(
                             children: [
                               Expanded(child: _buildTextField("AGE", _ageController, isNumber: true)),
@@ -522,22 +545,64 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   children: [
                                     const Text("GENDER", style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.2, color: Color(0xFF9E9E9E))),
                                     const SizedBox(height: 8),
-                                    DropdownButtonFormField<String>(
-                                      value: _selectedGender,
-                                      style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 14, fontFamily: 'Roboto'),
-                                      dropdownColor: Colors.white,
-                                      decoration: InputDecoration(
-                                        filled: true, fillColor: Colors.white,
-                                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
-                                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-                                      ),
-                                      items: const [
-                                        DropdownMenuItem(value: 'M', child: Text("MALE", style: TextStyle(color: Colors.black))),
-                                        DropdownMenuItem(value: 'F', child: Text("FEMALE", style: TextStyle(color: Colors.black))),
-                                        DropdownMenuItem(value: 'X', child: Text("NEUTRAL", style: TextStyle(color: Colors.black))),
-                                      ],
-                                      onChanged: (val) => setState(() => _selectedGender = val!),
-                                    ),
+                                    _isEditingCustomGender
+                                      ? TextField(
+                                          autofocus: true,
+                                          controller: _customGenderController,
+                                          textCapitalization: TextCapitalization.words,
+                                          style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 14, fontFamily: 'Roboto'),
+                                          decoration: InputDecoration(
+                                            filled: true, fillColor: Colors.white,
+                                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                                            suffixIcon: IconButton(
+                                              icon: const Icon(Icons.close, size: 16),
+                                              onPressed: () => setState(() {
+                                                _selectedGender = 'M';
+                                                _isEditingCustomGender = false;
+                                              }),
+                                            ),
+                                          ),
+                                          // 👇 Snaps back to resting state when they hit "Done/Enter"
+                                          onSubmitted: (_) => setState(() => _isEditingCustomGender = false),
+                                        )
+                                      : DropdownButtonFormField<String>(
+                                          value: ['M', 'F'].contains(_selectedGender) ? _selectedGender : 'CUSTOM',
+                                          style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 14, fontFamily: 'Roboto'),
+                                          dropdownColor: Colors.white,
+                                          decoration: InputDecoration(
+                                            filled: true, fillColor: Colors.white,
+                                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+                                          ),
+                                          items: [
+                                            const DropdownMenuItem(value: 'M', child: Text("MALE", style: TextStyle(color: Colors.black))),
+                                            const DropdownMenuItem(value: 'F', child: Text("FEMALE", style: TextStyle(color: Colors.black))),
+                                            DropdownMenuItem(
+                                              value: 'CUSTOM', 
+                                              // 👇 Dynamically shows their saved custom gender in the dropdown list!
+                                              child: Text(
+                                                (_selectedGender == 'CUSTOM' && _customGenderController.text.isNotEmpty)
+                                                    ? _customGenderController.text.toUpperCase()
+                                                    : "OTHER...", 
+                                                style: const TextStyle(color: Colors.black)
+                                              )
+                                            ),
+                                          ],
+                                          onChanged: (val) {
+                                            if (val == 'CUSTOM') {
+                                              setState(() {
+                                                _selectedGender = 'CUSTOM';
+                                                _isEditingCustomGender = true; // 👈 Activates the keyboard
+                                              });
+                                            } else {
+                                              setState(() {
+                                                _selectedGender = val!;
+                                                _isEditingCustomGender = false;
+                                              });
+                                            }
+                                          },
+                                        ),
                                   ],
                                 ),
                               ),
@@ -549,11 +614,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             width: double.infinity, height: 45,
                             child: ElevatedButton(
                               style: ElevatedButton.styleFrom(
-                                // 👇 Dynamically change color
                                 backgroundColor: _hasChanges ? Colors.indigo : Colors.grey[400], 
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))
                               ),
-                              // 👇 Disable button if no changes or loading
                               onPressed: (!_hasChanges || _isLoading) ? null : _saveProfile,
                               child: _isLoading 
                                 ? const CupertinoActivityIndicator(color: Colors.white, radius: 10) 
@@ -626,7 +689,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
 
                     // 🗑️ APPLE COMPLIANCE: DELETE ACCOUNT
-                    // Only visible if logged in.
                     if (!isGuest) ...[
                       const SizedBox(height: 20),
                       Center(

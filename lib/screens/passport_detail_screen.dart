@@ -111,12 +111,20 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
     }
   }
 
-  // 🪄 FIX 3: Only snap back to center/scale/rotation if entering the MTA Museum
   void _updateDefaultCardPosition() {
     final size = MediaQuery.of(context).size;
     setState(() {
       if (_currentBgIndex == 4) {
-        _cardPosition = Offset(size.width / 2, size.height / 2);
+        double targetY = size.height / 2; // Default vertical center
+        
+        // 🛑 BUG 2 FIX: If there are 1 or 3 MTA stations, they layout at the 
+        // top of the screen. We shift the passport card down to 65% of the 
+        // screen height so it doesn't cover them and trigger the opacity fade!
+        if (_mtaStations.length == 1 || _mtaStations.length == 3) {
+          targetY = size.height * 0.65; 
+        }
+
+        _cardPosition = Offset(size.width / 2, targetY);
         _cardScale = 1.0; 
         _cardRotation = 0.0; // 👈 Forces the tilt to snap perfectly upright
       }

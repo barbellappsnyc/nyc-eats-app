@@ -98,10 +98,25 @@ class VisaDocument extends StatelessWidget {
     final String birthYear = (ageVal > 0) 
         ? (DateTime.now().year - ageVal).toString().substring(2) 
         : "99";
+
+    // 🔠 Format Custom Genders for the visual document
+    String displaySex = sex;
+    if (displaySex == 'M' || displaySex == 'F') {
+      displaySex = displaySex; 
+    } else if (displaySex.length >= 2) {
+      displaySex = "${displaySex[0].toUpperCase()}${displaySex[1].toLowerCase()}"; // "Bisexual" -> "Bi"
+    } else if (displaySex.length == 1) {
+      displaySex = displaySex.toUpperCase();
+    } else {
+      displaySex = 'X'; // Failsafe
+    }
+
+    // Passports use standard single-character codes for the MRZ tracking line below the photo
+    final String mrzSex = (displaySex == 'M' || displaySex == 'F') ? displaySex : "<";
     
     final String safeFirstChar = safeName.isNotEmpty ? safeName.substring(0, 1) : "X";
     final String mrzLine1 = "V<${theme.countryCode}$cleanName<<${'<' * (20 - cleanName.length)}";
-    final String mrzLine2 = "${safeFirstChar}12345678${theme.countryCode}${birthYear}01014$sex${'<' * 14}00";
+    final String mrzLine2 = "${safeFirstChar}12345678${theme.countryCode}${birthYear}01014$mrzSex${'<' * 14}00";
 
     final bool hasPhoto = photo != null && photo.isNotEmpty;
 
@@ -137,7 +152,26 @@ class VisaDocument extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(children: [Icon(Icons.stars, size: 14, color: theme.primaryColor), const SizedBox(width: 6), Text("VISA / ${theme.countryName.toUpperCase()}", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.5, color: theme.primaryColor, fontSize: 12))]),
+                        // 🛠 FIX: Wrap the left side in Expanded so it yields to the badge
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Icon(Icons.stars, size: 14, color: theme.primaryColor), 
+                              const SizedBox(width: 6), 
+                              Expanded(
+                                child: Text(
+                                  "VISA / ${theme.countryName.toUpperCase()}", 
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis, // 👈 Gracefully adds "..." if it hits the badge
+                                  style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.5, color: theme.primaryColor, fontSize: 12)
+                                ),
+                              )
+                            ]
+                          ),
+                        ),
+                        const SizedBox(width: 12), // Adds a tiny buffer between the text and the badge
+                        
+                        // The Right Badge (Remains perfectly intact and sized)
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2), 
                           decoration: BoxDecoration(border: Border.all(color: theme.primaryColor, width: 1), borderRadius: BorderRadius.circular(4)), 
@@ -194,7 +228,7 @@ class VisaDocument extends StatelessWidget {
                                 
                                 Row(
                                   children: [
-                                    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [_buildLabel("Sex", theme.primaryColor), Text(sex, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, fontFamily: 'Courier', color: Colors.black))]),
+                                    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [_buildLabel("Sex", theme.primaryColor), Text(displaySex, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, fontFamily: 'Courier', color: Colors.black))]),
                                     const SizedBox(width: 20),
                                     Column(crossAxisAlignment: CrossAxisAlignment.start, children: [_buildLabel("Age", theme.primaryColor), Text(ageVal > 0 ? ageVal.toString() : '--', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, fontFamily: 'Courier', color: Colors.black))]),
                                     const SizedBox(width: 20),

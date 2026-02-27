@@ -46,7 +46,9 @@ class _MtaBackgroundState extends State<MtaBackground> {
   // 🛑 REMOVED: The entire _tick(Duration elapsed) function with the math
 
   void _initializeBlobsIfNeed(double width, double height) {
-    if (_isInitialized && _screenSize.width == width) return;
+    // 🛠️ STEP 2 FIX: Also check if the number of stations has changed!
+    // If a new station arrives from the DB, this forces the blobs to recalculate.
+    if (_isInitialized && _screenSize.width == width && _blobs.length == widget.stations.length) return;
     _screenSize = Size(width, height);
     _blobs.clear();
     

@@ -207,9 +207,12 @@ class _PassportStackScreenState extends State<PassportStackScreen>
       // Instead of letting the book grow (1 + visas), we lock it to the DB's max_pages.
       int dbMaxPages = bookData['max_pages'] ?? 1; 
       
-      // Standard (6), Diplomat (21), Single (1), Wildcard (1)
       final int newTotal = dbMaxPages;
-      final int newActiveIndex = bookData['last_page_index'] ?? 0;
+      
+      // 🛑 BUG 1 FIX: Don't snap back to the cover if we are already reading!
+      // If _isLoading is false, it's a silent background refresh, so we 
+      // keep the user's current page (_activeIndex). Otherwise, use the DB's page.
+      int newActiveIndex = _isLoading ? (bookData['last_page_index'] ?? 0) : _activeIndex;
       
       final rawStamps = bookData['stamps'] ?? [];
       
@@ -623,12 +626,21 @@ class _PassportStackScreenState extends State<PassportStackScreen>
       stampData: newStamp
     );
 
+    // 🤫 STEP 1 FIX: Silently fetch the updated book from the DB right now! 
+    // PostGIS calculates the nearest mta_station_id instantly on the backend.
+    // We do NOT "await" this call, so the stamping animation keeps playing smoothly.
+    _fetchBookData(forceRefresh: true);
+
     // Wait for the rest of the animation
     await Future.delayed(const Duration(milliseconds: 400));
 
     if (mounted) {
       setState(() { 
-        collectedStamps.add(newStamp); 
+        // Fallback: Add the blank stamp optimistically ONLY if the network 
+        // is slow and the background fetch hasn't finished updating the list yet.
+        if (!collectedStamps.any((s) => s['name'] == newStamp['name'])) {
+          collectedStamps.add(newStamp); 
+        }
         _isStampingSequence = false;   
         _isStampActionPending = false; 
       });
@@ -648,17 +660,27 @@ class _PassportStackScreenState extends State<PassportStackScreen>
     final double velocity = details.primaryVelocity ?? 0;
     final double currentDrag = _dragNotifier.value;
 
+    // 👆 SWIPE UP (Dismiss card)
     if (currentDrag < -100 || velocity < -400) {
       if (_activeIndex < _totalCards - 1) {
         _animateCardAway();
       } else {
         _snapBack();
       }
-    } else {
+    } 
+    // 👇 SWIPE DOWN (Retrieve previous card)
+    else if (currentDrag > 50 || velocity > 200) { // Highly sensitive for simulator
+      if (_activeIndex > 0) {
+        _animateCardRetrieve();
+      } else {
+        _snapBack();
+      }
+    } 
+    // 🛑 NOT ENOUGH MOVEMENT (Snap back to center)
+    else {
       _snapBack();
     }
   }
-
   void _animateCardAway() {
     final double screenHeight = MediaQuery.of(context).size.height;
     _slideAnim = Tween<double>(begin: _dragNotifier.value, end: -screenHeight).animate(
