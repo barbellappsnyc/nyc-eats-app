@@ -328,4 +328,294 @@ class CuisineConstants {
     'donut': _en, 'ice cream': _it, 'frozen_yogurt': _en, 'dessert': _fr, 'cookie': _en, 'pretzel': _de,
     'deli': _en, 'bagel': _en, 'sandwich': _en,
   };
+
+  // ===========================================================================
+  // ✈️ 4. AIRPORT CODES (For Vintage Baggage Tag Backgrounds)
+  // ===========================================================================
+
+  // --- 1. SOVEREIGN COUNTRIES & NATIONALITIES ---
+  static const List<String> _usAirports = ['JFK', 'LGA', 'EWR', 'LAX', 'ORD', 'ATL', 'MIA', 'SFO', 'DFW', 'SEA'];
+  static const List<String> _auAirports = ['SYD', 'MEL', 'BNE', 'PER', 'ADL', 'CBR', 'HBA', 'DRW'];
+  static const List<String> _brAirports = ['GRU', 'GIG', 'BSB', 'CNF', 'SSA', 'FOR', 'REC', 'POA'];
+  static const List<String> _khAirports = ['PNH', 'REP', 'KOS'];
+  static const List<String> _cnAirports = ['PEK', 'PVG', 'CAN', 'CTU', 'SZX', 'KMG', 'XIY', 'HGH'];
+  static const List<String> _coAirports = ['BOG', 'MDE', 'CLO', 'CTG', 'BAQ'];
+  static const List<String> _cuAirports = ['HAV', 'VRA', 'SCU', 'HOG', 'SNU'];
+  static const List<String> _doAirports = ['SDQ', 'PUJ', 'STI', 'POP', 'LRM'];
+  static const List<String> _phAirports = ['MNL', 'CEB', 'DVO', 'CRK', 'ILO'];
+  static const List<String> _frAirports = ['CDG', 'ORY', 'NCE', 'LYS', 'MRS', 'TLS', 'BOD'];
+  static const List<String> _grAirports = ['ATH', 'SKG', 'HER', 'RHO', 'CFU', 'JMK', 'JTR'];
+  static const List<String> _gyAirports = ['GEO', 'OGL'];
+  static const List<String> _inAirports = ['DEL', 'BOM', 'BLR', 'HYD', 'MAA', 'CCU', 'COK', 'AMD'];
+  static const List<String> _ieAirports = ['DUB', 'ORK', 'SNN', 'NOC'];
+  static const List<String> _ilAirports = ['TLV', 'ETM', 'HFA'];
+  static const List<String> _itAirports = ['FCO', 'MXP', 'VCE', 'NAP', 'BLQ', 'PMO', 'CTA', 'LIN'];
+  static const List<String> _jmAirports = ['KIN', 'MBJ', 'OCJ'];
+  static const List<String> _jpAirports = ['NRT', 'HND', 'KIX', 'ITM', 'CTS', 'FUK', 'OKA', 'NGO'];
+  static const List<String> _kzAirports = ['ALA', 'NQZ', 'CIT', 'KGF', 'GUW'];
+  static const List<String> _krAirports = ['ICN', 'GMP', 'CJU', 'PUS', 'TAQ'];
+  static const List<String> _lbAirports = ['BEY'];
+  static const List<String> _myAirports = ['KUL', 'PEN', 'BKI', 'KCH', 'JHB'];
+  static const List<String> _mxAirports = ['MEX', 'CUN', 'GDL', 'MTY', 'SJD', 'PVR', 'TIJ'];
+  static const List<String> _plAirports = ['WAW', 'KRK', 'GDN', 'KTW', 'WRO'];
+  static const List<String> _ptAirports = ['LIS', 'OPO', 'FAO', 'FNC', 'PDL'];
+  static const List<String> _esAirports = ['MAD', 'BCN', 'PMI', 'AGP', 'ALC', 'TFS', 'VLC'];
+  static const List<String> _syAirports = ['DAM', 'ALP', 'LTK'];
+  static const List<String> _twAirports = ['TPE', 'KHH', 'TSA', 'RMQ', 'TNN'];
+  static const List<String> _thAirports = ['BKK', 'DMK', 'HKT', 'CNX', 'USM', 'KBV'];
+  static const List<String> _uzAirports = ['TAS', 'SKD', 'NMA', 'BHK', 'FEG'];
+  static const List<String> _vnAirports = ['SGN', 'HAN', 'DAD', 'CXR', 'PQC', 'HPH'];
+
+  // --- 2. BROAD REGIONS & CONTINENTS ---
+  static const List<String> _africanAirports = ['JNB', 'CPT', 'NBO', 'ADD', 'LOS', 'ACC', 'DKR', 'KGL'];
+  static const List<String> _arabAirports = ['DXB', 'AUH', 'DOH', 'RUH', 'JED', 'KWI', 'MCT', 'BAH'];
+  static const List<String> _asianAirports = ['SIN', 'BKK', 'NRT', 'ICN', 'PEK', 'HKG', 'TPE', 'KUL'];
+  static const List<String> _caribbeanAirports = ['NAS', 'SJU', 'BGI', 'POS', 'SXM', 'ANU', 'GCM'];
+  static const List<String> _latamAirports = ['PTY', 'LIM', 'SCL', 'EZE', 'UIO', 'MVD', 'BOG'];
+  static const List<String> _medAirports = ['MLA', 'LCA', 'PFO', 'PMO', 'CAG', 'IBZ'];
+  static const List<String> _meAirports = ['DOH', 'DXB', 'AMM', 'BEY', 'MCT', 'RUH', 'KWI'];
+  static const List<String> _nordicAirports = ['CPH', 'OSL', 'ARN', 'HEL', 'KEF', 'BGO', 'GOT'];
+  static const List<String> _westAfricanAirports = ['LOS', 'ACC', 'DKR', 'ABJ', 'FNA', 'BKO', 'OXB'];
+
+  // --- 3. HIGHLY SPECIFIC TERRITORIES & CULTURES ---
+  static const List<String> _cantoneseAirports = ['CAN', 'SZX', 'MFM', 'HKG', 'ZUH'];
+  static const List<String> _druzeAirports = ['BEY', 'AMM', 'DAM', 'TLV'];
+  static const List<String> _hawaiianAirports = ['HNL', 'OGG', 'KOA', 'LIH', 'ITO'];
+  static const List<String> _himalayanAirports = ['KTM', 'PBH', 'LXA', 'IXB', 'SXR'];
+  static const List<String> _hkAirports = ['HKG'];
+  static const List<String> _jewishAirports = ['TLV', 'ETM', 'JFK', 'EWR'];
+  static const List<String> _southernAirports = ['ATL', 'MSY', 'BNA', 'CHS', 'MEM', 'SAV', 'AUS'];
+  static const List<String> _uyghurAirports = ['URC', 'KHG', 'KCA', 'HTN'];
+
+  // --- 4. GLOBAL FALLBACKS (For generic foods/cuisines outside the 48 regions) ---
+  static const List<String> _defaultAirports = ['JFK', 'LGA', 'EWR', 'LHR', 'CDG', 'DXB', 'SIN', 'HKG'];
+
+  // ===========================================================================
+  // 🗺️ MASTER MAPPING: Connecting Cuisines to Airport Codes
+  // ===========================================================================
+  static const Map<String, List<String>> airportCodes = {
+    // --- Americana ---
+    'american': _usAirports, 
+    'diner': _usAirports, 
+    'hot_dog': _usAirports, 
+    'corn_dog': _usAirports, 
+    'burger': _usAirports, 
+    'steak': _usAirports, 
+    'grill': _usAirports,
+    'southern': _southernAirports, 
+    'soul_food': _southernAirports, 
+    'soul': _southernAirports, 
+    'cajun': _southernAirports,
+
+    // --- Europe ---
+    'italian': _itAirports, 
+    'pizza': _itAirports,
+    'french': _frAirports,
+    'irish': _ieAirports,
+    'spanish': _esAirports, 
+    'tapas': _esAirports, 
+    'basque': _esAirports,
+    'portuguese': _ptAirports,
+    'greek': _grAirports, 
+    'gyros': _grAirports,
+    'scandinavian': _nordicAirports,
+    'polish': _plAirports,
+    
+    // European Fallbacks mapped to default Global Hubs
+    'german': _defaultAirports, 
+    'austrian': _defaultAirports, 
+    'swiss': _defaultAirports, 
+    'fondue': _defaultAirports, 
+    'belgian': _defaultAirports,
+    'british': _defaultAirports, 
+    'fish_and_chips': _defaultAirports,
+    'russian': _defaultAirports, 
+    'ukrainian': _defaultAirports, 
+    'georgian': _defaultAirports, 
+    'eastern_european': _defaultAirports, 
+    'romanian': _defaultAirports, 
+    'balkan': _defaultAirports,
+
+    // --- Asia ---
+    'japanese': _jpAirports, 
+    'sushi': _jpAirports, 
+    'ramen': _jpAirports,
+    'korean': _krAirports,
+    'chinese': _cnAirports, 
+    'sichuan': _cnAirports, 
+    'dim_sum': _cantoneseAirports, 
+    'dumpling': _cnAirports, 
+    'dumplings': _cnAirports, 
+    'hotpot': _cnAirports,
+    'filipino': _phAirports,
+    'thai': _thAirports,
+    'vietnamese': _vnAirports,
+    'indian': _inAirports, 
+    'pakistani': _inAirports,
+    'sri_lankan': _asianAirports,
+    'nepalese': _himalayanAirports, 
+    'himalayan': _himalayanAirports, 
+    'tibetan': _himalayanAirports,
+    'burmese': _asianAirports,
+    'cambodian': _khAirports,
+    'indonesian': _asianAirports,
+    'malaysian': _myAirports,
+    'taiwanese': _twAirports,
+    'uyghur': _uyghurAirports,
+
+    // --- Central Asia & Middle East ---
+    'afghan': _asianAirports, 
+    'persian': _meAirports,
+    'middle_eastern': _meAirports, 
+    'turkish': _meAirports, 
+    'kebab': _meAirports, 
+    'doner': _meAirports, 
+    'falafel': _meAirports,
+    'lebanese': _lbAirports,
+    'israeli': _ilAirports,
+    'yemeni': _arabAirports, 
+    'egyptian': _arabAirports,
+
+    // --- Latin America & Caribbean ---
+    'brazilian': _brAirports,
+    'mexican': _mxAirports, 
+    'tex-mex': _mxAirports, 
+    'taco': _mxAirports,
+    'colombian': _coAirports,
+    'argentinian': _latamAirports, 
+    'uruguayan': _latamAirports,
+    'peruvian': _latamAirports, 
+    'ecuadorian': _latamAirports,
+    'venezuelan': _latamAirports,
+    'salvadoran': _latamAirports, 
+    'salvadorian': _latamAirports, 
+    'guatemalan': _latamAirports, 
+    'honduran': _latamAirports,
+    'hispanic': _latamAirports, 
+    'latin': _latamAirports,
+    'jamaican': _jmAirports,
+    'dominican': _doAirports,
+    'cuban': _cuAirports,
+    'guyanese': _gyAirports,
+    'caribbean': _caribbeanAirports, 
+    'puerto_rican': _caribbeanAirports, 
+    'trinidadian': _caribbeanAirports, 
+    'haitian': _caribbeanAirports,
+
+    // --- Africa ---
+    'ethiopian': _africanAirports,
+    'senegalese': _westAfricanAirports,
+    'nigerian': _westAfricanAirports,
+    'west_african': _westAfricanAirports,
+    'african': _africanAirports,
+    'moroccan': _africanAirports,
+
+    // --- Specialized NYC & Global Fallbacks ---
+    'hawaiian': _hawaiianAirports, 
+    'poke': _hawaiianAirports,
+    
+    // We map Jewish Delis and Bagels heavily to NYC/TLV airports because of strong NYC appetizing culture
+    'deli': _jewishAirports, 
+    'bagel': _jewishAirports, 
+
+    // General Food / Vibes (Fallbacks)
+    'default': _defaultAirports,
+    'cafe': _defaultAirports, 
+    'bakery': _defaultAirports, 
+    'pastry': _defaultAirports, 
+    'crepe': _defaultAirports, 
+    'crepes': _defaultAirports,
+    'coffee': _defaultAirports, 
+    'bar': _defaultAirports, 
+    'pub': _defaultAirports, 
+    'gastropub': _defaultAirports, 
+    'wine': _defaultAirports, 
+    'cocktail': _defaultAirports,
+    'healthy': _defaultAirports, 
+    'salad': _defaultAirports, 
+    'health_food': _defaultAirports, 
+    'vegan': _defaultAirports,
+    'sandwich': _defaultAirports, 
+    'seafood': _defaultAirports, 
+    'fish': _defaultAirports, 
+    'soup': _defaultAirports, 
+    'buffet': _defaultAirports, 
+    'fine_dining': _defaultAirports, 
+    'regional': _defaultAirports,
+    'breakfast': _defaultAirports, 
+    'brunch': _defaultAirports, 
+    'international': _defaultAirports, 
+    'eclectic': _defaultAirports, 
+    'continental': _defaultAirports,
+    'bubble_tea': _defaultAirports, 
+    'bubble tea': _defaultAirports, 
+    'juice': _defaultAirports, 
+    'smoothie': _defaultAirports, 
+    'açaí': _defaultAirports, 
+    'snack': _defaultAirports, 
+    'donut': _defaultAirports, 
+    'ice cream': _defaultAirports, 
+    'frozen_yogurt': _defaultAirports, 
+    'dessert': _defaultAirports, 
+    'cookie': _defaultAirports, 
+    'pretzel': _defaultAirports,
+  };
+
+  // ===========================================================================
+  // 🏙️ 5. BILINGUAL CITY NAMES (For Baggage Tags)
+  // Native Language / English Name
+  // ===========================================================================
+  static const Map<String, String> airportCityNames = {
+    // --- USA ---
+    'JFK': 'New York', 'LGA': 'New York', 'EWR': 'Newark', 'LAX': 'Los Angeles',
+    'ORD': 'Chicago', 'ATL': 'Atlanta', 'MIA': 'Miami', 'SFO': 'San Francisco',
+    'DFW': 'Dallas', 'SEA': 'Seattle', 'MSY': 'New Orleans', 'BNA': 'Nashville',
+    'CHS': 'Charleston', 'MEM': 'Memphis', 'SAV': 'Savannah', 'AUS': 'Austin',
+    'HNL': 'Honolulu', 'OGG': 'Kahului', 'KOA': 'Kailua-Kona', 'LIH': 'Līhuʻe', 'ITO': 'Hilo',
+    // --- Europe ---
+    'CDG': 'Paris', 'ORY': 'Paris', 'NCE': 'Nice', 'LYS': 'Lyon', 'MRS': 'Marseille', 'TLS': 'Toulouse', 'BOD': 'Bordeaux',
+    'FCO': 'Roma / Rome', 'MXP': 'Milano / Milan', 'VCE': 'Venezia / Venice', 'NAP': 'Napoli / Naples', 'BLQ': 'Bologna', 'PMO': 'Palermo', 'CTA': 'Catania', 'LIN': 'Milano / Milan',
+    'MAD': 'Madrid', 'BCN': 'Barcelona', 'PMI': 'Palma de Mallorca', 'AGP': 'Málaga', 'ALC': 'Alicante', 'TFS': 'Tenerife', 'VLC': 'Valencia',
+    'LHR': 'London', 'DUB': 'Baile Átha Cliath / Dublin', 'ORK': 'Corcaigh / Cork', 'SNN': 'Sionna / Shannon', 'NOC': 'Cnoc Mhuire / Knock',
+    'ATH': 'Αθήνα / Athens', 'SKG': 'Θεσσαλονίκη / Thessaloniki', 'HER': 'Ηράκλειο / Heraklion', 'RHO': 'Ρόδος / Rhodes', 'CFU': 'Κέρκυρα / Corfu', 'JMK': 'Μύκονος / Mykonos', 'JTR': 'Σαντορίνη / Santorini',
+    'LIS': 'Lisboa / Lisbon', 'OPO': 'Porto', 'FAO': 'Faro', 'FNC': 'Funchal', 'PDL': 'Ponta Delgada',
+    'WAW': 'Warszawa / Warsaw', 'KRK': 'Kraków / Cracow', 'GDN': 'Gdańsk', 'KTW': 'Katowice', 'WRO': 'Wrocław',
+    'CPH': 'København / Copenhagen', 'OSL': 'Oslo', 'ARN': 'Stockholm', 'HEL': 'Helsinki', 'KEF': 'Reykjavík', 'BGO': 'Bergen', 'GOT': 'Göteborg / Gothenburg',
+    'MLA': 'Malta', 'LCA': 'Larnaca', 'PFO': 'Paphos', 'CAG': 'Cagliari', 'IBZ': 'Ibiza',
+    // --- Asia ---
+    'NRT': '東京 / Tokyo', 'HND': '東京 / Tokyo', 'KIX': '大阪 / Osaka', 'ITM': '大阪 / Osaka', 'CTS': '札幌 / Sapporo', 'FUK': '福岡 / Fukuoka', 'OKA': '那覇 / Naha', 'NGO': '名古屋 / Nagoya',
+    'PEK': '北京 / Beijing', 'PVG': '上海 / Shanghai', 'CAN': '广州 / Guangzhou', 'CTU': '成都 / Chengdu', 'SZX': '深圳 / Shenzhen', 'KMG': '昆明 / Kunming', 'XIY': '西安 / Xi\'an', 'HGH': '杭州 / Hangzhou',
+    'HKG': '香港 / Hong Kong', 'MFM': '澳門 / Macau', 'ZUH': '珠海 / Zhuhai',
+    'TPE': '台北 / Taipei', 'KHH': '高雄 / Kaohsiung', 'TSA': '台北 / Taipei', 'RMQ': '台中 / Taichung', 'TNN': '台南 / Tainan',
+    'ICN': '서울 / Seoul', 'GMP': '서울 / Seoul', 'CJU': '제주 / Jeju', 'PUS': '부산 / Busan', 'TAQ': '대구 / Daegu',
+    'BKK': 'กรุงเทพมหานคร / Bangkok', 'DMK': 'กรุงเทพมหานคร / Bangkok', 'HKT': 'ภูเก็ต / Phuket', 'CNX': 'เชียงใหม่ / Chiang Mai', 'USM': 'เกาะสมุย / Koh Samui', 'KBV': 'กระบี่ / Krabi',
+    'SGN': 'Hồ Chí Minh / Ho Chi Minh City', 'HAN': 'Hà Nội / Hanoi', 'DAD': 'Đà Nẵng / Da Nang', 'CXR': 'Nha Trang', 'PQC': 'Phú Quốc', 'HPH': 'Hải Phòng / Hai Phong',
+    'MNL': 'Maynila / Manila', 'CEB': 'Cebu', 'DVO': 'Davao', 'CRK': 'Angeles / Clark', 'ILO': 'Iloilo',
+    'KUL': 'Kuala Lumpur', 'PEN': 'Pulau Pinang / Penang', 'BKI': 'Kota Kinabalu', 'KCH': 'Kuching', 'JHB': 'Johor Bahru',
+    'SIN': 'Singapore', 'PNH': 'ភ្នំពេញ / Phnom Penh', 'REP': 'ក្រុងសៀមរាប / Siem Reap', 'KOS': 'ក្រុងព្រះសីហនុ / Sihanoukville',
+    'DEL': 'नई दिल्ली / New Delhi', 'BOM': 'मुंबई / Mumbai', 'BLR': 'ಬೆಂಗಳೂರು / Bangalore', 'HYD': 'హైదరాబాద్ / Hyderabad', 'MAA': 'சென்னை / Chennai', 'CCU': 'কলকাতা / Kolkata', 'COK': 'കൊച്ചി / Kochi', 'AMD': 'અમદાવાદ / Ahmedabad',
+    'KTM': 'काठमाडौं / Kathmandu', 'PBH': 'སྤ་རོ་ / Paro', 'LXA': 'ལྷ་ས་ / Lhasa', 'IXB': 'Siliguri / Bagdogra', 'SXR': 'سِری نَگَر / Srinagar',
+    'ALA': 'Алматы / Almaty', 'NQZ': 'Астана / Astana', 'CIT': 'Шымкент / Shymkent', 'KGF': 'Қарағанды / Karaganda', 'GUW': 'Атырау / Atyrau',
+    'TAS': 'Toshkent / Tashkent', 'SKD': 'Samarqand / Samarkand', 'NMA': 'Namangan', 'BHK': 'Buxoro / Bukhara', 'FEG': 'Fargʻona / Fergana',
+    'URC': 'ئۈرۈمچى / Ürümqi', 'KHG': 'قەشقەر / Kashgar', 'KCA': 'كۇچار / Kuqa', 'HTN': 'خوتەن / Hotan',
+    // --- Middle East & Africa ---
+    'DXB': 'دبي / Dubai', 'AUH': 'أبو ظبي / Abu Dhabi', 'DOH': 'الدوحة / Doha', 'RUH': 'الرياض / Riyadh', 'JED': 'جدة / Jeddah', 'KWI': 'الكويت / Kuwait', 'MCT': 'مسقط / Muscat', 'BAH': 'البحرين / Bahrain',
+    'TLV': 'תל אביב / Tel Aviv', 'ETM': 'אילת / Eilat', 'HFA': 'חיפה / Haifa',
+    'BEY': 'بيروت / Beirut', 'AMM': 'عمان / Amman', 'DAM': 'دمشق / Damascus', 'ALP': 'حلب / Aleppo', 'LTK': 'اللاذقية / Latakia',
+    'JNB': 'Johannesburg', 'CPT': 'Cape Town', 'NBO': 'Nairobi', 'ADD': 'Addis Ababa', 'LOS': 'Lagos', 'ACC': 'Accra', 'DKR': 'Dakar', 'KGL': 'Kigali',
+    'ABJ': 'Abidjan', 'FNA': 'Freetown', 'BKO': 'Bamako', 'OXB': 'Bissau',
+    // --- Latin America & Caribbean ---
+    'MEX': 'Ciudad de México / Mexico City', 'CUN': 'Cancún', 'GDL': 'Guadalajara', 'MTY': 'Monterrey', 'SJD': 'San José del Cabo', 'PVR': 'Puerto Vallarta', 'TIJ': 'Tijuana',
+    'GRU': 'São Paulo', 'GIG': 'Rio de Janeiro', 'BSB': 'Brasília', 'CNF': 'Belo Horizonte', 'SSA': 'Salvador', 'FOR': 'Fortaleza', 'REC': 'Recife', 'POA': 'Porto Alegre',
+    'BOG': 'Bogotá', 'MDE': 'Medellín', 'CLO': 'Cali', 'CTG': 'Cartagena', 'BAQ': 'Barranquilla',
+    'HAV': 'La Habana / Havana', 'VRA': 'Varadero', 'SCU': 'Santiago de Cuba', 'HOG': 'Holguín', 'SNU': 'Santa Clara',
+    'SDQ': 'Santo Domingo', 'PUJ': 'Punta Cana', 'STI': 'Santiago', 'POP': 'Puerto Plata', 'LRM': 'La Romana',
+    'PTY': 'Panamá / Panama City', 'LIM': 'Lima', 'SCL': 'Santiago', 'EZE': 'Buenos Aires', 'UIO': 'Quito', 'MVD': 'Montevideo',
+    'NAS': 'Nassau', 'SJU': 'San Juan', 'BGI': 'Bridgetown', 'POS': 'Port of Spain', 'SXM': 'Sint Maarten', 'ANU': 'Antigua', 'GCM': 'Grand Cayman',
+    'KIN': 'Kingston', 'MBJ': 'Montego Bay', 'OCJ': 'Ocho Rios',
+    'GEO': 'Georgetown', 'OGL': 'Ogle',
+    // --- Oceania ---
+    'SYD': 'Sydney', 'MEL': 'Melbourne', 'BNE': 'Brisbane', 'PER': 'Perth', 'ADL': 'Adelaide', 'CBR': 'Canberra', 'HBA': 'Hobart', 'DRW': 'Darwin',
+  };
+
 }

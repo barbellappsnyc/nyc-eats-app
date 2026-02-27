@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:nyc_eats/config/cuisine_constants.dart';
 import 'dart:math';
-import '../config/cuisine_constants.dart'; 
 
 // 👈 CHANGED: Now a simple StatelessWidget!
 class LanguageCollageBackground extends StatelessWidget {

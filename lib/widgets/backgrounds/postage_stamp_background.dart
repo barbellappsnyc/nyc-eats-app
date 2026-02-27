@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
-import '../config/cuisine_constants.dart'; // 👈 Adjust path if needed
+import 'package:nyc_eats/config/cuisine_constants.dart';
 
 class PostageStampBackground extends StatelessWidget {
   final String cuisine;

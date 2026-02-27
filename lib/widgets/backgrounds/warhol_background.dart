@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../config/cuisine_constants.dart';
+import 'package:nyc_eats/config/cuisine_constants.dart';
 
 class WarholBackground extends StatelessWidget {
   final String cuisine;

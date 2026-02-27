@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../widgets/coordinate_collage_background.dart';
-import '../widgets/postage_stamp_background.dart';
-import '../widgets/language_collage_background.dart';
+import 'package:nyc_eats/widgets/backgrounds/baggage_tag_background.dart';
+import 'package:nyc_eats/widgets/backgrounds/tablecloth_background.dart';
+import '../widgets/backgrounds/coordinate_collage_background.dart';
+import '../widgets/backgrounds/postage_stamp_background.dart';
+import '../widgets/backgrounds/language_collage_background.dart';
 import 'package:screenshot/screenshot.dart';
-import '../widgets/checkered_background.dart'; 
+import '../widgets/backgrounds/checkered_background.dart'; 
 
 import 'dart:io';
 import 'dart:typed_data';
@@ -13,9 +15,9 @@ import 'package:gal/gal.dart';
 import 'package:share_plus/share_plus.dart';
 import 'dart:ui'; 
 import 'package:flutter/cupertino.dart';
-import '../widgets/mta_background.dart';
+import '../widgets/backgrounds/mta_background.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../widgets/warhol_background.dart';
+import '../widgets/backgrounds/warhol_background.dart';
 
 // 🗺️ FAST & FREE BOROUGH CALCULATOR
 String getBorough(double lat, double lng) {
@@ -84,7 +86,7 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
   void initState() {
     super.initState();
 
-    _bgIsLight = [true, false, true, true, false, true, false];
+    _bgIsLight = [true, true, true, false, true, true, false, true, false];
 
     _squishController = AnimationController(
       vsync: this,
@@ -295,6 +297,13 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
 
     final List<Widget> bgDesigns = [
       Container(color: widget.backgroundColor), 
+      // 🛫 THE NEW DYNAMIC COLLAGE
+      BaggageTagBackground(
+        cuisine: widget.cuisine,
+        stamps: widget.stamps, 
+      ),
+      // 🍕 THE NEW OLD-SCHOOL NY TABLECLOTH
+      const PizzeriaTableclothBackground(),
       CoordinateCollageBackground(stamps: widget.stamps), 
       LanguageCollageBackground(cuisine: widget.cuisine, currentFont: _fonts[_fontIndex]), 
       PostageStampBackground(cuisine: widget.cuisine), 
