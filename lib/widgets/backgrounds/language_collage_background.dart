@@ -2,11 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:nyc_eats/config/cuisine_constants.dart';
 import 'dart:math';
 
-// 👈 CHANGED: Now a simple StatelessWidget!
 class LanguageCollageBackground extends StatelessWidget {
   final String cuisine;
-  final String currentFont; // 👈 NEW: Accepts the font from the parent screen
-  const LanguageCollageBackground({super.key, required this.cuisine, required this.currentFont});
+  final String currentFont; 
+
+  const LanguageCollageBackground({
+    super.key, 
+    required this.cuisine, 
+    required this.currentFont,
+  });
 
   List<String> _getPhrases() {
     final String searchTarget = cuisine.toLowerCase();
@@ -21,80 +25,71 @@ class LanguageCollageBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final List<String> phrases = _getPhrases();
-    final Random rnd = Random(42); 
+    
+    // We seed the randomizer with the cuisine's name. 
+    // This ensures the chaos looks completely organic, but doesn't frantically 
+    // reshuffle every single time the user drags the passport card.
+    final Random rnd = Random(cuisine.hashCode); 
 
-    final List<Color> paperColors = [
-      const Color(0xFFFBF8F1), const Color(0xFFF4ECD8), const Color(0xFFEFE5D0), 
-      const Color(0xFFF9F6EE), const Color(0xFFF5EBE0), 
+    // 🎨 The Passport Ink Palette
+    final List<Color> inkColors = [
+      const Color(0xFF1A2A42), // Faded Indigo / Customs Blue
+      const Color(0xFF8B1A1A), // Deep Crimson / Entry Stamp Red
+      const Color(0xFF1F4A2C), // Forest Green / Exit Stamp
+      const Color(0xFF2B2B2B), // Charcoal / Heavy Black Ink
+      const Color(0xFF6A2C70), // Faded Plum
     ];
 
-    final List<String> metaTags = [
-      '(n.)', '(v.)', 'adj.', 'adv.', 'expr.', 
-      '[idiom]', 'fig.', 'lit.', '1.', '2.', 'phr.'
-    ];
+    return Container(
+      color: const Color(0xFFF4F1EA), // Textured cream passport paper
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final List<Widget> stamps = [];
+          
+          // 🖨️ Fire 45 random stamps across the canvas
+          for (int i = 0; i < 45; i++) {
+            final String phrase = phrases[rnd.nextInt(phrases.length)];
+            final Color inkColor = inkColors[rnd.nextInt(inkColors.length)];
+            
+            // Randomize the aesthetic of the stamp
+            final double fontSize = rnd.nextDouble() * 36 + 16; // Sizes from 16 to 52
+            final double opacity = rnd.nextDouble() * 0.6 + 0.15; // Opacity from 15% (faded) to 75% (fresh)
+            final double angle = (rnd.nextDouble() * 0.3) - 0.15; // Slight tilt between -8.5 and +8.5 degrees
+            
+            // Randomize the coordinates (allowing them to bleed off the edges of the screen)
+            final double leftPos = rnd.nextDouble() * (constraints.maxWidth + 100) - 50;
+            final double topPos = rnd.nextDouble() * (constraints.maxHeight + 100) - 50;
 
-    Widget buildDictionaryBlock(int flex) {
-      final String phrase = phrases[rnd.nextInt(phrases.length)];
-      final Color bgColor = paperColors[rnd.nextInt(paperColors.length)];
-      final String metaTag = metaTags[rnd.nextInt(metaTags.length)];
-      
-      return Expanded(
-        flex: flex,
-        child: Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: bgColor,
-            border: Border.all(color: Colors.black.withOpacity(0.6), width: 0.5), 
-          ),
-          child: Stack(
-            children: [
+            stamps.add(
               Positioned(
-                top: 6, left: 8,
-                child: Text(
-                  metaTag,
-                  style: TextStyle(fontFamily: 'Times New Roman', fontSize: 11, fontStyle: FontStyle.italic, color: Colors.black.withOpacity(0.5)),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(top: 24, bottom: 12, left: 12, right: 12),
-                child: Center(
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown, 
+                left: leftPos,
+                top: topPos,
+                child: Transform.rotate(
+                  angle: angle,
+                  child: Opacity(
+                    opacity: opacity,
                     child: Text(
                       phrase,
-                      textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontFamily: currentFont, // 👈 Uses the passed-in font
-                        fontSize: 28, 
-                        fontWeight: FontWeight.w600, 
-                        color: Colors.black87,
-                        height: 1.1,
-                        letterSpacing: -0.5,
+                        fontFamily: currentFont, // Keeps your aesthetic font
+                        fontSize: fontSize,
+                        fontWeight: FontWeight.w900, // Heavy weight to mimic thick rubber stamps
+                        color: inkColor,
+                        letterSpacing: -1.0, // Tightly tracked for that physical stamp feel
                       ),
                     ),
                   ),
                 ),
               ),
-            ],
-          ),
-        ),
-      );
-    }
+            );
+          }
 
-    // 👈 CHANGED: Removed the Stack and Button. Just returns the pure grid!
-    return Container(
-      color: const Color(0xFFFDFBF7), 
-      padding: const EdgeInsets.all(4.0), 
-      child: SafeArea(
-        top: false, bottom: false,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(flex: 4, child: Column(children: [buildDictionaryBlock(3), buildDictionaryBlock(5), buildDictionaryBlock(2), buildDictionaryBlock(4), buildDictionaryBlock(3)])),
-            Expanded(flex: 5, child: Column(children: [buildDictionaryBlock(4), buildDictionaryBlock(3), buildDictionaryBlock(6), buildDictionaryBlock(2), buildDictionaryBlock(4)])),
-            Expanded(flex: 4, child: Column(children: [buildDictionaryBlock(2), buildDictionaryBlock(4), buildDictionaryBlock(3), buildDictionaryBlock(5), buildDictionaryBlock(2)])),
-          ],
-        ),
+          // Return the chaotic stack of text
+          return Stack(
+            clipBehavior: Clip.none,
+            children: stamps,
+          );
+        },
       ),
     );
   }

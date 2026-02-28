@@ -70,7 +70,6 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
     'Georgia', 'Helvetica', 'Courier', 'Times New Roman', 'Trebuchet MS'
   ];
 
-  // 🏎️ NEW: Tells the animation to turn off when your finger is actively dragging
   bool _isDragging = false;
   
   late List<bool> _bgIsLight;   
@@ -80,12 +79,13 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
   List<Map<String, dynamic>> _mtaStations = [];
   bool _isLoadingStations = true;
 
-  bool _isPositionInitialized = false; // 👈 NEW: Tracks the first frame
+  bool _isPositionInitialized = false; 
 
   @override
   void initState() {
     super.initState();
 
+    // Updated array length to match the 9 backgrounds
     _bgIsLight = [true, true, true, false, true, true, false, true, false];
 
     _squishController = AnimationController(
@@ -97,39 +97,41 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
       CurvedAnimation(parent: _squishController, curve: Curves.easeInOut),
     );
 
-    // 🛑 REMOVED: The post-frame callback that caused the Hero snap glitch
     _fetchMtaStations(); 
   }
 
-  // 🪄 FIX 2: This fires BEFORE the first frame paints, giving the Hero a perfect landing pad
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!_isPositionInitialized) {
       final size = MediaQuery.of(context).size;
       _cardPosition = Offset(size.width / 2, size.height / 2);
-      _cardScale = 0.85; // Standard resting scale
+      _cardScale = 0.85; 
       _isPositionInitialized = true;
     }
   }
 
-  void _updateDefaultCardPosition() {
+  // 🪄 THE FIX: Now it needs to know where it came from
+  void _updateDefaultCardPosition(int previousIndex) {
     final size = MediaQuery.of(context).size;
     setState(() {
-      if (_currentBgIndex == 4) {
-        double targetY = size.height / 2; // Default vertical center
-        
-        // 🛑 BUG 2 FIX: If there are 1 or 3 MTA stations, they layout at the 
-        // top of the screen. We shift the passport card down to 65% of the 
-        // screen height so it doesn't cover them and trigger the opacity fade!
+      // 1. ENTERING MTA: Snap down out of the way
+      if (_currentBgIndex == 6) { 
+        double targetY = size.height / 2; 
         if (_mtaStations.length == 1 || _mtaStations.length == 3) {
           targetY = size.height * 0.65; 
         }
-
         _cardPosition = Offset(size.width / 2, targetY);
         _cardScale = 1.0; 
-        _cardRotation = 0.0; // 👈 Forces the tilt to snap perfectly upright
+        _cardRotation = 0.0; 
+      } 
+      // 2. EXITING MTA: Smoothly reset to the center
+      else if (previousIndex == 6) {
+        _cardPosition = Offset(size.width / 2, size.height / 2);
+        _cardScale = 0.85; 
+        _cardRotation = 0.0; 
       }
+      // 3. ANY OTHER CHANGE: Do absolutely nothing. Keep the user's custom layout!
     });
   }
 
@@ -137,7 +139,8 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
     try {
       Uint8List? imageBytes;
 
-      if (_currentBgIndex == 5) {
+      // 👈 REWIRED: Checkered Background is now at Index 7
+      if (_currentBgIndex == 7) { 
         imageBytes = await _cardOnlyController.capture(pixelRatio: 3.0);
       } else {
         imageBytes = await _fullScreenController.capture(pixelRatio: 3.0);
@@ -215,21 +218,20 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
           .select()
           .inFilter('id', stationIds); 
 
-      // Inside your _fetchMtaStations() method, find the setState block and add this:
       if (mounted) {
         setState(() {
           _mtaStations = List<Map<String, dynamic>>.from(response);
           _isLoadingStations = false;
         });
-        // 👇 NEW: Fire the positioner once the data actually loads
-        _updateDefaultCardPosition(); 
+        
+        // 🪄 THE FIX: Pass -1 to satisfy the argument requirement without triggering the reset logic
+        _updateDefaultCardPosition(-1); 
       }
     } catch (e) {
       debugPrint("SUPABASE ERROR: $e");
     }
   }
 
-  // 💧 THE LIQUID GLASS BUTTON (iOS 18 / iPhone 17 Control Center Style)
   Widget _buildGroovedButton({
     required IconData icon,
     required VoidCallback onTap,
@@ -241,7 +243,6 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
         margin: const EdgeInsets.symmetric(horizontal: 6),
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          // A soft shadow to float the glass bead off the pill
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.15),
@@ -252,26 +253,24 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
         ),
         child: ClipOval(
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25), // Independent glass distortion
+            filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25), 
             child: Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                // 🧊 The Liquid Volume: Bright highlight top-left, fading to transparent
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    Colors.white.withOpacity(0.45), // Specular light catch on the top-left
-                    Colors.white.withOpacity(0.10), // The milky center
-                    Colors.white.withOpacity(0.0),  // Deep transparency on the bottom-right
+                    Colors.white.withOpacity(0.45), 
+                    Colors.white.withOpacity(0.10), 
+                    Colors.white.withOpacity(0.0),  
                   ],
                   stops: const [0.0, 0.4, 1.0],
                 ),
-                // ✨ The Glowing Edge
                 border: Border.all(
-                  color: Colors.white.withOpacity(0.4), // Glossy rim
-                  width: 1.2, // Slightly thicker for that curved glass feel
+                  color: Colors.white.withOpacity(0.4), 
+                  width: 1.2, 
                 ),
               ),
               child: Icon(icon, size: 26, color: color),
@@ -291,34 +290,30 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
   @override
   Widget build(BuildContext context) {
 
-    // 1. ADD THIS AT THE TOP OF THE BUILD METHOD
     final double cardWidth = (MediaQuery.of(context).size.width * 0.85).clamp(300.0, 400.0);
     final double cardHeight = cardWidth * (540 / 340);
 
     final List<Widget> bgDesigns = [
-      Container(color: widget.backgroundColor), 
-      // 🛫 THE NEW DYNAMIC COLLAGE
-      BaggageTagBackground(
-        cuisine: widget.cuisine,
-        stamps: widget.stamps, 
-      ),
-      // 🍕 THE NEW OLD-SCHOOL NY TABLECLOTH
-      const PizzeriaTableclothBackground(),
-      CoordinateCollageBackground(stamps: widget.stamps), 
-      LanguageCollageBackground(cuisine: widget.cuisine, currentFont: _fonts[_fontIndex]), 
-      PostageStampBackground(cuisine: widget.cuisine), 
-      // ... inside your bgDesigns array ...
-      MtaBackground(
+      Container(color: widget.backgroundColor), // Index 0
+      BaggageTagBackground(cuisine: widget.cuisine, stamps: widget.stamps), // Index 1
+      const PizzeriaTableclothBackground(), // Index 2
+      CoordinateCollageBackground(stamps: widget.stamps), // Index 3
+      LanguageCollageBackground(cuisine: widget.cuisine, currentFont: _fonts[_fontIndex]), // Index 4
+      
+      // 🪄 THE FIX: RepaintBoundary completely eliminates the drag lag
+      RepaintBoundary(
+        child: PostageStampBackground(cuisine: widget.cuisine), 
+      ), // Index 5
+      
+      MtaBackground( // Index 6
         stations: _mtaStations, 
         isDarkMode: _isMtaNightMode, 
         passportPosition: _cardPosition,
         passportScale: _cardScale,
-        isDragging: _isDragging, // 👈 NEW: Pass the state down!
+        isDragging: _isDragging, 
       ),
-      // ...
-      const CheckeredBackground(), 
-      // 🎨 NEW: THE WARHOL POP-ART BACKGROUND
-      WarholBackground(cuisine: widget.cuisine),
+      const CheckeredBackground(), // Index 7
+      WarholBackground(cuisine: widget.cuisine), // Index 8
     ];
 
     bool isLightBg = _bgIsLight[_currentBgIndex];
@@ -334,30 +329,33 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
         body: Stack(
           fit: StackFit.expand,
           children: [
-            // 🖼️ THE CAPTURABLE ART
             Screenshot(
               controller: _fullScreenController,
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  // 🟩 LAYER 1: THE BACKGROUND 
                   Positioned(
-                    // 🪄 THE FIX: Remove the 100px overflow ONLY for the MTA screen
-                    top: _currentBgIndex == 4 ? 0 : -100,
-                    bottom: _currentBgIndex == 4 ? 0 : -100,
-                    left: _currentBgIndex == 4 ? 0 : -100,
-                    right: _currentBgIndex == 4 ? 0 : -100,
+                    // 👈 REWIRED: Remove overflow only for MTA at Index 6
+                    top: _currentBgIndex == 6 ? 0 : -100,
+                    bottom: _currentBgIndex == 6 ? 0 : -100,
+                    left: _currentBgIndex == 6 ? 0 : -100,
+                    right: _currentBgIndex == 6 ? 0 : -100,
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTapDown: (_) => _squishController.forward(),
                       onTapCancel: () => _squishController.reverse(),
                       onTapUp: (_) {
                         _squishController.reverse();
+                        
+                        // 🪄 THE FIX: Save the current state before flipping the page
+                        int prevIndex = _currentBgIndex; 
+                        
                         setState(() {
                           _currentBgIndex = (_currentBgIndex + 1) % bgDesigns.length;
                         });
-                        // 👇 THE FIX: Re-calculate and snap the card to its ideal spot for the new background
-                        _updateDefaultCardPosition();
+                        
+                        // Pass the history to the smart positioner
+                        _updateDefaultCardPosition(prevIndex);
                       },
                       child: ScaleTransition(
                         scale: _squishAnimation,
@@ -368,13 +366,13 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
 
                   // 🪪 LAYER 2: THE CARD
                   AnimatedPositioned(
-                    duration: _isDragging ? Duration.zero : const Duration(milliseconds: 600),
-                    curve: Curves.easeOutExpo,
-                    // Dynamic center math (fixing the hardcoded 170/270)
+                    // 🪄 THE FIX: Snappier 450ms duration
+                    duration: _isDragging ? const Duration(milliseconds: 1) : const Duration(milliseconds: 450),
+                    curve: _isDragging ? Curves.linear : Curves.easeInOutCubic,
                     left: _cardPosition.dx - (cardWidth / 2), 
                     top: _cardPosition.dy - (cardHeight / 2),
-                    width: cardWidth,   // 👈 Explicit width for proper centering
-                    height: cardHeight, // 👈 Explicit height for proper centering
+                    width: cardWidth,   
+                    height: cardHeight, 
                     child: GestureDetector(
                       onTapDown: (_) {},
                       onTapUp: (_) {},
@@ -398,18 +396,18 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
                       onScaleEnd: (details) {
                         setState(() {
                            _isDragging = false; 
-                           // 🪄 THE SPRING-BACK: Re-added for the MTA background!
-                           if (_currentBgIndex == 4) {
-                              _updateDefaultCardPosition(); 
+                           // 🪄 THE FIX: Pass -1 as the previous index so it just triggers the "Entering MTA" logic to snap back
+                           if (_currentBgIndex == 6) {
+                              _updateDefaultCardPosition(-1); 
                            }
                         });
                       },
-                      // 🪄 FIX 1: Replaced Transform with AnimatedContainer
                       child: AnimatedContainer(
-                        duration: _isDragging ? Duration.zero : const Duration(milliseconds: 600),
-                        curve: Curves.easeOutExpo,
+                        // 🪄 THE FIX: Match the snappier 450ms duration
+                        duration: _isDragging ? const Duration(milliseconds: 1) : const Duration(milliseconds: 450),
+                        curve: _isDragging ? Curves.linear : Curves.easeInOutCubic,
                         alignment: Alignment.center,
-                        transformAlignment: Alignment.center, // 👈 CRITICAL: Rotates purely from the center
+                        transformAlignment: Alignment.center, 
                         transform: Matrix4.identity()
                           ..scale(_cardScale)
                           ..rotateZ(_cardRotation),
@@ -427,7 +425,6 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
               ),
             ),
             
-            // 🔙 LAYER 3: THE BACK BUTTON
             Positioned(
               top: MediaQuery.of(context).padding.top + 10,
               left: 16,
@@ -455,7 +452,6 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
               ),
             ),
 
-            // 📝 LAYER 4: THE HINT TEXT
             Positioned(
               bottom: 100,
               left: 0,
@@ -469,7 +465,7 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
                 ),
               ),
             ),
-            // 📸 LAYER 5: THE UNIFIED DYNAMIC CONTROL PILL
+
             Positioned(
               bottom: 40 + MediaQuery.of(context).padding.bottom,
               left: 0,
@@ -485,32 +481,30 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                         decoration: BoxDecoration(
-                          // A much softer, faint tray to let the liquid buttons pop
                           color: Colors.black.withOpacity(0.15), 
                           borderRadius: BorderRadius.circular(40),
                           border: Border.all(
-                            color: Colors.white.withOpacity(0.15), // Very faint rim
+                            color: Colors.white.withOpacity(0.15), 
                             width: 0.5,
                           ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            // ⬇️ ALWAYS VISIBLE: Download (Now on the Left)
                             _buildGroovedButton(
                               icon: CupertinoIcons.arrow_down,
                               onTap: _saveToCameraRoll,
                             ),
                             
-                            // ↗️ CONDITIONAL: Share (Now Middle-Left)
-                            if (_currentBgIndex != 5) 
+                            // 👈 REWIRED: Hidden for Checkered Background (Index 7)
+                            if (_currentBgIndex != 7) 
                               _buildGroovedButton(
                                 icon: CupertinoIcons.share,
                                 onTap: _shareToStory,
                               ),
 
-                            // 🔤 CONDITIONAL: Font Toggle (Now on the Right)
-                            if (_currentBgIndex == 2)
+                            // 👈 REWIRED: Shows Font Toggle for Language Background (Index 4)
+                            if (_currentBgIndex == 4)
                               _buildGroovedButton(
                                 icon: CupertinoIcons.textformat,
                                 onTap: () {
@@ -520,15 +514,15 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
                                 },
                               ),
 
-                            // 🌗 CONDITIONAL: Day/Night Toggle (Now on the Right)
-                            if (_currentBgIndex == 4)
+                            // 👈 REWIRED: Shows Day/Night Toggle for MTA Background (Index 6)
+                            if (_currentBgIndex == 6)
                               _buildGroovedButton(
                                 icon: _isMtaNightMode ? CupertinoIcons.moon_stars_fill : CupertinoIcons.sun_max_fill,
                                 color: _isMtaNightMode ? Colors.indigo[300]! : Colors.amber,
                                 onTap: () {
                                   setState(() {
                                     _isMtaNightMode = !_isMtaNightMode;
-                                    _bgIsLight[4] = !_isMtaNightMode; 
+                                    _bgIsLight[6] = !_isMtaNightMode; 
                                   });
                                 },
                               ),
