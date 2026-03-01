@@ -4,7 +4,6 @@ import 'package:nyc_eats/widgets/backgrounds/baggage_tag_background.dart';
 import 'package:nyc_eats/widgets/backgrounds/tablecloth_background.dart';
 import '../widgets/backgrounds/coordinate_collage_background.dart';
 import '../widgets/backgrounds/postage_stamp_background.dart';
-import '../widgets/backgrounds/language_collage_background.dart';
 import 'package:screenshot/screenshot.dart';
 import '../widgets/backgrounds/checkered_background.dart'; 
 
@@ -64,12 +63,6 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
   
   int _currentBgIndex = 0;
   bool _isMtaNightMode = true; 
-  
-  int _fontIndex = 0;
-  final List<String> _fonts = [
-    'Georgia', 'Helvetica', 'Courier', 'Times New Roman', 'Trebuchet MS'
-  ];
-
   bool _isDragging = false;
   
   late List<bool> _bgIsLight;   
@@ -85,8 +78,8 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
   void initState() {
     super.initState();
 
-    // Updated array length to match the 9 backgrounds
-    _bgIsLight = [true, true, true, false, true, true, false, true, false];
+    // 8 items to exactly match the 8 backgrounds left in the list
+    _bgIsLight = [true, true, true, false, true, false, true, false];
 
     _squishController = AnimationController(
       vsync: this,
@@ -111,12 +104,11 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
     }
   }
 
-  // 🪄 THE FIX: Now it needs to know where it came from
   void _updateDefaultCardPosition(int previousIndex) {
     final size = MediaQuery.of(context).size;
     setState(() {
-      // 1. ENTERING MTA: Snap down out of the way
-      if (_currentBgIndex == 6) { 
+      // 1. ENTERING MTA (Index 5)
+      if (_currentBgIndex == 5) { 
         double targetY = size.height / 2; 
         if (_mtaStations.length == 1 || _mtaStations.length == 3) {
           targetY = size.height * 0.65; 
@@ -125,13 +117,12 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
         _cardScale = 1.0; 
         _cardRotation = 0.0; 
       } 
-      // 2. EXITING MTA: Smoothly reset to the center
-      else if (previousIndex == 6) {
+      // 2. EXITING MTA (Index 5)
+      else if (previousIndex == 5) {
         _cardPosition = Offset(size.width / 2, size.height / 2);
         _cardScale = 0.85; 
         _cardRotation = 0.0; 
       }
-      // 3. ANY OTHER CHANGE: Do absolutely nothing. Keep the user's custom layout!
     });
   }
 
@@ -139,8 +130,8 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
     try {
       Uint8List? imageBytes;
 
-      // 👈 REWIRED: Checkered Background is now at Index 7
-      if (_currentBgIndex == 7) { 
+      // Checkered Background is now at Index 6
+      if (_currentBgIndex == 6) { 
         imageBytes = await _cardOnlyController.capture(pixelRatio: 3.0);
       } else {
         imageBytes = await _fullScreenController.capture(pixelRatio: 3.0);
@@ -224,7 +215,6 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
           _isLoadingStations = false;
         });
         
-        // 🪄 THE FIX: Pass -1 to satisfy the argument requirement without triggering the reset logic
         _updateDefaultCardPosition(-1); 
       }
     } catch (e) {
@@ -298,22 +288,18 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
       BaggageTagBackground(cuisine: widget.cuisine, stamps: widget.stamps), // Index 1
       const PizzeriaTableclothBackground(), // Index 2
       CoordinateCollageBackground(stamps: widget.stamps), // Index 3
-      LanguageCollageBackground(cuisine: widget.cuisine, currentFont: _fonts[_fontIndex]), // Index 4
-      
-      // 🪄 THE FIX: RepaintBoundary completely eliminates the drag lag
       RepaintBoundary(
         child: PostageStampBackground(cuisine: widget.cuisine), 
-      ), // Index 5
-      
-      MtaBackground( // Index 6
+      ), // Index 4
+      MtaBackground( // Index 5
         stations: _mtaStations, 
         isDarkMode: _isMtaNightMode, 
         passportPosition: _cardPosition,
         passportScale: _cardScale,
         isDragging: _isDragging, 
       ),
-      const CheckeredBackground(), // Index 7
-      WarholBackground(cuisine: widget.cuisine), // Index 8
+      const CheckeredBackground(), // Index 6
+      WarholBackground(cuisine: widget.cuisine), // Index 7
     ];
 
     bool isLightBg = _bgIsLight[_currentBgIndex];
@@ -335,11 +321,11 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
                 fit: StackFit.expand,
                 children: [
                   Positioned(
-                    // 👈 REWIRED: Remove overflow only for MTA at Index 6
-                    top: _currentBgIndex == 6 ? 0 : -100,
-                    bottom: _currentBgIndex == 6 ? 0 : -100,
-                    left: _currentBgIndex == 6 ? 0 : -100,
-                    right: _currentBgIndex == 6 ? 0 : -100,
+                    // Remove overflow only for MTA at Index 5
+                    top: _currentBgIndex == 5 ? 0 : -100,
+                    bottom: _currentBgIndex == 5 ? 0 : -100,
+                    left: _currentBgIndex == 5 ? 0 : -100,
+                    right: _currentBgIndex == 5 ? 0 : -100,
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTapDown: (_) => _squishController.forward(),
@@ -347,14 +333,12 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
                       onTapUp: (_) {
                         _squishController.reverse();
                         
-                        // 🪄 THE FIX: Save the current state before flipping the page
                         int prevIndex = _currentBgIndex; 
                         
                         setState(() {
                           _currentBgIndex = (_currentBgIndex + 1) % bgDesigns.length;
                         });
                         
-                        // Pass the history to the smart positioner
                         _updateDefaultCardPosition(prevIndex);
                       },
                       child: ScaleTransition(
@@ -366,7 +350,6 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
 
                   // 🪪 LAYER 2: THE CARD
                   AnimatedPositioned(
-                    // 🪄 THE FIX: Snappier 450ms duration
                     duration: _isDragging ? const Duration(milliseconds: 1) : const Duration(milliseconds: 450),
                     curve: _isDragging ? Curves.linear : Curves.easeInOutCubic,
                     left: _cardPosition.dx - (cardWidth / 2), 
@@ -396,14 +379,13 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
                       onScaleEnd: (details) {
                         setState(() {
                            _isDragging = false; 
-                           // 🪄 THE FIX: Pass -1 as the previous index so it just triggers the "Entering MTA" logic to snap back
-                           if (_currentBgIndex == 6) {
+                           // Trigger MTA return logic if let go on Index 5
+                           if (_currentBgIndex == 5) {
                               _updateDefaultCardPosition(-1); 
                            }
                         });
                       },
                       child: AnimatedContainer(
-                        // 🪄 THE FIX: Match the snappier 450ms duration
                         duration: _isDragging ? const Duration(milliseconds: 1) : const Duration(milliseconds: 450),
                         curve: _isDragging ? Curves.linear : Curves.easeInOutCubic,
                         alignment: Alignment.center,
@@ -496,33 +478,22 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
                               onTap: _saveToCameraRoll,
                             ),
                             
-                            // 👈 REWIRED: Hidden for Checkered Background (Index 7)
-                            if (_currentBgIndex != 7) 
+                            // Hidden for Checkered Background (Index 6)
+                            if (_currentBgIndex != 6) 
                               _buildGroovedButton(
                                 icon: CupertinoIcons.share,
                                 onTap: _shareToStory,
                               ),
 
-                            // 👈 REWIRED: Shows Font Toggle for Language Background (Index 4)
-                            if (_currentBgIndex == 4)
-                              _buildGroovedButton(
-                                icon: CupertinoIcons.textformat,
-                                onTap: () {
-                                  setState(() {
-                                    _fontIndex = (_fontIndex + 1) % _fonts.length;
-                                  });
-                                },
-                              ),
-
-                            // 👈 REWIRED: Shows Day/Night Toggle for MTA Background (Index 6)
-                            if (_currentBgIndex == 6)
+                            // Shows Day/Night Toggle for MTA Background (Index 5)
+                            if (_currentBgIndex == 5)
                               _buildGroovedButton(
                                 icon: _isMtaNightMode ? CupertinoIcons.moon_stars_fill : CupertinoIcons.sun_max_fill,
                                 color: _isMtaNightMode ? Colors.indigo[300]! : Colors.amber,
                                 onTap: () {
                                   setState(() {
                                     _isMtaNightMode = !_isMtaNightMode;
-                                    _bgIsLight[6] = !_isMtaNightMode; 
+                                    _bgIsLight[5] = !_isMtaNightMode; 
                                   });
                                 },
                               ),

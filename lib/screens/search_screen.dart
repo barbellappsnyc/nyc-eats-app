@@ -25,9 +25,11 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocus = FocusNode();
+  
   List<Restaurant> _filteredRestaurants = [];
+  List<String> _filteredCategories = []; // 👈 ADD THIS NEW VARIABLE
   String _query = "";
-
+  
   @override
   void initState() {
     super.initState();
@@ -48,11 +50,18 @@ class _SearchScreenState extends State<SearchScreen> {
       _query = query;
       if (query.isEmpty) {
         _filteredRestaurants = [];
+        _filteredCategories = []; // 👈 Reset this too
       } else {
+        // 1. Filter Restaurants
         _filteredRestaurants = widget.allRestaurants.where((r) {
           final nameMatch = r.name.toLowerCase().contains(query.toLowerCase());
           final cuisineMatch = r.cuisine.toLowerCase().contains(query.toLowerCase());
           return nameMatch || cuisineMatch;
+        }).toList();
+
+        // 2. 👈 NEW: Filter Categories
+        _filteredCategories = widget.availableCategories.where((c) {
+          return c.toLowerCase().contains(query.toLowerCase());
         }).toList();
       }
     });
@@ -209,36 +218,85 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildSearchResults(Color textColor, bool isDark) {
-    if (_filteredRestaurants.isEmpty) {
+    if (_filteredRestaurants.isEmpty && _filteredCategories.isEmpty) {
       return Center(
         child: Text("No results found", style: TextStyle(color: textColor)),
       );
     }
 
-    return ListView.builder(
-      itemCount: _filteredRestaurants.length,
-      itemBuilder: (context, index) {
-        final r = _filteredRestaurants[index];
-        return ListTile(
-          title: Text(r.name, style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
-          subtitle: Text(
-            "${r.cuisine} • ${r.price}",
-            style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600]),
-          ),
-          leading: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.redAccent.withOpacity(0.1),
-              shape: BoxShape.circle,
+    return ListView(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      children: [
+        // --- 🌍 MATCHING CUISINES SECTION ---
+        if (_filteredCategories.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+            child: Text(
+              "MATCHING CUISINES",
+              style: TextStyle(color: Colors.grey[500], fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.2),
             ),
-            child: const Icon(Icons.location_on, color: Colors.redAccent, size: 20),
           ),
-          onTap: () {
-            widget.onRestaurantSelected(r);
-            Navigator.pop(context);
-          },
-        );
-      },
+          ..._filteredCategories.map((cat) {
+            final emoji = _getEmojiForCategory(cat);
+            return ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+              leading: Container(
+                width: 45, height: 45,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.grey[800] : Colors.grey[100],
+                  shape: BoxShape.circle,
+                ),
+                child: emoji != null
+                    ? Text(emoji, style: const TextStyle(fontSize: 24))
+                    : Icon(Icons.restaurant, size: 20, color: textColor),
+              ),
+              title: Text(cat, style: TextStyle(color: textColor, fontSize: 16, fontWeight: FontWeight.w500)),
+              onTap: () {
+                widget.onCategorySelected(cat);
+                Navigator.pop(context);
+              },
+            );
+          }),
+          
+          // Add a divider if we also have restaurants below it
+          if (_filteredRestaurants.isNotEmpty)
+             Divider(height: 32, color: isDark ? Colors.grey[800] : Colors.grey[200], indent: 24, endIndent: 24),
+        ],
+
+        // --- 🍽️ MATCHING RESTAURANTS SECTION ---
+        if (_filteredRestaurants.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+            child: Text(
+              "RESTAURANTS",
+              style: TextStyle(color: Colors.grey[500], fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.2),
+            ),
+          ),
+          ..._filteredRestaurants.map((r) {
+            return ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4), // Added padding to align with cuisines
+              title: Text(r.name, style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
+              subtitle: Text(
+                "${r.cuisine} • ${r.price}",
+                style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600]),
+              ),
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.redAccent.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.location_on, color: Colors.redAccent, size: 20),
+              ),
+              onTap: () {
+                widget.onRestaurantSelected(r);
+                Navigator.pop(context);
+              },
+            );
+          }),
+        ]
+      ],
     );
   }
 }

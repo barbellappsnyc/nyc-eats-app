@@ -25,57 +25,56 @@ class LanguageCollageBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final List<String> phrases = _getPhrases();
-    
-    // We seed the randomizer with the cuisine's name. 
-    // This ensures the chaos looks completely organic, but doesn't frantically 
-    // reshuffle every single time the user drags the passport card.
+    // Seeds the layout so it stays perfectly still while you drag the passport
     final Random rnd = Random(cuisine.hashCode); 
 
-    // 🎨 The Passport Ink Palette
-    final List<Color> inkColors = [
-      const Color(0xFF1A2A42), // Faded Indigo / Customs Blue
-      const Color(0xFF8B1A1A), // Deep Crimson / Entry Stamp Red
-      const Color(0xFF1F4A2C), // Forest Green / Exit Stamp
-      const Color(0xFF2B2B2B), // Charcoal / Heavy Black Ink
-      const Color(0xFF6A2C70), // Faded Plum
-    ];
-
     return Container(
-      color: const Color(0xFFF4F1EA), // Textured cream passport paper
+      color: const Color(0xFF1C1C1E), // Dark, gritty tabletop background
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final List<Widget> stamps = [];
+          final List<Widget> strips = [];
           
-          // 🖨️ Fire 45 random stamps across the canvas
-          for (int i = 0; i < 45; i++) {
+          // Throw 18 strips of paper onto the table
+          for (int i = 0; i < 18; i++) { 
             final String phrase = phrases[rnd.nextInt(phrases.length)];
-            final Color inkColor = inkColors[rnd.nextInt(inkColors.length)];
             
-            // Randomize the aesthetic of the stamp
-            final double fontSize = rnd.nextDouble() * 36 + 16; // Sizes from 16 to 52
-            final double opacity = rnd.nextDouble() * 0.6 + 0.15; // Opacity from 15% (faded) to 75% (fresh)
-            final double angle = (rnd.nextDouble() * 0.3) - 0.15; // Slight tilt between -8.5 and +8.5 degrees
-            
-            // Randomize the coordinates (allowing them to bleed off the edges of the screen)
-            final double leftPos = rnd.nextDouble() * (constraints.maxWidth + 100) - 50;
+            // Randomize the physical placement and rotation
+            final double angle = (rnd.nextDouble() * 0.6) - 0.3; 
             final double topPos = rnd.nextDouble() * (constraints.maxHeight + 100) - 50;
+            final double leftPos = rnd.nextDouble() * (constraints.maxWidth + 100) - 50;
+            final double fontSize = rnd.nextDouble() * 14 + 22; // Sizes from 22 to 36
 
-            stamps.add(
+            strips.add(
               Positioned(
-                left: leftPos,
                 top: topPos,
+                left: leftPos,
                 child: Transform.rotate(
                   angle: angle,
-                  child: Opacity(
-                    opacity: opacity,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFDFBF7), // Warm receipt paper color
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.6),
+                          blurRadius: 10,
+                          offset: const Offset(5, 5), // Harsh, high-contrast drop shadow
+                        ),
+                      ],
+                      // Ripped paper effect via slightly uneven borders
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(rnd.nextDouble() * 3),
+                        bottomRight: Radius.circular(rnd.nextDouble() * 5),
+                      ),
+                    ),
                     child: Text(
                       phrase,
                       style: TextStyle(
-                        fontFamily: currentFont, // Keeps your aesthetic font
+                        fontFamily: currentFont, // 👈 Hooked directly to your Aa button
                         fontSize: fontSize,
-                        fontWeight: FontWeight.w900, // Heavy weight to mimic thick rubber stamps
-                        color: inkColor,
-                        letterSpacing: -1.0, // Tightly tracked for that physical stamp feel
+                        color: Colors.black87,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: -0.5,
                       ),
                     ),
                   ),
@@ -84,10 +83,9 @@ class LanguageCollageBackground extends StatelessWidget {
             );
           }
 
-          // Return the chaotic stack of text
           return Stack(
             clipBehavior: Clip.none,
-            children: stamps,
+            children: strips,
           );
         },
       ),

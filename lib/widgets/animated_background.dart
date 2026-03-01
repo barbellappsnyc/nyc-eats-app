@@ -66,6 +66,15 @@ class _AnimatedBackgroundState extends State<AnimatedBackground> with TickerProv
   List<Color> _getThemeColors(String sku) {
     switch (sku) {
 
+      case 'auth':
+        // 🌸 Plum & White Palette for Auth
+        return [
+          const Color(0xFF800020), // Rich Plum Red
+          Colors.white,
+          const Color(0xFFFDEBF1), // Pale pink/white
+          const Color(0xFF800020).withOpacity(0.7), // Blended Plum
+        ];
+
       case 'paywall':
         // 🌌 PAYWALL: Ultra-premium Deep Navy to Obsidian Black
         // Keeps the bottom dark so the glass buttons and white text pop perfectly.

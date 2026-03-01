@@ -140,14 +140,17 @@ class _SearchModalState extends State<SearchModal> {
   Widget build(BuildContext context) {
     final isDark = widget.isDarkMode;
 
-    // Filter Logic
+    // 1. Filter Categories (Countries/Cuisines)
     final visibleCategories = widget.availableCategories.where((cat) {
       return cat.toLowerCase().contains(_query.toLowerCase());
     }).toList();
 
-    final visibleRestaurants = _uniqueRestaurantNames.where((name) {
-      return name.toLowerCase().contains(_query.toLowerCase());
-    }).toList();
+    // 2. 🛠️ FIX: Filter Restaurants by BOTH Name and Cuisine!
+    final visibleRestaurants = widget.allRestaurants.where((r) {
+      final nameMatch = r.name.toLowerCase().contains(_query.toLowerCase());
+      final cuisineMatch = r.cuisine.toLowerCase().contains(_query.toLowerCase());
+      return nameMatch || cuisineMatch;
+    }).map((r) => r.name).toSet().toList()..sort(); // Keeps names unique and alphabetized
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.85,
@@ -157,41 +160,8 @@ class _SearchModalState extends State<SearchModal> {
       ),
       child: Column(
         children: [
-          // --- GRABBER ---
-          Center(
-            child: Container(
-              margin: const EdgeInsets.only(top: 10, bottom: 20),
-              width: 50, height: 5,
-              decoration: BoxDecoration(color: Colors.grey.withOpacity(0.5), borderRadius: BorderRadius.circular(10))
-            ),
-          ),
-
-          // --- SEARCH FIELD ---
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
-            child: TextField(
-              controller: _controller,
-              autofocus: true,
-              style: TextStyle(color: isDark ? Colors.white : Colors.black, fontSize: 18),
-              decoration: InputDecoration(
-                hintText: "Search cuisines or restaurants...",
-                hintStyle: TextStyle(color: Colors.grey[500]),
-                prefixIcon: Icon(Icons.search_rounded, color: isDark ? Colors.white70 : Colors.black54),
-                filled: true,
-                fillColor: isDark ? Colors.grey[800] : Colors.grey[100],
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
-                contentPadding: const EdgeInsets.symmetric(vertical: 16),
-              ),
-              onChanged: (val) {
-                setState(() {
-                  _query = val;
-                });
-              },
-            ),
-          ),
+          // ... (Keep the Grabber and Search Field exactly as they are) ...
           
-          const SizedBox(height: 10),
-
           // --- RESULTS LIST ---
           Expanded(
             child: ListView(
@@ -201,7 +171,10 @@ class _SearchModalState extends State<SearchModal> {
                 if (visibleCategories.isNotEmpty) ...[
                   Padding(
                     padding: const EdgeInsets.only(top: 10, bottom: 5),
-                    child: Text("CUISINES", style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)),
+                    child: Text(
+                      _query.isEmpty ? "EXPLORE CUISINES" : "MATCHING CUISINES", 
+                      style: const TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.2)
+                    ),
                   ),
                   ...visibleCategories.map((cat) => _buildSafeTile(cat, true)),
                 ],
@@ -210,15 +183,18 @@ class _SearchModalState extends State<SearchModal> {
                 if (visibleRestaurants.isNotEmpty) ...[
                   Padding(
                     padding: const EdgeInsets.only(top: 20, bottom: 5),
-                    child: Text("RESTAURANTS", style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)),
+                    child: const Text(
+                      "RESTAURANTS", 
+                      style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.2)
+                    ),
                   ),
                   ...visibleRestaurants.take(50).map((name) => _buildSafeTile(name, false)),
                 ],
 
                 // EMPTY STATE
                 if (visibleCategories.isEmpty && visibleRestaurants.isEmpty)
-                   Padding(
-                     padding: const EdgeInsets.only(top: 50),
+                   const Padding(
+                     padding: EdgeInsets.only(top: 50),
                      child: Center(child: Text("No results found.", style: TextStyle(color: Colors.grey))),
                    )
               ],

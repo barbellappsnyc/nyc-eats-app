@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:nyc_eats/widgets/animated_background.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../screens/passport_collection_screen.dart';
@@ -9,7 +10,6 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../services/revenuecat_service.dart';
 import 'package:flutter/services.dart';
 import 'dart:ui';
-import 'package:flutter/services.dart';
 import 'package:flutter/cupertino.dart';
 
 class AuthScreen extends StatefulWidget {
@@ -482,258 +482,326 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
+  // 🍽️ Layer 2: Static Grid of Food Emojis
+  Widget _buildEmojiGrid() {
+    final List<String> foodEmojis = [
+      '🍕', '🍔', '🍟', '🌭', '🍿', '🥞', '🧇', '🥓', '🥩', '🍗', '🍖', '🌮',
+      '🌯', '🥙', '🧆', '🥘', '🍲', '🍝', '🍜', '🍦', '🍧', '🍨', '🍩', '🍪', 
+      '🎂', '🍰', '🧁', '🥧', '🍫', '🍬', '🍭', '🍡', '🍢', '🍣', '🍤', '🍥',
+    ];
+
+    return IgnorePointer( 
+      // Allows vertical bleeding
+      child: SingleChildScrollView(
+        physics: const NeverScrollableScrollPhysics(), 
+        child: Column(
+          children: List.generate(
+            (MediaQuery.of(context).size.height / 50).ceil(), 
+            (rowIndex) => Opacity(
+              opacity: 0.40, // 👈 Pushed opacity up to 40%
+              // Allows horizontal bleeding off the right side
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const NeverScrollableScrollPhysics(),
+                child: Row(
+                  children: List.generate(
+                    12, 
+                    (colIndex) {
+                      final emoji = foodEmojis[(rowIndex + colIndex) % foodEmojis.length];
+                      return Padding(
+                        padding: const EdgeInsets.all(16.0), // Slightly more spacing for bigger emojis
+                        child: Text(
+                          emoji, 
+                          style: const TextStyle(fontSize: 36) // 👈 Increased size from 22 to 36!
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     const Color navyBlue = Color(0xFF1A237E);
     const Color passportRed = Color(0xFFD32F2F);
     final Color hintColor = Colors.grey[600]!;
 
-    // AnnotatedRegion forces the battery/wifi/time icons to be black
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.dark,
       child: Scaffold(
-        backgroundColor: const Color(0xFFFDFBF7),
-        // ❌ AppBar is completely deleted!
+        backgroundColor: Colors.transparent, // 👈 CHANGED: Let the layers show through!
         body: Stack(
           fit: StackFit.expand,
           children: [
-            // 📝 LAYER 1: The Scrolling Form
+            // 🚦 LAYER 1: Plum Red & White Moving Gradient
+            const Positioned.fill(
+              child: AnimatedBackground(sku: 'auth'),
+            ),
+
+            // 🍽️ LAYER 2: The Static Emoji Grid
+            Positioned.fill(
+              child: _buildEmojiGrid(),
+            ),
+
+            // 📝 LAYER 3: The Scrolling Liquid Glass Form
             SingleChildScrollView(
-              // We add dynamic top padding so the form scrolls beautifully UNDER the notch/button
               padding: EdgeInsets.only(
                 top: MediaQuery.of(context).padding.top + 60,
-                left: 32,
-                right: 32,
+                left: 24, // Slightly reduced padding to give the card breathing room
+                right: 24,
                 bottom: 24,
               ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // 🛡️ OFFICIAL CREST
-                  Container(
-                    width: 80,
-                    height: 80,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 16.0, sigmaY: 16.0), // 🔮 Glassmorphism Blur
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
                     decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: navyBlue, width: 3),
-                    ),
-                    child: const Center(
-                      child: Icon(Icons.public, size: 50, color: navyBlue),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  
-                  // 🔤 WARMER HEADERS
-                  Text(
-                    _isLogin ? 'WELCOME BACK' : 'GRAB YOUR PASSPORT',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontFamily: 'Courier',
-                      fontSize: 28,
-                      fontWeight: FontWeight.w900,
-                      color: navyBlue,
-                      letterSpacing: 1.0,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _isLogin
-                        ? 'LOG IN TO CONTINUE YOUR JOURNEY.'
-                        : 'LET\'S GET YOU READY TO EXPLORE NYC.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontFamily: 'Courier', 
-                      color: hintColor, 
-                      fontSize: 12, 
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5
-                    ),
-                  ),
-                  const SizedBox(height: 40),
-
-                  // 📝 FORM FIELDS
-                  TextField(
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
-                    decoration: _inputDecoration("EMAIL ADDRESS", Icons.email_outlined),
-                  ),
-                  const SizedBox(height: 16),
-
-                  TextField(
-                    controller: _passwordController,
-                    obscureText: _obscurePassword, 
-                    style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
-                    decoration: _inputDecoration(
-                      "PASSWORD",
-                      Icons.key_outlined,
-                    ).copyWith(
-                      suffixIcon: IconButton(
-                        splashRadius: 20, 
-                        icon: Icon(
-                          _obscurePassword ? PhosphorIconsRegular.eyeClosed : PhosphorIconsRegular.eye,      
-                          color: hintColor.withOpacity(0.7), 
-                          size: 22, 
-                        ),
-                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword), 
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-
-                  // 👇 Forgot Password Button
-                  if (_isLogin)
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: _showForgotPasswordDialog,
-                        child: Text("FORGOT PASSWORD?", style: TextStyle(color: hintColor, fontWeight: FontWeight.bold, fontFamily: 'Courier')),
-                      ),
-                    ),
-
-                  if (!_isLogin) const SizedBox(height: 16),
-
-                  // 👇 SIGN UP FIELDS
-                  if (!_isLogin) ...[
-                    TextField(
-                      controller: _confirmPasswordController,
-                      obscureText: _obscureConfirmPassword, 
-                      style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
-                      decoration: _inputDecoration(
-                        "CONFIRM PASSWORD",
-                        Icons.lock_reset_outlined,
-                      ).copyWith(
-                        suffixIcon: IconButton(
-                          splashRadius: 20, 
-                          icon: Icon(
-                            _obscureConfirmPassword ? PhosphorIconsRegular.eyeClosed : PhosphorIconsRegular.eye,      
-                            color: hintColor.withOpacity(0.7), 
-                            size: 22, 
-                          ),
-                          onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword), 
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    TextField(
-                      controller: _nameController,
-                      textCapitalization: TextCapitalization.characters,
-                      style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
-                      decoration: _inputDecoration(
-                        "WHAT SHOULD WE CALL YOU?",
-                        Icons.badge_outlined,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    Row(
-                      children: [
-                        Expanded(
-                          flex: 3,
-                          child: TextField(
-                            controller: _ageController,
-                            keyboardType: TextInputType.number,
-                            style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
-                            decoration: _inputDecoration("AGE", Icons.cake_outlined),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          flex: 4,
-                          child: _selectedGender == 'CUSTOM'
-                            ? TextField(
-                                autofocus: true, // 👈 ADD THIS LINE
-                                controller: _customGenderController,
-                                textCapitalization: TextCapitalization.characters,
-                                style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 14),
-                                decoration: _inputDecoration("CUSTOM GENDER", Icons.wc_outlined).copyWith(
-                                  suffixIcon: IconButton(
-                                    icon: const Icon(Icons.close, size: 16),
-                                    onPressed: () => setState(() => _selectedGender = 'M'), 
-                                  ),
-                                ),
-                              )
-                            : DropdownButtonFormField<String>(
-                                isExpanded: true, 
-                                value: ['M', 'F'].contains(_selectedGender) ? _selectedGender : 'CUSTOM',
-                                dropdownColor: const Color(0xFFFDFBF7),
-                                style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 14),
-                                decoration: _inputDecoration("GENDER", Icons.wc_outlined),
-                                items: const [
-                                  DropdownMenuItem(value: 'M', child: Text("MALE")),
-                                  DropdownMenuItem(value: 'F', child: Text("FEMALE")),
-                                  DropdownMenuItem(value: 'CUSTOM', child: Text("CUSTOM...")),
-                                ],
-                                onChanged: (val) => setState(() => _selectedGender = val!),
-                              ),
-                        ),
+                      color: Colors.white.withOpacity(0.45), // 🧴 Translucent frosted glass
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: Colors.white.withOpacity(0.6), width: 1.5), // Shiny edge
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 30, offset: const Offset(0, 10))
                       ],
                     ),
-                    const SizedBox(height: 16),
-                  ],
-
-                  const SizedBox(height: 20),
-
-                  // 🛑 MAIN ACTION BUTTON
-                  SizedBox(
-                    height: 56,
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _authenticate,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: passportRed, 
-                        foregroundColor: Colors.white,
-                        elevation: 8,
-                        shadowColor: passportRed.withOpacity(0.5),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      child: Text(
-                        _isLogin ? 'START EXPLORING' : 'CREATE PASSPORT',
-                        style: const TextStyle(
-                          fontFamily: 'Courier',
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1.0,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-
-                  // 🔄 TOGGLE LINK
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        _isLogin ? "NEW TO NYC EATS? " : "ALREADY HAVE A PASSPORT? ",
-                        style: const TextStyle(color: Colors.black54, fontFamily: 'Courier', fontSize: 12, fontWeight: FontWeight.bold),
-                      ),
-                      GestureDetector(
-                        onTap: () => setState(() => _isLogin = !_isLogin),
-                        child: Text(
-                          _isLogin ? "SIGN UP" : "LOG IN",
-                          style: const TextStyle(
-                            color: navyBlue,
-                            fontFamily: 'Courier',
-                            fontSize: 12,
-                            fontWeight: FontWeight.w900,
-                            decoration: TextDecoration.underline,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // 🛡️ OFFICIAL CREST
+                        Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: navyBlue, width: 3),
+                          ),
+                          child: const Center(
+                            child: Icon(Icons.public, size: 50, color: navyBlue),
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 24),
+                        
+                        // 🔤 WARMER HEADERS
+                        Text(
+                          _isLogin ? 'WELCOME BACK' : 'GRAB YOUR PASSPORT',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontFamily: 'Courier',
+                            fontSize: 28,
+                            fontWeight: FontWeight.w900,
+                            color: navyBlue,
+                            letterSpacing: 1.0,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _isLogin
+                              ? 'LOG IN TO CONTINUE YOUR JOURNEY.'
+                              : 'LET\'S GET YOU READY TO EXPLORE NYC.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontFamily: 'Courier', 
+                            color: hintColor, 
+                            fontSize: 12, 
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5
+                          ),
+                        ),
+                        const SizedBox(height: 40),
+
+                        // 📝 FORM FIELDS
+                        TextField(
+                          controller: _emailController,
+                          keyboardType: TextInputType.emailAddress,
+                          style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
+                          decoration: _inputDecoration("EMAIL ADDRESS", Icons.email_outlined),
+                        ),
+                        const SizedBox(height: 16),
+
+                        TextField(
+                          controller: _passwordController,
+                          obscureText: _obscurePassword, 
+                          style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
+                          decoration: _inputDecoration(
+                            "PASSWORD",
+                            Icons.key_outlined,
+                          ).copyWith(
+                            suffixIcon: IconButton(
+                              splashRadius: 20, 
+                              icon: Icon(
+                                _obscurePassword ? PhosphorIconsRegular.eyeClosed : PhosphorIconsRegular.eye,      
+                                color: hintColor.withOpacity(0.7), 
+                                size: 22, 
+                              ),
+                              onPressed: () => setState(() => _obscurePassword = !_obscurePassword), 
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+
+                        // 👇 Forgot Password Button
+                        if (_isLogin)
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: _showForgotPasswordDialog,
+                              child: Text("FORGOT PASSWORD?", style: TextStyle(color: hintColor, fontWeight: FontWeight.bold, fontFamily: 'Courier')),
+                            ),
+                          ),
+
+                        if (!_isLogin) const SizedBox(height: 16),
+
+                        // 👇 SIGN UP FIELDS
+                        if (!_isLogin) ...[
+                          TextField(
+                            controller: _confirmPasswordController,
+                            obscureText: _obscureConfirmPassword, 
+                            style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
+                            decoration: _inputDecoration(
+                              "CONFIRM PASSWORD",
+                              Icons.lock_reset_outlined,
+                            ).copyWith(
+                              suffixIcon: IconButton(
+                                splashRadius: 20, 
+                                icon: Icon(
+                                  _obscureConfirmPassword ? PhosphorIconsRegular.eyeClosed : PhosphorIconsRegular.eye,      
+                                  color: hintColor.withOpacity(0.7), 
+                                  size: 22, 
+                                ),
+                                onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword), 
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          TextField(
+                            controller: _nameController,
+                            textCapitalization: TextCapitalization.characters,
+                            style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
+                            decoration: _inputDecoration(
+                              "WHAT SHOULD WE CALL YOU?",
+                              Icons.badge_outlined,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+
+                          Row(
+                            children: [
+                              Expanded(
+                                flex: 3,
+                                child: TextField(
+                                  controller: _ageController,
+                                  keyboardType: TextInputType.number,
+                                  style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
+                                  decoration: _inputDecoration("AGE", Icons.cake_outlined),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                flex: 4,
+                                child: _selectedGender == 'CUSTOM'
+                                  ? TextField(
+                                      autofocus: true, 
+                                      controller: _customGenderController,
+                                      textCapitalization: TextCapitalization.characters,
+                                      style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 14),
+                                      decoration: _inputDecoration("CUSTOM GENDER", Icons.wc_outlined).copyWith(
+                                        suffixIcon: IconButton(
+                                          icon: const Icon(Icons.close, size: 16),
+                                          onPressed: () => setState(() => _selectedGender = 'M'), 
+                                        ),
+                                      ),
+                                    )
+                                  : DropdownButtonFormField<String>(
+                                      isExpanded: true, 
+                                      value: ['M', 'F'].contains(_selectedGender) ? _selectedGender : 'CUSTOM',
+                                      dropdownColor: const Color(0xFFFDFBF7),
+                                      style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 14),
+                                      decoration: _inputDecoration("GENDER", Icons.wc_outlined),
+                                      items: const [
+                                        DropdownMenuItem(value: 'M', child: Text("MALE")),
+                                        DropdownMenuItem(value: 'F', child: Text("FEMALE")),
+                                        DropdownMenuItem(value: 'CUSTOM', child: Text("CUSTOM...")),
+                                      ],
+                                      onChanged: (val) => setState(() => _selectedGender = val!),
+                                    ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+
+                        const SizedBox(height: 20),
+
+                        // 🛑 MAIN ACTION BUTTON
+                        SizedBox(
+                          height: 56,
+                          child: ElevatedButton(
+                            onPressed: _isLoading ? null : _authenticate,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: passportRed, 
+                              foregroundColor: Colors.white,
+                              elevation: 8,
+                              shadowColor: passportRed.withOpacity(0.5),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            child: Text(
+                              _isLogin ? 'START EXPLORING' : 'CREATE PASSPORT',
+                              style: const TextStyle(
+                                fontFamily: 'Courier',
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1.0,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+
+                        // 🔄 TOGGLE LINK
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              _isLogin ? "NEW TO NYC EATS? " : "ALREADY HAVE A PASSPORT? ",
+                              style: const TextStyle(color: Colors.black54, fontFamily: 'Courier', fontSize: 12, fontWeight: FontWeight.bold),
+                            ),
+                            GestureDetector(
+                              onTap: () => setState(() => _isLogin = !_isLogin),
+                              child: Text(
+                                _isLogin ? "SIGN UP" : "LOG IN",
+                                style: const TextStyle(
+                                  color: navyBlue,
+                                  fontFamily: 'Courier',
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w900,
+                                  decoration: TextDecoration.underline,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 40),
-                ],
+                ),
               ),
             ),
 
-            // ✖️ LAYER 2: The Fixed Frosted Apple-Style Close Button
+            // ✖️ LAYER 4: The Fixed Frosted Apple-Style Close Button
             Positioned(
-              top: MediaQuery.of(context).padding.top + 8, // Safely below the notch
+              top: MediaQuery.of(context).padding.top + 8,
               left: 20,
               child: ClipOval(
                 child: BackdropFilter(
@@ -743,8 +811,8 @@ class _AuthScreenState extends State<AuthScreen> {
                     height: 44,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.grey.withOpacity(0.15), // Translucent grey
-                      border: Border.all(color: Colors.black.withOpacity(0.05)), // Subtle edge definition
+                      color: Colors.white.withOpacity(0.5), 
+                      border: Border.all(color: Colors.white.withOpacity(0.8)), 
                     ),
                     child: IconButton(
                       padding: EdgeInsets.zero,
@@ -756,7 +824,7 @@ class _AuthScreenState extends State<AuthScreen> {
               ),
             ),
 
-            // 🛡️ LAYER 3: THE LOADING CURTAIN
+            // 🛡️ LAYER 5: THE LOADING CURTAIN
             if (_isLoading)
               Container(
                 color: navyBlue.withOpacity(0.9), 

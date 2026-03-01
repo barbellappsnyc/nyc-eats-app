@@ -10,6 +10,9 @@ import 'passport_collection_screen.dart';
 import 'auth_screen.dart'; 
 import 'package:path_provider/path_provider.dart'; 
 import '../screens/map_screen.dart'; // Adjust path if needed
+import 'dart:ui'; // 👈 Essential for BackdropFilter blur
+import 'package:flutter/services.dart'; // Just in case, keeping it safe
+// ... rest of your existing imports ...
 
 Future<bool?> openProfileScreen(BuildContext context, {
   String? name, String? photoUrl, String? gender, int? age
@@ -610,22 +613,54 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                           const SizedBox(height: 30),
                           
-                          SizedBox(
-                            width: double.infinity, height: 45,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: _hasChanges ? Colors.indigo : Colors.grey[400], 
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))
+                          // 🛡️ THE LIQUID GLASS "SAVE RECORDS" PILL
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(999), // 👈 FIX: Proper clipping widget
+                            child: BackdropFilter(
+                              // 🔮 Frosted blur effect over Layer 1
+                              filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                width: double.infinity,
+                                height: 48, // Slightly taller pill
+                                decoration: BoxDecoration(
+                                  // 🧴 Liquid Glass styling with conditional colors
+                                  color: (!_hasChanges || _isLoading)
+                                      ? Colors.grey.withOpacity(0.08) // Faint glass if disabled
+                                      : Colors.indigo.withOpacity(0.12), // Subtle indigo glass if active
+                                  borderRadius: BorderRadius.circular(999), // Stadium pill shape
+                                  // ✨ The Shining Edge (shimmering border)
+                                  border: Border.all(
+                                    color: Colors.white.withOpacity(0.2), 
+                                    width: 1.5,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 20, offset: const Offset(0, 5))
+                                  ],
+                                ),
+                                child: TextButton(
+                                  onPressed: (!_hasChanges || _isLoading) ? null : _saveProfile,
+                                  style: TextButton.styleFrom(
+                                    padding: EdgeInsets.zero, 
+                                    foregroundColor: Colors.indigo,
+                                  ),
+                                  child: _isLoading 
+                                    ? const CupertinoActivityIndicator(color: Colors.indigo, radius: 10) 
+                                    : Text(
+                                        "SAVE RECORDS", 
+                                        style: TextStyle(
+                                          color: (!_hasChanges || _isLoading) ? Colors.grey[500] : Colors.indigo,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 1.0
+                                        )
+                                      ),
+                                ),
                               ),
-                              onPressed: (!_hasChanges || _isLoading) ? null : _saveProfile,
-                              child: _isLoading 
-                                ? const CupertinoActivityIndicator(color: Colors.white, radius: 10) 
-                                : const Text("SAVE RECORDS", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                             ),
                           ),
-                        ],
+                        ], // End Column children for Official Data
                       ),
-                    ),
+                    ), // 👈 FIX: This was the missing bracket that closes the "Official Data" Container!
 
                     const SizedBox(height: 40),
 
@@ -659,52 +694,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       }),
                     const SizedBox(height: 40),
 
-                    // --- LOG IN / LOG OUT ---
-                    SizedBox(
-                      width: double.infinity, 
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: _handleAuthAction, 
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: isGuest ? const Color(0xFF2E7D32) : const Color(0xFFD32F2F), 
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          elevation: 0,
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(isGuest ? Icons.login : Icons.logout, color: Colors.white, size: 20),
-                            const SizedBox(width: 10),
-                            Text(
-                              isGuest ? "LOG IN / CREATE ACCOUNT" : "LOG OUT OF ACCOUNT", 
-                              style: const TextStyle(
-                                color: Colors.white, 
-                                fontWeight: FontWeight.bold, 
-                                letterSpacing: 1.2
-                              )
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                    // 🗑️ APPLE COMPLIANCE: DELETE ACCOUNT
-                    if (!isGuest) ...[
-                      const SizedBox(height: 20),
-                      Center(
-                        child: TextButton(
-                          onPressed: _deleteAccount,
-                          child: const Text(
-                            "Delete Account", 
-                            style: TextStyle(
-                              color: Colors.white30, 
-                              fontSize: 12, 
-                              fontWeight: FontWeight.bold
-                            )
+                    // --- AUTH & ACCOUNT MANAGEMENT PILLS ---
+                    // Conditioning the visibility of the delete button based on guest status
+                    isGuest
+                        ? // A. JUST A FULL-WIDTH "LOG IN" PILL IF GUEST
+                          _buildAuthPill(isGuest: true)
+                        : // B. ROW OF TWO PILLS IF LOGGED IN (Perfect 50/50 split)
+                          Row(
+                            children: [
+                              Expanded(flex: 1, child: _buildAuthPill(isGuest: false)),
+                              const SizedBox(width: 12), // Slightly tighter gap to give text more breathing room
+                              Expanded(flex: 1, child: _buildDeletePill()),
+                            ],
                           ),
-                        ),
-                      ),
-                    ],
 
                     const SizedBox(height: 40),
                   ],
@@ -752,6 +754,117 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------
+  // 🛠️ HELPER: BUILD AUTHENTICATION PILL (Glassmorphism)
+  // ---------------------------------------------------------
+  Widget _buildAuthPill({required bool isGuest}) {
+    final bgColor = isGuest ? const Color(0xFF2E7D32) : const Color(0xFFD32F2F);
+    const textColor = Colors.white; // 👈 Forced to white for both Log In and Log Out
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(999), 
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
+        child: Container(
+          height: 48,
+          decoration: BoxDecoration(
+            // 🧴 Increased opacity to 0.85 for a rich, solid glass look
+            color: bgColor.withOpacity(0.85),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.3), 
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 20, offset: const Offset(0, 5))
+            ],
+          ),
+          child: TextButton(
+            onPressed: _handleAuthAction, 
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              foregroundColor: textColor, 
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(isGuest ? Icons.login : Icons.logout, color: textColor, size: 18),
+                const SizedBox(width: 8),
+                FittedBox( 
+                  child: Text(
+                    isGuest ? "LOG IN / SIGN UP" : "LOG OUT", 
+                    style: const TextStyle(
+                      color: textColor, 
+                      fontWeight: FontWeight.bold, 
+                      letterSpacing: 0.8,
+                      fontSize: 12,
+                    )
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------
+  // 🗑️ HELPER: BUILD DELETE ACCOUNT PILL (Glassmorphism)
+  // ---------------------------------------------------------
+  Widget _buildDeletePill() {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(999), 
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
+        child: Container(
+          height: 48,
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.85), 
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.9), 
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 20, offset: const Offset(0, 5))
+            ],
+          ),
+          child: TextButton(
+            onPressed: _deleteAccount,
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 12), // Added inner padding
+              foregroundColor: const Color(0xFFD32F2F), 
+            ),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                 Icon(Icons.delete_forever_outlined, color: Color(0xFFD32F2F), size: 16), // Slightly smaller icon
+                 SizedBox(width: 4),
+                 Flexible( 
+                   // 🛠️ FIX: Forces the text to scale down on tiny screens instead of overflowing
+                   child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        "DELETE ACCOUNT", 
+                        style: TextStyle(
+                          color: Color(0xFFD32F2F), 
+                          fontWeight: FontWeight.bold, 
+                          letterSpacing: 0.5, // Tighter letter spacing to fit the long word
+                          fontSize: 12,
+                        )
+                      ),
+                   ),
+                 ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
