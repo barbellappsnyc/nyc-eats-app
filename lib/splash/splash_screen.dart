@@ -113,8 +113,11 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
+Widget build(BuildContext context) {
+  return AnnotatedRegion<SystemUiOverlayStyle>(
+    // 💡 This ensures icons are white regardless of what happened on the previous screen
+    value: SystemUiOverlayStyle.light, 
+    child: Scaffold(
       backgroundColor: Colors.black, 
       body: Stack(
         fit: StackFit.expand,
@@ -143,9 +146,9 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
           ),
         ],
       ),
-    );
-  }
-
+    ),
+  );
+}
   // ----------------------------------------------------------------
   // ⌨️ PHASE 1: THE OVERLAY TYPING ANIMATION (APPLE GARAMOND)
   // ----------------------------------------------------------------

@@ -27,6 +27,7 @@ import 'passport_collection_screen.dart'; // 👈 Import the collection
 import '../services/passport_service.dart'; // 👈 Import the service
 import 'package:connectivity_plus/connectivity_plus.dart'; // 👈 NEW
 import '../services/tile_provider.dart';
+import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -77,6 +78,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
   String? _userName;
   String? _userGender;
   int? _userAge;
+
+  // 🔦 TUTORIAL KEYS
+  final GlobalKey _searchKey = GlobalKey();
+  final GlobalKey _profileKey = GlobalKey();
+  final GlobalKey _wheelKey = GlobalKey();
+  final GlobalKey _passportKey = GlobalKey();
 
   // --- ANIMATED TEXT VARIABLES ---
   int _currentPhraseIndex = 0;
@@ -147,12 +154,13 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
     _initLocationService();
 
     // 🕵️ BACKGROUND TASK: PRE-LOAD DARK MAP
-    // We wait 3 seconds so we don't slow down the initial UI animation
     Future.delayed(const Duration(seconds: 3), () {
-      // Coordinates: NYC (40.735, -73.99) | isDarkMode: true
       MapHeater.preCacheTiles(40.735, -73.99, true); 
       debugPrint("🌑 Dark Mode Map warming up in background...");
     });
+
+    // 🔦 LAUNCH THE TUTORIAL CHECK HERE
+    _checkAndShowTutorial(); // 👈 ADD THIS
   }
 
   // 💾 NEW: CACHE LOADER (The Speed Trick)
@@ -672,6 +680,170 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
     }
   }
 
+  // ----------------------------------------------------------------
+  // 🔦 FIRST TIME USER TUTORIAL (COACH MARKS)
+  // ----------------------------------------------------------------
+  Future<void> _checkAndShowTutorial() async {
+    final prefs = await SharedPreferences.getInstance();
+    final hasSeen = prefs.getBool('has_seen_tutorial') ?? false;
+    // final hasSeen = false; // FORCE SHOW TUTORIAL
+
+    if (!hasSeen) {
+      // Small delay to ensure the map and buttons are fully drawn on screen first
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (mounted) _showTutorial();
+      });
+    }
+  }
+
+  void _showTutorial() {
+    TutorialCoachMark(
+      targets: _createTargets(),
+      colorShadow: Colors.black, 
+      paddingFocus: 10,
+      opacityShadow: 0.9, 
+      hideSkip: true, // 👈 THE FIX: Hide the default package skip button
+      onFinish: () {
+        SharedPreferences.getInstance().then((prefs) {
+          prefs.setBool('has_seen_tutorial', true);
+        });
+      },
+      onSkip: () {
+        SharedPreferences.getInstance().then((prefs) {
+          prefs.setBool('has_seen_tutorial', true);
+        });
+        return true; 
+      },
+    ).show(context: context);
+  }
+
+  List<TargetFocus> _createTargets() {
+    return [
+      TargetFocus(
+        identify: "search_target",
+        keyTarget: _searchKey,
+        shape: ShapeLightFocus.RRect, 
+        radius: 10, 
+        contents: [
+          TargetContent(
+            align: ContentAlign.bottom,
+            builder: (context, controller) => Padding(
+              padding: const EdgeInsets.only(top: 20.0),
+              child: _buildTutorialText("THE VAULT", "17,000 hidden gems across all 5 boroughs.\n\nTap here to search or filter by Michelin stars, vegan, and more.", controller),
+            ),
+          ),
+        ],
+      ),
+      TargetFocus(
+        identify: "wheel_target",
+        keyTarget: _wheelKey,
+        shape: ShapeLightFocus.Circle,
+        contents: [
+          TargetContent(
+            align: ContentAlign.top,
+            builder: (context, controller) => _buildTutorialText("THE SPIN", "Can't decide? Spin the global wheel and let fate choose your next cuisine.", controller),
+          ),
+        ],
+      ),
+      TargetFocus(
+        identify: "passport_target",
+        keyTarget: _passportKey,
+        shape: ShapeLightFocus.Circle,
+        contents: [
+          TargetContent(
+            align: ContentAlign.top,
+            builder: (context, controller) => _buildTutorialText("THE COLLECTION", "Your Gourmet Passport. Check in to spots, collect official stamps, and build your culinary visa.", controller),
+          ),
+        ],
+      ),
+      TargetFocus(
+        identify: "profile_target",
+        keyTarget: _profileKey,
+        shape: ShapeLightFocus.Circle,
+        contents: [
+          TargetContent(
+            align: ContentAlign.bottom,
+            builder: (context, controller) => Padding(
+              padding: const EdgeInsets.only(top: 20.0),
+              // 👈 Notice isLast is true here!
+              child: _buildTutorialText("THE DIPLOMAT", "Upgrade your status. Manage your records, official ID photo, and passports here.", controller, isLast: true),
+            ),
+          ),
+        ],
+      ),
+    ];
+  }
+
+  Widget _buildTutorialText(String title, String description, TutorialCoachMarkController controller, {bool isLast = false}) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 🍎 TITLE
+        Text(
+          title, 
+          style: const TextStyle(
+            fontFamily: 'AppleGaramond', 
+            fontWeight: FontWeight.bold, 
+            color: Colors.white, 
+            fontSize: 32, 
+            letterSpacing: 1.5
+          )
+        ),
+        const SizedBox(height: 12),
+        // 📱 DESCRIPTION
+        Text(
+          description, 
+          style: const TextStyle(
+            color: Colors.white70, 
+            fontSize: 18, 
+            height: 1.4,
+            fontWeight: FontWeight.w500,
+          )
+        ),
+        const SizedBox(height: 28), // Space before buttons
+        
+        // 🎛️ CUSTOM NAVIGATION BUTTONS
+        Row(
+          children: [
+            // ⚪ THE PRIMARY ACTION (NEXT / DONE)
+            ElevatedButton(
+              onPressed: () => isLast ? controller.skip() : controller.next(), // skip() on the last slide simply closes it
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: Colors.black,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+              ),
+              child: Text(
+                isLast ? "DONE" : "NEXT", 
+                style: const TextStyle(fontFamily: 'Courier', fontWeight: FontWeight.bold, letterSpacing: 1.5, fontSize: 14)
+              ),
+            ),
+            const SizedBox(width: 20),
+            
+            // ✖️ THE SECONDARY ACTION (SKIP)
+            if (!isLast)
+              GestureDetector(
+                onTap: () => controller.skip(),
+                child: const Text(
+                  "SKIP TUTORIAL", 
+                  style: TextStyle(
+                    fontFamily: 'Courier', 
+                    color: Colors.white54, 
+                    fontWeight: FontWeight.bold, 
+                    fontSize: 12, 
+                    letterSpacing: 1.0
+                  )
+                ),
+              ),
+          ],
+        )
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
@@ -762,7 +934,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
                   children: [
                     // Search Bar
                     GestureDetector(
-                      onTap: _openSearchPage, 
+                      key: _searchKey, // 👈 ADD THIS
+                      onTap: _openSearchPage,
                       child: Container(
                         margin: const EdgeInsets.all(16), 
                         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
@@ -815,8 +988,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
 
                             // 5. PROFILE AVATAR (Far Right)
                             GestureDetector(
+                              key: _profileKey, // 👈 ADD THIS
                               onTap: () async {
-                                // Open the profile
                                 await openProfileScreen(
                                   context, 
                                   name: _userName,
@@ -882,7 +1055,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    FloatingActionButton(mini: true, heroTag: "wheel_btn", backgroundColor: isDarkMode ? Colors.indigoAccent : Colors.deepPurpleAccent, foregroundColor: Colors.white, elevation: 6, onPressed: _openCountryWheel, child: const Icon(Icons.casino)),
+                    FloatingActionButton(key: _wheelKey, mini: true, heroTag: "wheel_btn", backgroundColor: isDarkMode ? Colors.indigoAccent : Colors.deepPurpleAccent, foregroundColor: Colors.white, elevation: 6, onPressed: _openCountryWheel, child: const Icon(Icons.casino)),
                     const SizedBox(height: 12),
                     FloatingActionButton(mini: true, heroTag: "theme_btn", backgroundColor: isDarkMode ? Colors.grey[800] : Colors.white, foregroundColor: isDarkMode ? Colors.white : Colors.black, elevation: 4, onPressed: _toggleTheme, child: Icon(isDarkMode ? Icons.dark_mode : Icons.light_mode)),
                     FloatingActionButton(mini: true, heroTag: "gps_btn", backgroundColor: isDarkMode ? Colors.grey[800] : Colors.white, foregroundColor: isDarkMode ? Colors.white : Colors.black, elevation: 4, onPressed: _recenterMap, child: Icon(myLocation == null ? CupertinoIcons.location_slash_fill : CupertinoIcons.location_fill)),
@@ -900,6 +1073,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       ),
       
       floatingActionButton: FloatingActionButton(
+        key: _passportKey, // 👈 ADD THIS
         backgroundColor: Colors.amber,
         child: const Icon(Icons.filter_none, color: Colors.black),
         onPressed: () {

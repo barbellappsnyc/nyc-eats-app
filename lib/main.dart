@@ -6,13 +6,17 @@ import 'services/purchase_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'services/revenuecat_service.dart'; 
 import 'package:flutter/services.dart'; 
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
+  // Load the secrets
+  await dotenv.load(fileName: ".env");
+  
   await Supabase.initialize(
-    url: 'https://frihlhztdsxieoszfyuh.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZyaWhsaHp0ZHN4aWVvc3pmeXVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgyNDAwNjksImV4cCI6MjA4MzgxNjA2OX0.kQBxoROE934PHvwxwz02iHRjZerl9A1CGcy86CrJBEk',
+    url: dotenv.env['SUPABASE_URL']!,
+    anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
   );
   
   final prefs = await SharedPreferences.getInstance();
