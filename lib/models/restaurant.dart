@@ -1,16 +1,14 @@
 import 'package:latlong2/latlong.dart';
 
 class Restaurant {
-  final int id; // <--- 1. ADD THIS FIELD
+  final int id;
   final String name;
-  final String cuisine; 
+  final String cuisine;
   final String price;
-  final double rating; 
+  final double rating;
   final bool hasMichelin;
   final LatLng location;
   final String imageUrl;
-  
-  // --- NEW FIELDS ---
   final String? phone;
   final String? website;
   final String? openingHours;
@@ -18,16 +16,15 @@ class Restaurant {
   final bool takeaway;
   final bool reservations;
   final bool cocktails;
-  final bool isVegetarian; // NEW
-  final bool isVegan;      // NEW
-  // 🌟 ADD THESE TWO LINES 🌟
-  final int michelinStars; 
+  final bool isVegetarian;
+  final bool isVegan;
+  final int michelinStars;
   final bool bibGourmand;
 
   int get priceLevel => price.length;
 
   Restaurant({
-    required this.id, // <--- 2. ADD TO CONSTRUCTOR
+    required this.id,
     required this.name,
     required this.cuisine,
     required this.price,
@@ -35,7 +32,6 @@ class Restaurant {
     required this.hasMichelin,
     required this.location,
     required this.imageUrl,
-    // --- NEW ---
     this.phone,
     this.website,
     this.openingHours,
@@ -43,48 +39,136 @@ class Restaurant {
     required this.takeaway,
     required this.reservations,
     required this.cocktails,
-    this.isVegetarian = false, // NEW (Default to false)
-    this.isVegan = false,      // NEW
-
-    // 🌟 ADD THESE TWO LINES 🌟
+    this.isVegetarian = false,
+    this.isVegan = false,
     this.michelinStars = 0,
     this.bibGourmand = false,
   });
 
   factory Restaurant.fromMap(Map<String, dynamic> map) {
+    // 🛡️ THE SHIELD: Converts strings, ints, or nulls into real booleans
+    bool toBool(dynamic value) {
+      if (value == null) return false;
+      if (value is bool) return value;
+      if (value is String) {
+        return value.toLowerCase() == 'true' || value == '1';
+      }
+      if (value is int) return value == 1;
+      return false;
+    }
+
     return Restaurant(
-      id: map['id'] as int, // <--- 3. EXTRACT ID FROM DATABASE
-      name: map['name'] ?? 'Unknown',
-      cuisine: map['cuisine'] ?? 'Other',
-      price: map['price'] ?? '\$\$',
-      rating: (map['rating'] as num?)?.toDouble() ?? 0.0,
-      hasMichelin: map['has_michelin'] ?? false,
+      id: map['id'] ?? 0,
+      name: map['name'] ?? 'Unknown Restaurant',
+      cuisine: map['cuisine'] ?? 'other',
+      price: map['price']?.toString() ?? '\$\$', // 👈 Cleaned up price
+      rating: (map['rating'] ?? 0.0).toDouble(),
+      hasMichelin: toBool(map['has_michelin']),
       location: LatLng(
-        (map['lat'] as num?)?.toDouble() ?? 40.7, 
-        (map['lng'] as num?)?.toDouble() ?? -74.0
+        (map['lat'] ?? 0.0).toDouble(),
+        (map['lng'] ?? 0.0).toDouble(),
       ),
-      imageUrl: map['image_url'] ?? "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?q=80&w=600",
-      
-      // --- MAPPING NEW FIELDS ---
-      phone: map['phone'],
-      website: map['website'],
-      openingHours: map['opening_hours'],
-      delivery: map['delivery'] ?? false,
-      takeaway: map['takeaway'] ?? false,
-      reservations: map['reservation'] ?? false,
-      cocktails: map['cocktails'] ?? false,
-
-      // NEW: Supabase might return null, so we default to false
-      isVegetarian: map['is_vegetarian'] ?? false, 
-      isVegan: map['is_vegan'] ?? false,
-
-      // 🌟 ADD THESE MAPPINGS 🌟
-      // Note: Make sure your Supabase columns match these names ('michelin_stars' and 'bib_gourmand')
-      michelinStars: map['michelin_stars'] ?? 0, 
-      bibGourmand: map['bib_gourmand'] ?? false,
-
+      imageUrl: map['image_url'] ?? '',
+      phone: map['phone']?.toString(),
+      website: map['website']?.toString(),
+      openingHours: map['opening_hours']?.toString(),
+      delivery: toBool(map['delivery']),
+      takeaway: toBool(map['takeaway']),
+      reservations: toBool(map['reservation']),
+      cocktails: toBool(map['cocktails']),
+      isVegetarian: toBool(map['is_vegetarian']),
+      isVegan: toBool(map['is_vegan']),
+      bibGourmand: toBool(map['bib_gourmand']),
+      michelinStars: map['michelin_stars'] != null 
+          ? int.tryParse(map['michelin_stars'].toString().split('.')[0]) ?? 0 
+          : 0,
     );
   }
+
+//   factory Restaurant.fromMap(Map<String, dynamic> map) {
+//     return Restaurant(
+//       id: map['id'] as int, // <--- 3. EXTRACT ID FROM DATABASE
+//       name: map['name'] ?? 'Unknown',
+//       cuisine: map['cuisine'] ?? 'Other',
+//       price: map['price'] ?? '\$\$',
+//       rating: (map['rating'] as num?)?.toDouble() ?? 0.0,
+//       hasMichelin: map['has_michelin'] ?? false,
+//       location: LatLng(
+//         (map['lat'] as num?)?.toDouble() ?? 40.7, 
+//         (map['lng'] as num?)?.toDouble() ?? -74.0
+//       ),
+//       imageUrl: map['image_url'] ?? "https://images.unsplash.com/photo-1414235077428-338989a2e8c0?q=80&w=600",
+      
+//       // --- MAPPING NEW FIELDS ---
+//       phone: map['phone'],
+//       website: map['website'],
+//       openingHours: map['opening_hours'],
+//       delivery: map['delivery'] ?? false,
+//       takeaway: map['takeaway'] ?? false,
+//       reservations: map['reservation'] ?? false,
+//       cocktails: map['cocktails'] ?? false,
+
+//       // // NEW: Supabase might return null, so we default to false
+//       // isVegetarian: map['is_vegetarian'] ?? false, 
+//       // isVegan: map['is_vegan'] ?? false,
+
+//       // // 🌟 ADD THESE MAPPINGS 🌟
+//       // // Note: Make sure your Supabase columns match these names ('michelin_stars' and 'bib_gourmand')
+//       // michelinStars: map['michelin_stars'] ?? 0, 
+//       // bibGourmand: map['bib_gourmand'] ?? false,
+//       // Inside Restaurant.fromMap...
+
+// michelinStars: map['michelin_stars'] != null ? int.parse(map['michelin_stars'].toString().split('.')[0]) : 0,
+
+// // This handles cases where Supabase sends strings like "false" instead of actual booleans
+// bibGourmand: map['bib_gourmand'] == true || map['bib_gourmand'].toString().toLowerCase() == 'true',
+// isVegetarian: map['is_vegetarian'] == true || map['is_vegetarian'].toString().toLowerCase() == 'true',
+// isVegan: map['is_vegan'] == true || map['is_vegan'].toString().toLowerCase() == 'true',
+
+//     );
+//   }
+
+  // factory Restaurant.fromMap(Map<String, dynamic> map) {
+  //   // 🛡️ INTERNAL HELPER: Converts "True", true, or 1 into a real Dart bool
+  //   bool toBool(dynamic value) {
+  //     if (value == null) return false;
+  //     if (value is bool) return value;
+  //     if (value is String) {
+  //       return value.toLowerCase() == 'true' || value == '1';
+  //     }
+  //     if (value is int) return value == 1;
+  //     return false;
+  //   }
+
+  //   return Restaurant(
+  //     id: map['id'] ?? 0,
+  //     name: map['name'] ?? 'Unknown Restaurant',
+  //     cuisine: map['cuisine'] ?? 'other',
+  //     price: map['price'] ?? '$$',
+  //     rating: (map['rating'] ?? 0.0).toDouble(),
+  //     hasMichelin: toBool(map['has_michelin']),
+  //     location: LatLng(
+  //       (map['lat'] ?? 0.0).toDouble(),
+  //       (map['lng'] ?? 0.0).toDouble(),
+  //     ),
+  //     imageUrl: map['image_url'] ?? '',
+  //     phone: map['phone'],
+  //     website: map['website'],
+  //     openingHours: map['opening_hours'],
+  //     // 🛡️ APPLYING THE SHIELD TO EVERY BOOLEAN
+  //     delivery: toBool(map['delivery']),
+  //     takeaway: toBool(map['takeaway']),
+  //     reservations: toBool(map['reservation']),
+  //     cocktails: toBool(map['cocktails']),
+  //     isVegetarian: toBool(map['is_vegetarian']),
+  //     isVegan: toBool(map['is_vegan']),
+  //     bibGourmand: toBool(map['bib_gourmand']),
+  //     // 🛡️ MICHELIN STARS SAFETY
+  //     michelinStars: map['michelin_stars'] != null 
+  //         ? int.tryParse(map['michelin_stars'].toString().split('.')[0]) ?? 0 
+  //         : 0,
+  //   );
+  // }
 
   // Use this if you need to save back to cache
   Map<String, dynamic> toMap() {

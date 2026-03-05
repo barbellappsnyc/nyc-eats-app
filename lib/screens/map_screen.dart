@@ -21,11 +21,11 @@ import '../widgets/restaurant_detail_sheet.dart';
 import '../widgets/country_wheel_modal.dart';
 import '../widgets/map_filter_bar.dart';
 import 'search_screen.dart';
-import 'auth_screen.dart'; // <--- Add this
-import 'profile_edit_screen.dart'; // 👈 Import new file
-import 'passport_collection_screen.dart'; // 👈 Import the collection
-import '../services/passport_service.dart'; // 👈 Import the service
-import 'package:connectivity_plus/connectivity_plus.dart'; // 👈 NEW
+import 'auth_screen.dart'; 
+import 'profile_edit_screen.dart'; 
+import 'passport_collection_screen.dart'; 
+import '../services/passport_service.dart'; 
+import 'package:connectivity_plus/connectivity_plus.dart'; 
 import '../services/tile_provider.dart';
 import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 
@@ -39,12 +39,13 @@ class MapScreen extends StatefulWidget {
 class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, WidgetsBindingObserver {
   final MapController _mapController = MapController();
 
+  bool _isJumpingToLocation = false;
+
   // --- STATE VARIABLES ---
   bool isDarkMode = false;
   bool showOpenOnly = false;
   bool savedOnly = false;
 
-  
   Set<String> _selectedMichelin = {}; 
   Set<String> _selectedPrices = {}; 
   
@@ -56,6 +57,13 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
   Set<String> savedRestaurantNames = {};
   bool isLoading = true;
   bool hasError = false;
+
+  int _fetchedCount = 0;
+  int _totalToFetch = 0;
+  
+  // 🌟 NEW: The "Fake" smooth counter variables
+  int _displayFetchedCount = 0;
+  Timer? _simulationTimer;
 
   bool _isCheckingLocation = false;
 
@@ -70,10 +78,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
   // 🔌 CONNECTIVITY STATE
   bool _isOffline = false;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
-  bool _isGpsDisabled = false; // Tracks if the System Toggle is off
+  bool _isGpsDisabled = false; 
 
-  // Inside _MapScreenState class:
-  // 👇 ADD THESE 4 LINES HERE
   String? _userPhotoUrl;
   String? _userName;
   String? _userGender;
@@ -99,15 +105,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
     WidgetsBinding.instance.addObserver(this);
     _safeInit();
 
-    // 🔌 START LISTENING
     _initConnectivityListener();
-
-    // 🚀 STEP 1: LOAD EVERYTHING INSTANTLY
     _fastBootSequence();
   }
 
   Future<void> _safeInit() async {
-    _fetchUserProfile(); // 👈 Add this call
+    _fetchUserProfile(); 
     PassportService.prewarmCache();
 
     await _loadTheme();
@@ -115,17 +118,17 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
     await _fetchRestaurants();
     
     _initLocationService();
-
-
   }
 
   @override
   void dispose() {
+    _simulationTimer?.cancel(); // 👈 ADD THIS
     _textTimer?.cancel();
+    // ... rest of your dispose method
     WidgetsBinding.instance.removeObserver(this);
     _positionStreamSubscription?.cancel();
     _serviceStatusStreamSubscription?.cancel();
-    _connectivitySubscription?.cancel(); // 👈 Don't forget this!
+    _connectivitySubscription?.cancel(); 
     super.dispose();
   }
 
@@ -140,30 +143,24 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
   }
 
   Future<void> _fastBootSequence() async {
-    // 1. Load Theme & Ghost Location (Instant)
     _loadTheme();
     await _loadCachedLocation(); 
 
-    // 2. Fetch Data
     _fetchUserProfile();
     PassportService.prewarmCache();
     await _loadFavorites();
     await _fetchRestaurants();
     
-    // 3. Start GPS
     _initLocationService();
 
-    // 🕵️ BACKGROUND TASK: PRE-LOAD DARK MAP
     Future.delayed(const Duration(seconds: 3), () {
       MapHeater.preCacheTiles(40.735, -73.99, true); 
       debugPrint("🌑 Dark Mode Map warming up in background...");
     });
 
-    // 🔦 LAUNCH THE TUTORIAL CHECK HERE
-    _checkAndShowTutorial(); // 👈 ADD THIS
+    _checkAndShowTutorial(); 
   }
 
-  // 💾 NEW: CACHE LOADER (The Speed Trick)
   Future<void> _loadCachedLocation() async {
     final prefs = await SharedPreferences.getInstance();
     final double? lat = prefs.getDouble('last_known_lat');
@@ -174,8 +171,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
         setState(() {
           myLocation = LatLng(lat, lng);
         });
-        // 🎥 MOVE CAMERA INSTANTLY TO GHOST LOCATION
-        // We do this via a slight delay to ensure the map widget is built
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _mapController.move(myLocation!, 14.0);
         });
@@ -183,7 +178,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
     }
   }
 
-  // 💾 NEW: CACHE SAVER
   Future<void> _saveLocationToCache(LatLng position) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble('last_known_lat', position.latitude);
@@ -191,34 +185,36 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
   }
 
   void _initConnectivityListener() {
-    // 1. Check current status
     Connectivity().checkConnectivity().then((results) {
        _updateConnectionStatus(results);
     });
 
-    // 2. Listen for changes
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen(_updateConnectionStatus);
     
-    // 3. Listen for GPS Toggle (Service Status)
     _serviceStatusStreamSubscription = Geolocator.getServiceStatusStream().listen((ServiceStatus status) {
       if (mounted) {
         setState(() {
           _isGpsDisabled = (status == ServiceStatus.disabled);
-          if (_isGpsDisabled) myLocation = null; // Hide the blue dot
+          if (_isGpsDisabled) myLocation = null; 
         });
       }
     });
   }
 
   void _updateConnectionStatus(List<ConnectivityResult> results) {
-    // If ANY result is not 'none', we have connection.
     bool hasConnection = results.any((r) => r != ConnectivityResult.none);
+    
     if (mounted) {
       setState(() => _isOffline = !hasConnection);
+      
+      // 🚀 AUTO-RESUME: If connection is restored and the dataset is incomplete
+      if (hasConnection && allRestaurants.length < 36252) {
+        debugPrint("🌐 Connection restored! Resuming background sync...");
+        _fetchRestaurants(); 
+      }
     }
   }
 
-  // --- THEME & FAVORITES ---
   Future<void> _loadTheme() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() => isDarkMode = prefs.getBool('is_dark_mode') ?? false);
@@ -247,21 +243,17 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
     await prefs.setStringList('saved_restaurants', savedRestaurantNames.toList());
   }
 
-  // --- LOCATION SERVICES ---
   Future<void> _checkLocationOnResume() async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled && mounted && myLocation == null) _showLocationDialog();
     else _checkPermissionAndListen();
   }
 
-  // 📡 UPDATED LOCATION SERVICE
   Future<void> _initLocationService() async {
-    // Check if permission is already granted from previous run
     final permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
       _startListening();
     } else {
-      // Only ask if we really need to (don't block the UI)
       _checkPermissionAndListen();
     }
   }
@@ -284,14 +276,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
   }
 
   void _startListening() {
-    // 1. Try Native Last Known (Backup to our cache)
     Geolocator.getLastKnownPosition().then((pos) {
       if (pos != null && myLocation == null) {
          setState(() => myLocation = LatLng(pos.latitude, pos.longitude));
       }
     });
 
-    // 2. Start the Real Stream
     _positionStreamSubscription = Geolocator.getPositionStream(
       locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, distanceFilter: 10)
     ).listen((Position position) {
@@ -299,7 +289,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       
       if (mounted) {
         setState(() { myLocation = newLoc; });
-        // 💾 SAVE IT FOR NEXT TIME
         _saveLocationToCache(newLoc);
       }
     });
@@ -319,7 +308,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
     );
   }
 
-  // --- DATA ---
   List<String> get dynamicCuisines {
     final Set<String> uniqueCuisines = {};
     for (var r in allRestaurants) {
@@ -338,7 +326,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
     return File('${directory.path}/restaurants_cache.json');
   }
 
-  // 🌟 NEW: ISOLATE FUNCTION (Must be static or top-level)
   static List<Restaurant> _parseRestaurantsInBackground(String jsonString) {
     final List<dynamic> jsonList = jsonDecode(jsonString);
     return jsonList.map((json) => Restaurant.fromMap(json)).toList();
@@ -349,7 +336,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       final file = await _localFile;
       if (await file.exists()) {
         final contents = await file.readAsString();
-        // 🌟 OPTIMIZATION: Parse in background thread
         return await compute(_parseRestaurantsInBackground, contents);
       }
     } catch (e) { debugPrint("Error reading cache: $e"); }
@@ -357,70 +343,157 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
   }
 
   Future<void> _fetchRestaurants() async {
-    setState(() { isLoading = true; hasError = false; });
+    setState(() { 
+      isLoading = true; 
+      hasError = false; 
+    });
 
-    // 1. 🔍 TRY THE LOCAL CACHE FIRST
+    List<dynamic> fullList = []; 
+
+    // 1. 🔍 TRY THE LOCAL CACHE FIRST (FULL OR PARTIAL)
     try {
       debugPrint("🔍 Checking local device cache...");
       final cachedRestaurants = await _loadFromCache();
       
-      if (cachedRestaurants.isNotEmpty) {
-        debugPrint("⚡ BOOM! Loaded ${cachedRestaurants.length} restaurants instantly from the hard drive!");
+      if (cachedRestaurants.length >= 36252) { 
+        debugPrint("⚡ BOOM! Full cache found!");
         if (mounted) {
           setState(() {
             allRestaurants = cachedRestaurants;
             isLoading = false;
-            hasError = false;
           });
         }
-        return; // 🛑 STOP HERE! Do not talk to Supabase!
+        return; 
+      } else if (cachedRestaurants.isNotEmpty) {
+        debugPrint("⚠️ Partial cache found (${cachedRestaurants.length}). Resuming fetch...");
+        // Pre-populate UI with what we have for a seamless resume experience
+        if (mounted) setState(() => allRestaurants = cachedRestaurants);
+        // Load the raw JSON back into fullList to append the missing batches
+        final file = await _localFile;
+        fullList = jsonDecode(await file.readAsString());
       }
     } catch (e) {
       debugPrint("⚠️ Cache miss or error: $e");
     }
 
-    // 2. ☁️ CACHE EMPTY: FETCH FROM SUPABASE
+    // 2. ☁️ FETCH FROM SUPABASE (RESUMEABLE)
     try {
-      debugPrint("☁️ Cache empty. Fetching from Supabase sequentially...");
+      debugPrint("☁️ Fetching from database...");
       
-      final totalRecords = await Supabase.instance.client
-          .from('restaurants')
-          .count(CountOption.exact);
-          
-      final batchSize = 1000;
-      final totalPages = (totalRecords / batchSize).ceil();
-      List<dynamic> fullList = [];
+      const int totalRecords = 36252;
+      const int batchSize = 1000;
+      
+      // Calculate starting page based on existing cached data
+      int startPage = (fullList.length / batchSize).floor();
+      int totalPages = (totalRecords / batchSize).ceil();
 
-      for (int i = 0; i < totalPages; i++) {
+      // Initialize counters to the current progress point
+      if (mounted) {
+        setState(() {
+          _fetchedCount = fullList.length;
+          _displayFetchedCount = fullList.length;
+          _totalToFetch = totalRecords;
+        });
+      }
+      
+      _startSimulationTimer();
+
+      for (int i = startPage; i < totalPages; i++) {
         final start = i * batchSize;
         final end = start + batchSize - 1;
         
         final batch = await Supabase.instance.client
             .from('restaurants')
             .select() 
-            .range(start, end);
+            .range(start, end)
+            .order('id', ascending: true); 
             
         fullList.addAll(batch as List<dynamic>);
-        debugPrint("✅ Fetched batch ${i + 1} of $totalPages");
+        
+        if (mounted) {
+          setState(() {
+            _fetchedCount = fullList.length; 
+          });
+        }
       }
 
-      // 3. 💾 SAVE THE FRESH DATA TO CACHE FOR NEXT TIME
+      // 🛑 STOP THE SIMULATION WHEN FETCHING IS COMPLETELY DONE
+      _simulationTimer?.cancel();
+      if (mounted) {
+        setState(() {
+          _displayFetchedCount = 36252; 
+        });
+      }
+
       await _saveToCache(fullList);
+
+      final List<Restaurant> mappedRestaurants = await compute(parseRestaurantsInBackground, fullList);
 
       if (mounted) {
         setState(() {
-          allRestaurants = fullList.map((json) => Restaurant.fromMap(json)).toList();
+          allRestaurants = mappedRestaurants;
           isLoading = false;
           hasError = false;
         });
       }
-    } catch (e, stackTrace) {
+      
+    } catch (e) {
       debugPrint('🚨 ERROR FETCHING RESTAURANTS: $e');
-      if (mounted) setState(() { isLoading = false; hasError = true; });
+      
+      // 3. 🛡️ SALVAGE LOGIC: If connection drops, use what we managed to grab
+      _simulationTimer?.cancel(); 
+
+      if (fullList.isNotEmpty) {
+        debugPrint('⚠️ Connection lost, but salvaging ${fullList.length} spots!');
+        
+        await _saveToCache(fullList);
+        final List<Restaurant> partialRestaurants = await compute(parseRestaurantsInBackground, fullList);
+        
+        if (mounted) {
+          setState(() {
+            allRestaurants = partialRestaurants;
+            isLoading = false;
+            hasError = false; 
+          });
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text("Connection lost. Showing partial map data."),
+              backgroundColor: isDarkMode ? Colors.redAccent : Colors.red,
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          setState(() { 
+            isLoading = false; 
+            hasError = true; 
+          });
+        }
+      }
     }
   }
 
-  // 🛠 FIX: Add forceRefresh parameter
+  void _startSimulationTimer() {
+    _simulationTimer?.cancel();
+    _simulationTimer = Timer.periodic(const Duration(milliseconds: 35), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      setState(() {
+        // Cap the fake counter so it never passes the ACTUAL fetched data + 950
+        int maxSimulated = _fetchedCount + 950; 
+        if (_displayFetchedCount < maxSimulated && _displayFetchedCount < 36252) {
+          _displayFetchedCount += Random().nextInt(34) + 12; 
+          if (_displayFetchedCount > 36252) _displayFetchedCount = 36252;
+        }
+      });
+    });
+  }
+
   Future<void> _fetchUserProfile({bool forceRefresh = false}) async {
     final data = await PassportService.fetchUserProfile(forceRefresh: forceRefresh);
     
@@ -459,7 +532,45 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
     }).toList();
   }
 
-  // --- ACTIONS ---
+  // 🌟 NEW: Dedicated jump method with Cupertino spinner
+  Future<void> _jumpToRestaurant(Restaurant restaurant) async {
+    setState(() { _isJumpingToLocation = true; });
+
+    // Give UI thread a breather to render the Cupertino spinner
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    if (mounted) {
+      setState(() { 
+        selectedRestaurantName = restaurant.name; 
+        selectedCategory = null; 
+      });
+      _zoomToResults(visibleRestaurants);
+    }
+
+    // Give map tiles time to load into memory
+    await Future.delayed(const Duration(milliseconds: 600));
+
+    if (mounted) {
+      setState(() { _isJumpingToLocation = false; });
+      
+      // Auto-open the detail sheet for the premium feel
+      showModalBottomSheet(
+        context: context, 
+        isScrollControlled: true, 
+        useSafeArea: true, 
+        clipBehavior: Clip.antiAlias,
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
+        backgroundColor: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+        builder: (context) => RestaurantDetailSheet(
+          restaurant: restaurant, 
+          isDarkMode: isDarkMode, 
+          isSaved: savedRestaurantNames.contains(restaurant.name),
+          myLocation: myLocation, 
+          onFavoriteToggle: () => _toggleFavorite(restaurant.name),
+        ),
+      );
+    }
+  }
   
   void _openSearchPage() {
     Navigator.push(
@@ -474,8 +585,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
             _zoomToResults(visibleRestaurants);
           },
           onRestaurantSelected: (restaurant) {
-            setState(() { selectedRestaurantName = restaurant.name; selectedCategory = null; });
-            _zoomToResults(visibleRestaurants);
+            _jumpToRestaurant(restaurant); // 🌟 Implemented here
           },
         ),
       ),
@@ -489,7 +599,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       backgroundColor: Colors.transparent,
       builder: (context) => CountryWheelModal(
         isDarkMode: isDarkMode,
-        availableCuisines: dynamicCuisines, // <--- 🌟 PASS THE LIST HERE
+        availableCuisines: dynamicCuisines, 
         onCountrySelected: (country) {
           setState(() { selectedCategory = country; selectedRestaurantName = null; });
           _zoomToResults(visibleRestaurants);
@@ -567,11 +677,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
     }).toList();
   }
 
-
   String _formatClusterCount(int count) => count < 1000 ? count.toString() : '${(count / 1000).floor()}k+';
 
   Widget _buildAvatarContent() {
-    // 1. DATA LOADING
     if (_userName == null) {
       return const Center(
         child: SizedBox(
@@ -581,24 +689,20 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       );
     }
 
-    // 2. NO PHOTO SAVED
     if (_userPhotoUrl == null || _userPhotoUrl!.isEmpty) {
       return Icon(Icons.person, size: 20, color: Colors.grey[600]);
     }
 
-    // 3. LOCAL FILE (Guest Mode)
     if (!_userPhotoUrl!.startsWith('http')) {
       return Image.file(
         File(_userPhotoUrl!), 
         fit: BoxFit.cover,
-        // 🛠 FIX: Fallback to Grey Icon if file is missing/corrupt
         errorBuilder: (context, error, stackTrace) {
           return Icon(Icons.person, size: 20, color: Colors.grey[600]);
         },
       );
     }
 
-    // 4. NETWORK IMAGE (User Mode)
     return Image.network(
       _userPhotoUrl!,
       fit: BoxFit.cover,
@@ -611,14 +715,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
           )
         );
       },
-      // 🛠 FIX: Fallback to Grey Icon if URL fails
       errorBuilder: (context, error, stackTrace) {
         return Icon(Icons.person, size: 20, color: Colors.grey[600]);
       },
     );
   }
 
-  // 🚨 SYSTEM STATUS BAR
   Widget _buildSystemStatus() {
     if (!_isOffline && !_isGpsDisabled) return const SizedBox.shrink();
 
@@ -629,7 +731,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
         decoration: BoxDecoration(
-          color: _isOffline ? const Color(0xFFD32F2F) : const Color(0xFFFFA000), // Red or Orange
+          color: _isOffline ? const Color(0xFFD32F2F) : const Color(0xFFFFA000), 
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
@@ -667,11 +769,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
     );
   }
 
-  // 💾 NEW: Save to Cache
   Future<void> _saveToCache(List<dynamic> jsonList) async {
     try {
       final file = await _localFile;
-      // Convert the raw Supabase JSON list into a String and save it to the device
       final jsonString = jsonEncode(jsonList);
       await file.writeAsString(jsonString);
       debugPrint("💾 SUCCESS: Saved ${jsonList.length} restaurants to local device storage!");
@@ -680,16 +780,11 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
     }
   }
 
-  // ----------------------------------------------------------------
-  // 🔦 FIRST TIME USER TUTORIAL (COACH MARKS)
-  // ----------------------------------------------------------------
   Future<void> _checkAndShowTutorial() async {
     final prefs = await SharedPreferences.getInstance();
     final hasSeen = prefs.getBool('has_seen_tutorial') ?? false;
-    // final hasSeen = false; // FORCE SHOW TUTORIAL
 
     if (!hasSeen) {
-      // Small delay to ensure the map and buttons are fully drawn on screen first
       Future.delayed(const Duration(milliseconds: 800), () {
         if (mounted) _showTutorial();
       });
@@ -702,7 +797,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       colorShadow: Colors.black, 
       paddingFocus: 10,
       opacityShadow: 0.9, 
-      hideSkip: true, // 👈 THE FIX: Hide the default package skip button
+      hideSkip: true, 
       onFinish: () {
         SharedPreferences.getInstance().then((prefs) {
           prefs.setBool('has_seen_tutorial', true);
@@ -765,7 +860,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
             align: ContentAlign.bottom,
             builder: (context, controller) => Padding(
               padding: const EdgeInsets.only(top: 20.0),
-              // 👈 Notice isLast is true here!
               child: _buildTutorialText("THE DIPLOMAT", "Upgrade your status. Manage your records, official ID photo, and passports here.", controller, isLast: true),
             ),
           ),
@@ -779,7 +873,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 🍎 TITLE
         Text(
           title, 
           style: const TextStyle(
@@ -791,7 +884,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
           )
         ),
         const SizedBox(height: 12),
-        // 📱 DESCRIPTION
         Text(
           description, 
           style: const TextStyle(
@@ -801,14 +893,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
             fontWeight: FontWeight.w500,
           )
         ),
-        const SizedBox(height: 28), // Space before buttons
+        const SizedBox(height: 28), 
         
-        // 🎛️ CUSTOM NAVIGATION BUTTONS
         Row(
           children: [
-            // ⚪ THE PRIMARY ACTION (NEXT / DONE)
             ElevatedButton(
-              onPressed: () => isLast ? controller.skip() : controller.next(), // skip() on the last slide simply closes it
+              onPressed: () => isLast ? controller.skip() : controller.next(), 
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
                 foregroundColor: Colors.black,
@@ -823,7 +913,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
             ),
             const SizedBox(width: 20),
             
-            // ✖️ THE SECONDARY ACTION (SKIP)
             if (!isLast)
               GestureDetector(
                 onTap: () => controller.skip(),
@@ -852,7 +941,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
     ));
 
     return Scaffold(
-      floatingActionButtonLocation: FloatingActionButtonLocation.startFloat, // Moves to Bottom Left
+      floatingActionButtonLocation: FloatingActionButtonLocation.startFloat, 
       body: Stack(
         children: [
           // --- MAP LAYER ---
@@ -868,7 +957,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
                 TileLayer(
                   urlTemplate: isDarkMode ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png' : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
                   subdomains: const ['a', 'b', 'c'], retinaMode: true,
-                  // 🌟 NEW: Restored Caching Provider
                   tileProvider: CachedTileProvider(), 
                 ),
                 MarkerClusterLayerWidget(
@@ -886,6 +974,49 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
               ],
             ),
           ),
+
+          // 🌟 NEW: FIRST LOAD PREMIUM PROGRESS BAR
+          if (isLoading && allRestaurants.isEmpty)
+            Positioned.fill(
+              child: Container(
+                color: isDarkMode ? const Color(0xFF121212) : const Color(0xFFF9F9F9),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const CupertinoActivityIndicator(radius: 14),
+                      const SizedBox(height: 16),
+                      // ... inside the first load loading block
+                      SizedBox(
+                        width: 200,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: LinearProgressIndicator(
+                            // 👈 UPDATE THIS TO USE THE DISPLAY COUNT
+                            value: _displayFetchedCount / 36252, 
+                            backgroundColor: Colors.grey.withOpacity(0.2),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              isDarkMode ? Colors.white : Colors.black,
+                            ),
+                            minHeight: 4,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        // 👈 UPDATE THIS TO USE THE DISPLAY COUNT
+                        "Fetching $_displayFetchedCount of 36252 restaurants...",
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                          fontSize: 12,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
 
           // --- EMPTY STATE ---
           if (!isLoading && !hasError && visibleRestaurants.isEmpty)
@@ -922,7 +1053,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
           // --- LOADING / ERROR ---
           if (hasError) Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(Icons.wifi_off, size: 64, color: Colors.grey), const SizedBox(height: 16), const Text("No Connection", style: TextStyle(fontSize: 20)), ElevatedButton(onPressed: _fetchRestaurants, child: const Text("Retry"))])),
           
-
           // --- UI: SEARCH & FILTER BAR ---
           if (!hasError)
           Align(
@@ -932,9 +1062,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
               child: SafeArea(
                 child: Column(
                   children: [
-                    // Search Bar
                     GestureDetector(
-                      key: _searchKey, // 👈 ADD THIS
+                      key: _searchKey, 
                       onTap: _openSearchPage,
                       child: Container(
                         margin: const EdgeInsets.all(16), 
@@ -946,11 +1075,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
                         ),
                         child: Row(
                           children: [
-                            // 1. SEARCH ICON
                             Icon(Icons.search, color: isDarkMode ? Colors.white : Colors.black),
                             const SizedBox(width: 8),
                             
-                            // 2. TEXT (Takes remaining space)
                             Expanded(
                               child: (selectedCategory == null && selectedRestaurantName == null)
                                   ? SizedBox(
@@ -971,7 +1098,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
                                     ),
                             ),
 
-                            // 3. CROSS ICON (Rendered LEFT of Profile)
                             if (selectedCategory != null || selectedRestaurantName != null)
                               GestureDetector(
                                 onTap: () => setState(() { selectedCategory = null; selectedRestaurantName = null; }), 
@@ -983,12 +1109,10 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
                                 )
                               ),
 
-                            // 4. SPACER
                             const SizedBox(width: 8),
 
-                            // 5. PROFILE AVATAR (Far Right)
                             GestureDetector(
-                              key: _profileKey, // 👈 ADD THIS
+                              key: _profileKey, 
                               onTap: () async {
                                 await openProfileScreen(
                                   context, 
@@ -998,7 +1122,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
                                   age: _userAge
                                 );
                                 
-                                // 🛠 FIX: Aggressively force a fresh pull from the DB/Cache
                                 await _fetchUserProfile(forceRefresh: true);
                               },
                               child: Container(
@@ -1019,10 +1142,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
                       ),
                     ),
 
-                    // 🚨 INSERT HERE:
                     _buildSystemStatus(),
 
-                    // Filter Bar
                     MapFilterBar(
                       isDarkMode: isDarkMode,
                       showOpenOnly: showOpenOnly,
@@ -1069,22 +1190,30 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
               ),
             ),
           ),
+
+          // 🌟 NEW: JUMPING TO LOCATION OVERLAY
+          if (_isJumpingToLocation)
+            Positioned.fill(
+              child: Container(
+                color: isDarkMode ? Colors.black54 : Colors.white54, 
+                child: const Center(
+                  child: CupertinoActivityIndicator(radius: 16),
+                ),
+              ),
+            ),
         ],
       ),
       
       floatingActionButton: FloatingActionButton(
-        key: _passportKey, // 👈 ADD THIS
+        key: _passportKey, 
         backgroundColor: Colors.amber,
         child: const Icon(Icons.filter_none, color: Colors.black),
         onPressed: () {
-              // 🔓 UNLOCKED LOGIC
-              // We removed the "if (session != null)" check.
-              // Now, EVERYONE (even guests) gets to enter the Passport Screen.
               Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (context) => const PassportCollectionScreen(
-                    initialBookId: null, // Guests will auto-load the 'Ghost Book'
+                    initialBookId: null, 
                   )
                 ),
               );
@@ -1092,5 +1221,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       ),
     );
   }
+}
 
+// 🛠️ THIS MUST LIVE OUTSIDE OF ANY CLASS
+List<Restaurant> parseRestaurantsInBackground(List<dynamic> responseData) {
+  return responseData.map((json) => Restaurant.fromMap(json)).toList();
 }
