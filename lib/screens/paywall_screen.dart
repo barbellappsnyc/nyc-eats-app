@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:nyc_eats/screens/passport_stack_screen.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import '../services/purchase_service.dart';
 import 'auth_screen.dart'; 
@@ -23,6 +24,21 @@ class PaywallScreen extends StatefulWidget {
 class _PaywallScreenState extends State<PaywallScreen> {
   List<Package> _packages = [];
   bool _isLoading = true;
+
+  int _currentShopIndex = 0;
+  final PageController _pageController = PageController();
+  
+  final List<Map<String, String>> _shopTiers = [
+    {'sku': 'single_page', 'label': '1', 'title': 'SINGLE ENTRY'},
+    {'sku': 'standard_book', 'label': 'S', 'title': 'STANDARD PASSPORT'},
+    {'sku': 'diplomat_book', 'label': 'D', 'title': 'DIPLOMAT BOOK'},
+  ];
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -163,10 +179,155 @@ class _PaywallScreenState extends State<PaywallScreen> {
     );
   }
 
+  Package? _getActivePackage() {
+    if (_packages.isEmpty) return null;
+    final String activeSku = _shopTiers[_currentShopIndex]['sku']!;
+    try {
+      // Matches the dummy book SKU ('standard_book') to the RevenueCat identifier
+      return _packages.firstWhere((pkg) => pkg.storeProduct.identifier.contains(activeSku));
+    } catch (e) {
+      return null;
+    }
+  }
+
+  void _showAuthDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.lock_outline, size: 48, color: Colors.white54),
+              const SizedBox(height: 20),
+              const Text(
+                "AUTHENTICATION REQUIRED",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: 'Courier', 
+                  fontSize: 18, 
+                  fontWeight: FontWeight.w900, 
+                  color: Colors.white, 
+                  letterSpacing: 1.0
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                "You need to create an account or log in to purchase the passport and save your stamps.",
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 14, color: Colors.white70, height: 1.5),
+              ),
+              const SizedBox(height: 28),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.grey, 
+                        padding: const EdgeInsets.symmetric(vertical: 16)
+                      ),
+                      child: const Text("CANCEL", style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context); 
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => AuthScreen(
+                              purchasedSku: _shopTiers[_currentShopIndex]['sku'],
+                              incomingRestaurant: widget.incomingRestaurant,
+                            ),
+                          )
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.black,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Text("LOGIN", style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
+              )
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBuyButton() {
+    final Package? activePackage = _getActivePackage();
+    final bool isLoggedIn = Supabase.instance.client.auth.currentUser != null;
+    
+    // Determine what the text should say
+    String buttonText = "LOADING...";
+    if (!_isLoading) {
+      if (!isLoggedIn) {
+        buttonText = "LOGIN TO PURCHASE";
+      } else if (activePackage != null) {
+        buttonText = "ACQUIRE PASSPORT - ${activePackage.storeProduct.priceString}";
+      } else {
+        buttonText = "UNAVAILABLE"; // 👈 If you see this, your RevenueCat SKUs don't match _shopTiers!
+      }
+    }
+
+    // Button is clickable if we aren't loading, AND (we need to login OR we have a package)
+    final bool isClickable = !_isLoading && (!isLoggedIn || activePackage != null);
+
+    return Positioned(
+      bottom: 40,
+      left: 24,
+      right: 24,
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: (isLoggedIn && isClickable) ? Colors.white : Colors.grey[850],
+          foregroundColor: (isLoggedIn && isClickable) ? Colors.black : Colors.grey[400],
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          elevation: (isLoggedIn && isClickable) ? 10 : 0,
+          side: isLoggedIn ? BorderSide.none : BorderSide(color: Colors.white.withOpacity(0.1)),
+        ),
+        onPressed: isClickable
+            ? () {
+                if (!isLoggedIn) {
+                  _showAuthDialog();
+                } else if (activePackage != null) {
+                  _buy(activePackage); 
+                }
+              }
+            : null,
+        child: _isLoading 
+          ? const CupertinoActivityIndicator(color: Colors.white) 
+          : Text(
+              buttonText,
+              style: const TextStyle(
+                fontFamily: 'Courier',
+                fontWeight: FontWeight.w900,
+                fontSize: 15,
+                letterSpacing: 1.2,
+              ),
+            ),
+      ),
+    );
+  }
   @override
   Widget build(BuildContext context) {
+    // 👇 Reverted to original layout math to preserve the perfect aspect ratio
+    final double cardWidth = (MediaQuery.of(context).size.width * 0.85).clamp(300.0, 400.0);
+    final double cardHeight = cardWidth * (540 / 340);
+
     return Scaffold(
-      // 🌌 Transparent so the AnimatedBackground handles the visuals
       backgroundColor: Colors.transparent, 
       extendBodyBehindAppBar: true,
       appBar: AppBar(
@@ -183,180 +344,96 @@ class _PaywallScreenState extends State<PaywallScreen> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // 🌊 LAYER 1: The Dark, High-Contrast Paywall Gradient
-          const AnimatedBackground(sku: 'paywall'),
+          const AnimatedBackground(sku: 'free_tier'),
           
-          // 🛒 LAYER 2: Package Selection Section
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  // ✨ NEW: The Animated Fact Card
-                  const _NycFactCard(),
-                  
-                  // 📦 Packages
-                  _isLoading
-                      ? const Center(child: CupertinoActivityIndicator(color: Colors.white, radius: 16))
-                      : Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: _packages.map((pkg) => _buildPackageButton(pkg)).toList(),
-                        ),
-                ],
-              ),
-            ),
+          PageView.builder(
+            controller: _pageController,
+            scrollDirection: Axis.vertical,
+            onPageChanged: (index) {
+              setState(() => _currentShopIndex = index);
+            },
+            itemCount: _shopTiers.length,
+            itemBuilder: (context, index) {
+              final tier = _shopTiers[index];
+              
+              return Center(
+                // 👇 NEW: Shrinks the entire widget uniformly without altering the layout math
+                child: Transform.scale(
+                  scale: 0.85, // Tweak this number (0.8, 0.9) to get the perfect size
+                  child: SizedBox(
+                    width: cardWidth,
+                    height: cardHeight + 100, 
+                    child: PassportStackScreen(
+                      isDemo: true, 
+                      skuType: tier['sku'],
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
+          
+          // 📍 LAYER 3: SIDE INDICATORS
+          _buildSideIndicators(),
+
+          // 💳 LAYER 4: THE DYNAMIC BUY BUTTON
+          _buildBuyButton(),
         ],
       ),
     );
   }
-}
 
-class _NycFactCard extends StatefulWidget {
-  const _NycFactCard();
+  Widget _buildSideIndicators() {
+    const double itemHeight = 35.0; // Hitbox height per item
+    const int itemCount = 3;
+    const double totalHeight = itemHeight * itemCount;
 
-  @override
-  State<_NycFactCard> createState() => _NycFactCardState();
-}
-
-class _NycFactCardState extends State<_NycFactCard> {
-  final List<String> _facts = [
-    "NYC has over 25,000 restaurants. If you ate at a new one every day, it would take 68 years to visit them all!",
-    "The first pizzeria in America, Lombardi's, opened in NYC in 1905.",
-    "The cronut was invented in NYC by Dominique Ansel in 2013.",
-    "Eggs Benedict was invented at the Waldorf Astoria in NYC in 1894 as a hangover cure.",
-    "NYC is home to the world's most expensive burger, costing \$295 at Serendipity 3.",
-    "The classic black-and-white cookie became an NYC staple at Glaser's Bake Shop in 1902.",
-    "Katz’s Delicatessen sells over 15,000 pounds of pastrami every single week.",
-    "The New York style hot dog was popularized by Charles Feltman at Coney Island in 1867.",
-    "NYC consumes more coffee than any other US city—almost 7 times the national average!",
-    "The first American restaurant to use tablecloths was Delmonico's in NYC.",
-    "General Tso’s Chicken was perfected and popularized in NYC, not China.",
-    "English muffins were invented in NYC by Samuel Bath Thomas in 1880.",
-    "The Bloody Mary was allegedly invented at the King Cole Bar in NYC's St. Regis Hotel in 1934.",
-    "There are more than 4,000 street food vendors operating in NYC today.",
-    "The modern pasta primavera was invented at Le Cirque in NYC in the 1970s.",
-    "Manhattan clam chowder uses a tomato base and was heavily influenced by Italian immigrants.",
-    "A single NYC bagel is famously boiled before baking to give it that distinct chewy crust.",
-    "NYC tap water is the secret ingredient to its legendary bagels and pizza dough due to its unique mineral profile.",
-    "The concept of the 'brunch' was popularized in NYC in the late 19th century.",
-    "The hot dog eating contest at Nathan's Famous on Coney Island has been held since 1916.",
-    "Baked Alaska was created at Delmonico's in NYC in 1867 to celebrate the US purchase of Alaska.",
-    "The first restaurant to offer a tasting menu in the US is widely considered to be an NYC establishment.",
-    "Chicken and waffles gained nationwide fame during the Harlem Renaissance at Wells Supper Club in NYC.",
-    "The Reuben sandwich was allegedly created at Reuben's Restaurant in NYC in 1914.",
-    "NYC has the largest Chinatown in the Western Hemisphere, boasting over 300 restaurants.",
-    "The famous 'rainbow bagel' was created at The Bagel Store in Brooklyn.",
-    "NYC is currently home to over 70 Michelin-starred restaurants.",
-    "The first automats (vending machine restaurants) in the US were popularized by Horn & Hardart in NYC.",
-    "Pastrami was introduced to NYC by Romanian Jewish immigrants in the late 19th century.",
-    "The Waldorf Salad was created in 1896 at the Waldorf-Astoria Hotel by the maitre d', Oscar Tschirky.",
-    "Ray's Pizza has dozens of unrelated locations in NYC, sparking a long-running debate over the 'Original' Ray's.",
-    "New York Cheesecake relies heavily on cream cheese rather than ricotta for its dense texture.",
-    "The first iced tea was reportedly popularized in NYC before making its way to the St. Louis World's Fair.",
-    "Spaghetti and meatballs is an Italian-American invention that originated in NYC's Little Italy.",
-    "NYC is the birthplace of the Manhattan cocktail, created at the Manhattan Club in the 1870s.",
-    "Shake Shack started as a humble hot dog cart in Madison Square Park in 2001."
-  ];
-
-  late Timer _timer;
-  int _currentIndex = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _facts.shuffle(); // Randomize sequence
-    _timer = Timer.periodic(const Duration(seconds: 6), (timer) {
-      if (mounted) {
-        setState(() {
-          _currentIndex = (_currentIndex + 1) % _facts.length;
-        });
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 24),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+    return Positioned(
+      right: 12, // Snug against the right edge
+      top: 0,
+      bottom: 0,
+      child: Center(
+        child: GestureDetector(
+          // 👇 The Scrubbing Mechanism
+          onVerticalDragUpdate: (details) {
+            double y = details.localPosition.dy;
+            int index = (y / itemHeight).floor();
+            index = index.clamp(0, itemCount - 1);
+            
+            if (_currentShopIndex != index) {
+              _pageController.animateToPage(
+                index,
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeOutCubic,
+              );
+            }
+          },
+          // Transparent container to catch the drag gestures
           child: Container(
-            width: double.infinity,
-            
-            // 📐 1. STRICT HEIGHT: Replaced 'constraints' with a hardcoded 'height'. 
-            // Fuck around with this number (try 280, 320, etc.) to get your perfect tall box.
-            height: 280, 
-            
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.08), 
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.25), 
-                width: 1.5,
-              ),
-            ),
+            color: Colors.transparent, 
+            height: totalHeight,
+            width: 40,
             child: Column(
-              // 📐 2. THE LOCK: 'start' pins the header to the top. The facts will flow down.
-              mainAxisAlignment: MainAxisAlignment.start, 
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // 📌 THE HEADER (Now permanently locked in place)
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center, 
-                  children: [
-                    const Icon(Icons.auto_awesome, color: Colors.white70, size: 20),
-                    const SizedBox(width: 8),
-                    Text(
-                      "NYC FOOD FACTS",
-                      style: TextStyle(
-                        fontFamily: 'Courier',
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white.withOpacity(0.8),
-                        letterSpacing: 2.5,
-                      ),
-                    ),
-                  ],
-                ),
-                
-                // ↕️ 3. TWEAK SPACING: This is the gap between the locked header and the facts.
-                const SizedBox(height: 32), 
-                
-                // 📝 THE FACTS (Fills the space below without shifting the header)
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 400),
-                  transitionBuilder: (Widget child, Animation<double> animation) {
-                    return FadeTransition(opacity: animation, child: child);
-                  },
-                  child: Text(
-                    _facts[_currentIndex],
-                    key: ValueKey<int>(_currentIndex),
-                    textAlign: TextAlign.center, 
-                    style: const TextStyle(
-                      fontFamily: 'Courier',
-                      fontSize: 16, 
-                      color: Colors.white,
-                      height: 1.6, 
-                      fontWeight: FontWeight.bold,
-                    ),
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: _shopTiers.asMap().entries.map((entry) {
+                final index = entry.key;
+                final label = entry.value['label']!;
+                final isActive = index == _currentShopIndex;
+
+                return Text(
+                  label,
+                  style: TextStyle(
+                    color: isActive ? Colors.white : Colors.white38,
+                    fontSize: isActive ? 15 : 13,
+                    fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
                   ),
-                ),
-              ],
+                );
+              }).toList(),
             ),
           ),
         ),
       ),
     );
   }
+
 }

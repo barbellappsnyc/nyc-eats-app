@@ -531,26 +531,10 @@ class _StoreCardPlaceholder extends StatelessWidget {
                 foregroundColor: Colors.black,
               ),
               onPressed: () {
-                final user = Supabase.instance.client.auth.currentUser;
-
-                if (user != null) {
-                  // 🟢 User is Logged In -> Open the Shop
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const PaywallScreen()),
-                  );
-                } else {
-                  // 🔴 User is Guest -> Force Login first
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        "Please create an account to access the shop.",
-                      ),
-                    ),
-                  );
-                  Navigator.of(
-                    context,
-                  ).push(MaterialPageRoute(builder: (_) => const AuthScreen()));
-                }
+                // 🟢 Let everyone into the shop so they can feel the books
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const PaywallScreen()),
+                );
               },
               child: const Text("BROWSE SHOP"),
             ),

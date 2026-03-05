@@ -24,12 +24,14 @@ class PassportStackScreen extends StatefulWidget {
   final String? bookId; 
   final String? skuType;
   final bool isReadOnly; 
+  final bool isDemo; // 👈 NEW: Demo mode flag
   // 👇 ADD THESE CALLBACKS
   final VoidCallback? onStampComplete;
   final ValueChanged<bool>? onButtonVisibilityChanged;
   final ValueChanged<String>? onRequestBookSwitch; // 👈 NEW
   final Restaurant? autoTriggerRestaurant; // 👈 NEW
   final VoidCallback? onAutoTriggerComplete; // 👈 NEW
+  
 
   const PassportStackScreen({
     super.key,
@@ -37,6 +39,7 @@ class PassportStackScreen extends StatefulWidget {
     this.bookId,
     this.skuType = 'free_tier',
     this.isReadOnly = false,
+    this.isDemo = false,
     this.onStampComplete, // 👈 NEW CALLBACK
     this.onButtonVisibilityChanged, // 👈 NEW CALLBACK
     this.onRequestBookSwitch, // 👈 NEW CALLBACK
@@ -77,6 +80,9 @@ class _PassportStackScreenState extends State<PassportStackScreen>
   late Animation<Offset> _buttonSlideAnim;
   // late AnimationController _zoomController;
   // late Animation<double> _zoomAnim;
+  // --- MACHINE GUN RETRIEVE ---
+  Timer? _retrieveTimer;
+  bool _isHoldingRetrieve = false;
 
   final AudioPlayer _player = AudioPlayer();
   final GlobalKey _stackKey = GlobalKey();
@@ -133,7 +139,9 @@ class _PassportStackScreenState extends State<PassportStackScreen>
 
   @override
   void dispose() {
+    _retrieveTimer?.cancel(); // 👈 NEW: Kill the machine gun
     _slideController.dispose();
+    // ... rest of dispose ...
     _stampController.dispose();
     _buttonController.dispose();
     // _zoomController.dispose();
@@ -141,9 +149,38 @@ class _PassportStackScreenState extends State<PassportStackScreen>
     super.dispose();
   }
 
+  // 🎭 MOCK DATA INJECTOR FOR THE SHOP
+  void _applyDemoData() {
+    if (!mounted) return;
+    setState(() {
+      _isLoading = false;
+      _passportSku = widget.skuType ?? 'standard_book';
+      _userName = "TRAVELER"; // Dummy name
+      userVisas = []; // Blank pages
+      collectedStamps = []; // No stamps
+      _activeIndex = 0;
+      
+      // 👇 CHANGED: Match the actual physical DB limits
+      if (_passportSku == 'single_page') {
+        _totalCards = 1;  // Just the visa page
+      } else if (_passportSku == 'diplomat_book') {
+        _totalCards = 21; // Cover + 20 pages
+      } else {
+        _totalCards = 6;  // Cover + 5 pages
+      }
+    });
+  }
+
   Future<void> _fetchBookData({bool forceRefresh = false}) async {
+    // 🛑 1. DEMO MODE INTERCEPT
+    if (widget.isDemo) {
+      _applyDemoData();
+      return;
+    }
+
     // 🛠 FIX: Check if user is Guest
     final isGuest = Supabase.instance.client.auth.currentUser == null;
+    // ... rest of the existing fetch code
     
     // 🚀 FORCE REFRESH FOR GUESTS
     // We intentionally ignore the RAM cache for guests and read straight from disk.
@@ -691,7 +728,7 @@ class _PassportStackScreenState extends State<PassportStackScreen>
         _activeIndex++;
         _dragNotifier.value = 0; 
       });
-      if (widget.bookId != null) {
+      if (widget.bookId != null && !widget.isDemo) { // 👈 Prevent demo DB writes
         PassportService.updateBookPage(widget.bookId!, _activeIndex);
       }
       HapticFeedback.lightImpact();
@@ -704,9 +741,9 @@ class _PassportStackScreenState extends State<PassportStackScreen>
       _activeIndex--; 
       _dragNotifier.value = -screenHeight; 
     });
-    if (widget.bookId != null) {
-       PassportService.updateBookPage(widget.bookId!, _activeIndex);
-    }
+    if (widget.bookId != null && !widget.isDemo) { // 👈 Prevent demo DB writes
+        PassportService.updateBookPage(widget.bookId!, _activeIndex);
+      }
 
     _slideAnim = Tween<double>(begin: -screenHeight, end: 0).animate(
       CurvedAnimation(parent: _slideController, curve: Curves.easeOutBack),
@@ -715,6 +752,33 @@ class _PassportStackScreenState extends State<PassportStackScreen>
       _dragNotifier.value = 0.0;
       HapticFeedback.mediumImpact();
     });
+  }
+
+  void _startMachineGunRetrieve() {
+    if (_activeIndex <= 0) return;
+    
+    setState(() => _isHoldingRetrieve = true);
+    HapticFeedback.heavyImpact(); // Let the user know the machine gun is primed
+    
+    // 💥 Fire the first shot immediately
+    _animateCardRetrieve();
+    
+    // 🔫 Start rapid fire (150ms per page)
+    _retrieveTimer = Timer.periodic(const Duration(milliseconds: 150), (timer) {
+      if (_activeIndex > 0) {
+        _animateCardRetrieve();
+        HapticFeedback.lightImpact(); // Rapid physical feedback
+      } else {
+        _stopMachineGunRetrieve();
+      }
+    });
+  }
+
+  void _stopMachineGunRetrieve() {
+    _retrieveTimer?.cancel();
+    if (mounted && _isHoldingRetrieve) {
+      setState(() => _isHoldingRetrieve = false);
+    }
   }
 
   Future<void> _programmaticPageFlip() async {
@@ -732,7 +796,7 @@ class _PassportStackScreenState extends State<PassportStackScreen>
         _activeIndex++;
         _dragNotifier.value = 0; 
       });
-      if (widget.bookId != null) {
+      if (widget.bookId != null && !widget.isDemo) { // 👈 Prevent demo DB writes
         PassportService.updateBookPage(widget.bookId!, _activeIndex);
       }
     }
@@ -919,8 +983,12 @@ class _PassportStackScreenState extends State<PassportStackScreen>
   }
 
   void _onCardTap() {
+    // 🛑 DEMO MODE LOCK: Don't open the detail screen
+    if (widget.isDemo) return; 
+    
     // 🛑 1. BOUNCER: PREVENT COVER TAP
     if (_activeIndex == 0 && (_passportSku == 'diplomat_book' || _passportSku == 'standard_book')) {
+// ... rest of code
       return; 
     }
 
@@ -1325,14 +1393,33 @@ class _PassportStackScreenState extends State<PassportStackScreen>
 
             if (_activeIndex > 0 && !_showStampButton && !_isStampingSequence)
               Positioned(
-                top: 110, 
-                right: 20,
-                child: FloatingActionButton.small(
-                  backgroundColor: Colors.white.withOpacity(0.2),
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  onPressed: _animateCardRetrieve,
-                  child: const Icon(Icons.refresh),
+                top: 0, 
+                right: 0,
+                child: GestureDetector(
+                  // 👆 Single Tap (Normal Retrieve)
+                  onTap: () {
+                    if (_activeIndex > 0) _animateCardRetrieve();
+                  },
+                  // 🔫 Long Press (Machine Gun Mode)
+                  onLongPressStart: (_) => _startMachineGunRetrieve(),
+                  onLongPressEnd: (_) => _stopMachineGunRetrieve(),
+                  onLongPressCancel: _stopMachineGunRetrieve,
+                  
+                  // 🎈 15% Scale Effect
+                  child: AnimatedScale(
+                    scale: _isHoldingRetrieve ? 1.15 : 1.0, 
+                    duration: const Duration(milliseconds: 150),
+                    curve: Curves.easeOutBack,
+                    child: Container(
+                      width: 40, // Exact size of FAB.small
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.refresh, color: Colors.white, size: 20),
+                    ),
+                  ),
                 ),
               ),
 
