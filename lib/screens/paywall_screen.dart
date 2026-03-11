@@ -11,6 +11,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../widgets/animated_background.dart'; // Ensure this path matches your folder structure!
 import 'dart:async'; // 👈 Don't forget to add this to the very top of your file!
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/gestures.dart'; // 👈 For the tap recognizers
+import 'package:url_launcher/url_launcher.dart'; // 👈 To open the browser
 
 class PaywallScreen extends StatefulWidget {
   final Restaurant? incomingRestaurant;
@@ -34,18 +36,26 @@ class _PaywallScreenState extends State<PaywallScreen> {
     {'sku': 'diplomat_book', 'label': 'D', 'title': 'DIPLOMAT BOOK'},
   ];
 
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
-  }
+  late TapGestureRecognizer _tosRecognizer;
+  late TapGestureRecognizer _privacyRecognizer;
 
   @override
   void initState() {
     super.initState();
     _loadOfferings();
+    
+    // 👇 Initialize the tap listeners
+    _tosRecognizer = TapGestureRecognizer()..onTap = _launchToS;
+    _privacyRecognizer = TapGestureRecognizer()..onTap = _launchPrivacy;
   }
 
+  @override
+  void dispose() {
+    _pageController.dispose();
+    _tosRecognizer.dispose(); // 👈 Prevent memory leaks
+    _privacyRecognizer.dispose(); // 👈 Prevent memory leaks
+    super.dispose();
+  }
   Future<void> _loadOfferings() async {
     try {
       final packages = await PurchaseService().fetchOffers();
@@ -270,7 +280,6 @@ class _PaywallScreenState extends State<PaywallScreen> {
     final Package? activePackage = _getActivePackage();
     final bool isLoggedIn = Supabase.instance.client.auth.currentUser != null;
     
-    // Determine what the text should say
     String buttonText = "LOADING...";
     if (!_isLoading) {
       if (!isLoggedIn) {
@@ -278,17 +287,15 @@ class _PaywallScreenState extends State<PaywallScreen> {
       } else if (activePackage != null) {
         buttonText = "ACQUIRE PASSPORT - ${activePackage.storeProduct.priceString}";
       } else {
-        buttonText = "UNAVAILABLE"; // 👈 If you see this, your RevenueCat SKUs don't match _shopTiers!
+        buttonText = "UNAVAILABLE"; 
       }
     }
 
-    // Button is clickable if we aren't loading, AND (we need to login OR we have a package)
     final bool isClickable = !_isLoading && (!isLoggedIn || activePackage != null);
 
-    return Positioned(
-      bottom: 40,
-      left: 24,
-      right: 24,
+    // 👇 CHANGED: Removed Positioned wrapper. Used SizedBox to force full width.
+    return SizedBox(
+      width: double.infinity,
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
           backgroundColor: (isLoggedIn && isClickable) ? Colors.white : Colors.grey[850],
@@ -321,6 +328,57 @@ class _PaywallScreenState extends State<PaywallScreen> {
       ),
     );
   }
+  
+  Widget _buildLegalFooter() {
+    return Text.rich(
+      TextSpan(
+        text: "By purchasing, you agree to our ",
+        style: const TextStyle(color: Colors.black, fontSize: 11, height: 1.4),
+        children: [
+          TextSpan(
+            text: "Terms of Service",
+            style: const TextStyle(
+              decoration: TextDecoration.underline, 
+              color: Colors.black,
+              fontWeight: FontWeight.bold,
+            ),
+            recognizer: _tosRecognizer, // 👈 ADDED THIS
+          ),
+          const TextSpan(text: " and "),
+          TextSpan(
+            text: "Privacy Policy",
+            style: const TextStyle(
+              decoration: TextDecoration.underline, 
+              color: Colors.black,
+              fontWeight: FontWeight.bold,
+            ),
+            recognizer: _privacyRecognizer, // 👈 ADDED THIS
+          ),
+          const TextSpan(
+            text: ".\nPassports are one-time consumable purchases."
+          ),
+        ],
+      ),
+      textAlign: TextAlign.center,
+    );
+  }
+
+  Future<void> _launchToS() async {
+    // Replace with your actual Terms of Service URL later
+    final Uri url = Uri.parse('https://yourwebsite.com/terms'); 
+    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+      debugPrint('Could not launch $url');
+    }
+  }
+
+  Future<void> _launchPrivacy() async {
+    // Replace with your actual Privacy Policy URL later
+    final Uri url = Uri.parse('https://yourwebsite.com/privacy'); 
+    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+      debugPrint('Could not launch $url');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // 👇 Reverted to original layout math to preserve the perfect aspect ratio
@@ -376,8 +434,27 @@ class _PaywallScreenState extends State<PaywallScreen> {
           // 📍 LAYER 3: SIDE INDICATORS
           _buildSideIndicators(),
 
-          // 💳 LAYER 4: THE DYNAMIC BUY BUTTON
-          _buildBuyButton(),
+          // 💳 & ⚖️ LAYERS 4 & 5: DYNAMIC BOTTOM CONTROLS
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: SafeArea(
+              child: Padding(
+                padding: EdgeInsets.symmetric(
+                  // Dynamic padding based on percentage of screen size
+                  horizontal: MediaQuery.of(context).size.width * 0.06, 
+                  vertical: MediaQuery.of(context).size.height * 0.02,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min, // Hugs the elements tightly
+                  children: [
+                    _buildBuyButton(),
+                    SizedBox(height: MediaQuery.of(context).size.height * 0.015), // Scalable gap
+                    _buildLegalFooter(),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );

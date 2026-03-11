@@ -256,6 +256,254 @@ Widget build(BuildContext context) {
   }
 }
 
+// class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMixin {
+//   // ⏱️ Sequence Trackers (4 Phases)
+//   int _currentPhase = 1; 
+  
+//   // 👇 Added \n to force a permanent line break before Restaurants
+//   final String _phrase1 = "36,000+ NYC\nRestaurants🗽"; 
+//   final String _phrase2 = "Gourmet Passports🛫";
+//   final String _phrase3 = "Coming Soon...😉";
+  
+//   int _index1 = 0;
+//   int _index2 = 0;
+//   int _index3 = 0;
+//   bool _showCursor = true;
+
+//   late Timer _typewriterTimer;
+//   late Timer _cursorTimer;
+
+//   @override
+//   void initState() {
+//     super.initState();
+    
+//     _cursorTimer = Timer.periodic(const Duration(milliseconds: 500), (timer) {
+//       if (mounted) setState(() => _showCursor = !_showCursor);
+//     });
+
+//     _startPhaseOne();
+//   }
+
+//   // ---------------------------------------------------------
+//   // THE 4-PHASE TIMING ENGINE
+//   // ---------------------------------------------------------
+
+//   Future<void> _startPhaseOne() async {
+//     await Future.delayed(const Duration(milliseconds: 600));
+//     // Using .characters prevents emojis from crashing the length count
+//     final chars = _phrase1.characters.toList();
+
+//     _typewriterTimer = Timer.periodic(const Duration(milliseconds: 110), (timer) {
+//       if (_index1 < chars.length) {
+//         setState(() => _index1++);
+//         if (chars[_index1 - 1].trim().isNotEmpty) {
+//           SystemSound.play(SystemSoundType.click);
+//           HapticFeedback.selectionClick(); 
+//         }
+//       } else {
+//         timer.cancel();
+//         _startPhaseTwo();
+//       }
+//     });
+//   }
+
+//   Future<void> _startPhaseTwo() async {
+//     await Future.delayed(const Duration(milliseconds: 1500)); 
+//     setState(() => _currentPhase = 2); 
+//     await Future.delayed(const Duration(milliseconds: 400)); 
+
+//     final chars = _phrase2.characters.toList();
+
+//     _typewriterTimer = Timer.periodic(const Duration(milliseconds: 110), (timer) {
+//       if (_index2 < chars.length) {
+//         setState(() => _index2++);
+//         if (chars[_index2 - 1].trim().isNotEmpty) {
+//           SystemSound.play(SystemSoundType.click);
+//           HapticFeedback.selectionClick(); 
+//         }
+//       } else {
+//         timer.cancel();
+//         _startPhaseThree();
+//       }
+//     });
+//   }
+
+//   Future<void> _startPhaseThree() async {
+//     await Future.delayed(const Duration(milliseconds: 1500)); 
+//     setState(() => _currentPhase = 3); 
+//     await Future.delayed(const Duration(milliseconds: 400)); 
+
+//     final chars = _phrase3.characters.toList();
+
+//     _typewriterTimer = Timer.periodic(const Duration(milliseconds: 110), (timer) {
+//       if (_index3 < chars.length) {
+//         setState(() => _index3++);
+//         if (chars[_index3 - 1].trim().isNotEmpty) {
+//           SystemSound.play(SystemSoundType.click);
+//           HapticFeedback.selectionClick(); 
+//         }
+//       } else {
+//         timer.cancel();
+//         _startPhaseFour();
+//       }
+//     });
+//   }
+
+//   Future<void> _startPhaseFour() async {
+//     await Future.delayed(const Duration(milliseconds: 1500));
+//     setState(() {
+//       _currentPhase = 4; // Trigger the final logo fade-in
+//       _showCursor = false;
+//     });
+//   }
+
+//   @override
+//   void dispose() {
+//     if (_typewriterTimer.isActive) _typewriterTimer.cancel();
+//     if (_cursorTimer.isActive) _cursorTimer.cancel();
+//     super.dispose();
+//   }
+
+//   // ---------------------------------------------------------
+//   // THE UI ROUTER
+//   // ---------------------------------------------------------
+
+//   @override
+//   Widget build(BuildContext context) {
+//     return AnnotatedRegion<SystemUiOverlayStyle>(
+//       value: SystemUiOverlayStyle.light, 
+//       child: Scaffold(
+//         backgroundColor: Colors.black, 
+//         body: Stack(
+//           fit: StackFit.expand,
+//           children: [
+//             const CinematicBokehBackground(),
+            
+//             BackdropFilter(
+//               filter: ImageFilter.blur(sigmaX: 4.0, sigmaY: 4.0),
+//               child: Container(color: Colors.black.withOpacity(0.20)),
+//             ),
+
+//             Center(
+//               child: AnimatedSwitcher(
+//                 duration: const Duration(milliseconds: 800),
+//                 switchInCurve: Curves.easeOut,
+//                 switchOutCurve: Curves.easeIn,
+//                 // Router for the 4 phases
+//                 child: _currentPhase == 1 
+//                     ? _buildTypingPhase(_phrase1, _index1, "Phase1")
+//                     : _currentPhase == 2
+//                         ? _buildTypingPhase(_phrase2, _index2, "Phase2")
+//                         : _currentPhase == 3
+//                             ? _buildTypingPhase(_phrase3, _index3, "Phase3")
+//                             : _buildLogoPhase(),
+//               ),
+//             ),
+//           ],
+//         ),
+//       ),
+//     );
+//   }
+
+//   // ---------------------------------------------------------
+//   // 🛡️ THE PERFECTLY STATIC OVERLAY WIDGET
+//   // ---------------------------------------------------------
+
+//   Widget _buildTypingPhase(String fullText, int currentIndex, String keyLabel) {
+//     final chars = fullText.characters.toList();
+//     String typedText = chars.sublist(0, currentIndex).join();
+//     String untypedText = chars.sublist(currentIndex).join();
+
+//     const baseStyle = TextStyle(fontFamily: 'AppleGaramond', fontSize: 36, letterSpacing: 1.2, height: 1.4);
+
+//     return Padding(
+//       padding: const EdgeInsets.symmetric(horizontal: 24.0), 
+//       child: Stack(
+//         alignment: Alignment.topCenter,
+//         children: [
+//           // 🌚 LAYER 1: The purely static grey footprint. 
+//           // Contains ZERO moving parts. It mathematically cannot shift.
+//           RichText(
+//             key: ValueKey(keyLabel + "_bg"), 
+//             textAlign: TextAlign.center, 
+//             text: TextSpan(
+//               style: baseStyle.copyWith(color: Colors.white24),
+//               text: fullText, // Just the raw, unedited text
+//             ),
+//           ),
+          
+//           // 💡 LAYER 2: The white overlay painting exactly on top
+//           RichText(
+//             key: ValueKey(keyLabel + "_fg"), 
+//             textAlign: TextAlign.center, 
+//             text: TextSpan(
+//               style: baseStyle,
+//               children: [
+//                 TextSpan(text: typedText, style: const TextStyle(color: Colors.white)),
+                
+//                 // 🛡️ THE FIX: A strictly 0-width cursor
+//                 WidgetSpan(
+//                   alignment: PlaceholderAlignment.baseline,
+//                   baseline: TextBaseline.alphabetic,
+//                   child: SizedBox(
+//                     width: 0, 
+//                     child: Text(
+//                       '|', 
+//                       softWrap: false, // Prevents the 0-width box from crushing the text
+//                       overflow: TextOverflow.visible, // Forces the cursor to paint visibly outside the box
+//                       style: TextStyle(
+//                         fontFamily: 'AppleGaramond', 
+//                         fontSize: 36, 
+//                         color: _showCursor ? Colors.white : Colors.transparent, 
+//                         fontWeight: FontWeight.w300,
+//                         height: 1.4,
+//                       )
+//                     ),
+//                   ),
+//                 ),
+                
+//                 // Invisible text forcing Layer 2 to calculate the exact same layout boundaries as Layer 1
+//                 TextSpan(text: untypedText, style: const TextStyle(color: Colors.transparent)),
+//               ],
+//             ),
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+
+//   Widget _buildLogoPhase() {
+//     return Column(
+//       mainAxisSize: MainAxisSize.min,
+//       key: const ValueKey("LogoPhase"), 
+//       children: [
+//         const Text(
+//           "NYC EATS",
+//           textAlign: TextAlign.center,
+//           style: TextStyle(
+//             fontFamily: 'AppleGaramond', 
+//             fontSize: 48,
+//             fontWeight: FontWeight.w900,
+//             letterSpacing: 6.0,
+//             color: Colors.white,
+//           ),
+//         ),
+//         const SizedBox(height: 12),
+//         Text(
+//           "GOURMET PASSPORTS",
+//           textAlign: TextAlign.center,
+//           style: TextStyle(
+//             fontFamily: 'Courier', 
+//             fontSize: 14,
+//             fontWeight: FontWeight.bold,
+//             letterSpacing: 8.0,
+//             color: Colors.white.withOpacity(0.6),
+//           ),
+//         ),
+//       ],
+//     );
+//   }
+// }
 // ----------------------------------------------------------------
 // 🚕 THE RAINY CAB RIDE (PURE CODE BOKEH ANIMATION)
 // ----------------------------------------------------------------
