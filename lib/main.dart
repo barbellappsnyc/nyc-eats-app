@@ -46,6 +46,8 @@ class NycEatsApp extends StatelessWidget {
         brightness: Brightness.light, 
         scaffoldBackgroundColor: Colors.black,
         useMaterial3: true,
+        // 👇 Set the default fallback font for the entire app
+        fontFamily: 'SFPro', // (Or omit if you want the native iOS system font)
       ),
       // 👇 2. SET THE HOME SCREEN TO YOUR NEW SPLASH SCREEN
       home: const SplashScreen(), 

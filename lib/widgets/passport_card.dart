@@ -261,8 +261,9 @@ class PassportCard extends StatelessWidget {
       baseColor = const Color(0xFF041022); 
       highlightColor = const Color(0xFF162538);
     } else {
-      baseColor = const Color(0xFF1B4D3E); 
-      highlightColor = const Color(0xFF2E6B52);
+      // Imperial Burgundy
+      baseColor = const Color(0xFF3B0918); // Deep Oxblood
+      highlightColor = const Color(0xFF5C1026); // Rich Burgundy
     }
 
     return Material(

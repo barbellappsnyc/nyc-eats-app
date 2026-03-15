@@ -1123,19 +1123,6 @@ class _PassportStackScreenState extends State<PassportStackScreen>
     );
   }
 
-  // Widget _buildActiveCard(int index) {
-  //   return AnimatedBuilder(
-  //     animation: _zoomController,
-  //     builder: (context, child) {
-  //       return Transform.scale(
-  //         scale: _isStampingSequence ? _zoomAnim.value : 1.0, 
-  //         child: child,
-  //       );
-  //     },
-  //     child: _buildCardContent(index, useKeys: !_isStampingSequence), 
-  //   );
-  // }
-
   Widget _buildActiveCard(int index) {
     return _buildCardContent(
       index, 
@@ -1146,71 +1133,7 @@ class _PassportStackScreenState extends State<PassportStackScreen>
   }
   
   Widget _buildCardContent(int index, {required bool useKeys, bool isFlyingStamp = false}) {
-    // =========================================================================
-    // 🎚️ FAILSAFE SWITCH: CHOOSE YOUR LOGIC
-    // =========================================================================
 
-    // -------------------------------------------------------------------------
-    // 🔴 OPTION A: OLD DISTRIBUTED LOGIC (Current)
-    // -------------------------------------------------------------------------
-
-    // int filledPagesCount = 1 + userVisas.length; 
-    // if (_passportSku == 'single_page') filledPagesCount = 1;
-
-    // bool isAssigned = index < filledPagesCount;
-
-    // String title = "VACANT PAGE";
-    // Color? color;
-    // String? dateIssued;
-    // List<Map<String, String>> stamps = [];
-
-    // if (isAssigned) {
-    //   if (index == 0) {
-    //     if (_passportSku == 'single_page' && userVisas.isNotEmpty) {
-    //        final visa = userVisas[0];
-    //        title = visa['cuisine'].toString().toUpperCase();
-    //        if (visa['visa_types'] != null && visa['visa_types']['color_hex'] != null) {
-    //          color = _parseColor(visa['visa_types']['color_hex']);
-    //        }
-    //        if (visa['created_at'] != null) {
-    //           dateIssued = DateFormat('MMM d, yyyy').format(DateTime.parse(visa['created_at']));
-    //        }
-    //        stamps = collectedStamps; 
-    //     } else {
-    //        title = _passportSku == 'free_tier' ? "TEMP VISA" : "GLOBAL VISA";
-    //        stamps = collectedStamps.where((s) => s['cuisine'] == 'Global').toList();
-    //        if (_passportSku == 'free_tier') stamps = collectedStamps;
-    //     }
-    //   } else {
-    //     if (userVisas.length > index - 1) {
-    //       final visa = userVisas[index - 1];
-    //       title = visa['cuisine'].toString().toUpperCase();
-    //       if (visa['visa_types'] != null && visa['visa_types']['color_hex'] != null) {
-    //         color = _parseColor(visa['visa_types']['color_hex']);
-    //       }
-    //       if (visa['created_at'] != null) {
-    //          dateIssued = DateFormat('MMM d, yyyy').format(DateTime.parse(visa['created_at']));
-    //       }
-    //       final allCuisineStamps = collectedStamps.where((s) => s['cuisine'] == visa['cuisine']).toList();
-    //       int cuisinePageOrder = 0;
-    //       for (int i = 0; i < index - 1; i++) {
-    //         if (userVisas[i]['cuisine'] == visa['cuisine']) {
-    //           cuisinePageOrder++;
-    //         }
-    //       }
-    //       final int skipCount = cuisinePageOrder * 4;
-    //       stamps = allCuisineStamps.skip(skipCount).take(4).toList();
-    //     }
-    //   }
-    // }
-    
-    // -------------------------------------------------------------------------
-    // 🟢 OPTION B: NEW BRAIN LOGIC 
-    // -------------------------------------------------------------------------
-
-    // 🛡️ THE FIX: We build the book object from our stable local state.
-    // This prevents the UI from flickering to the 'free_tier' default if the 
-    // Service cache is temporarily wiped during a database sync.
     final Map<String, dynamic> fullBook = {
       'sku_type': _passportSku,
       'visas': userVisas,
@@ -1393,8 +1316,10 @@ class _PassportStackScreenState extends State<PassportStackScreen>
 
             if (_activeIndex > 0 && !_showStampButton && !_isStampingSequence)
               Positioned(
-                top: 0, 
-                right: 0,
+                // 👇 Lock to the exact right edge of the card
+                right: (MediaQuery.of(context).size.width - (MediaQuery.of(context).size.width * 0.85).clamp(300.0, 400.0)) / 2,
+                // 👇 Push it down just above the stack
+                top: MediaQuery.of(context).size.height * 0.12, // Tweak this decimal slightly if it sits too high/low on your simulator
                 child: GestureDetector(
                   // 👆 Single Tap (Normal Retrieve)
                   onTap: () {
@@ -1414,7 +1339,7 @@ class _PassportStackScreenState extends State<PassportStackScreen>
                       width: 40, // Exact size of FAB.small
                       height: 40,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withOpacity(0.5),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(Icons.refresh, color: Colors.white, size: 20),

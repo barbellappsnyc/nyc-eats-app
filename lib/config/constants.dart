@@ -1,5 +1,9 @@
 // lib/constant.dart
 
+import 'dart:ui';
+
+import 'package:flutter/material.dart';
+
 final Map<String, List<String>> categoryLogic = {
   "American": ["Steak", "Deli", "American", "Burger", "Diner"],
   "Bagels": ["Bagel", "Bakery", "Deli"],
@@ -299,3 +303,39 @@ final Map<String, String> categoryFlags = {
   "Catering": "🍽️",
   "Fine Dining": "🤵",
 };
+
+class AppTextStyles {
+  // --- GOURMET (HEADERS & PASSPORTS) ---
+  // Ensure 'AppleGaramond' matches exactly what you named it in pubspec.yaml
+  static const TextStyle passportTitle = TextStyle(
+    fontFamily: 'AppleGaramond', 
+    fontWeight: FontWeight.w700,
+    fontSize: 22,
+    color: Colors.white,
+    letterSpacing: 1.0,
+  );
+
+  static const TextStyle dialogHeader = TextStyle(
+    fontFamily: 'AppleGaramond',
+    fontWeight: FontWeight.w700,
+    fontSize: 18,
+    color: Colors.white,
+    letterSpacing: 1.0,
+  );
+
+  // --- BARBELL (UTILITY, BUTTONS & DATA) ---
+  // If you added SF Pro to pubspec, specify it. Otherwise, Flutter defaults to SF Pro on iOS natively if you leave fontFamily blank.
+  static const TextStyle buttonText = TextStyle(
+    fontFamily: 'SFPro', // Remove this line if relying on iOS system default
+    fontWeight: FontWeight.w900,
+    fontSize: 15,
+    letterSpacing: 1.2,
+  );
+
+  static const TextStyle bodySmall = TextStyle(
+    fontFamily: 'SFPro', // Remove this line if relying on iOS system default
+    fontWeight: FontWeight.w400,
+    fontSize: 11,
+    color: Colors.white70,
+  );
+}

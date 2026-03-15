@@ -113,6 +113,16 @@ flutter:
     - family: AppleGaramond
       fonts:
         - asset: assets/fonts/AppleGaramond.ttf
+        - asset: assets/fonts/AppleGaramond-Italic.ttf
+          style: italic
+
+    - family: SFPro  # This is the name you will use in your code
+      fonts:
+        - asset: assets/fonts/SF-Pro-Display-Regular.otf
+        - asset: assets/fonts/SF-Pro-Display-Bold.otf
+          weight: 700
+        - asset: assets/fonts/SF-Pro-Italic.ttf
+          style: italic
   # fonts:
   #   - family: Schyler
   #     fonts:

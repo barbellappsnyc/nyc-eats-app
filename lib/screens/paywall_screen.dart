@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:nyc_eats/screens/passport_stack_screen.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import '../services/purchase_service.dart';
@@ -191,10 +192,23 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
   Package? _getActivePackage() {
     if (_packages.isEmpty) return null;
+    
+    // 1. Get the internal UI name (e.g., 'standard_book')
     final String activeSku = _shopTiers[_currentShopIndex]['sku']!;
+
+    // 2. Translate it to the exact RevenueCat identifier
+    String revenueCatIdentifier = '';
+    if (activeSku == 'single_page') {
+      revenueCatIdentifier = 'nyceats_single';
+    } else if (activeSku == 'standard_book') {
+      revenueCatIdentifier = 'nyceats_standard';
+    } else if (activeSku == 'diplomat_book') {
+      revenueCatIdentifier = 'nyceats_diplomat';
+    }
+
+    // 3. Find the matching package
     try {
-      // Matches the dummy book SKU ('standard_book') to the RevenueCat identifier
-      return _packages.firstWhere((pkg) => pkg.storeProduct.identifier.contains(activeSku));
+      return _packages.firstWhere((pkg) => pkg.storeProduct.identifier == revenueCatIdentifier);
     } catch (e) {
       return null;
     }
@@ -379,83 +393,249 @@ class _PaywallScreenState extends State<PaywallScreen> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    // 👇 Reverted to original layout math to preserve the perfect aspect ratio
-    final double cardWidth = (MediaQuery.of(context).size.width * 0.85).clamp(300.0, 400.0);
-    final double cardHeight = cardWidth * (540 / 340);
+  void _showPurchaseInfo(String sku, String title) {
+    String description = "";
+    String capacity = "";
+    Color accentColor = Colors.white;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent, 
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: Padding(
-          padding: const EdgeInsets.only(left: 16.0),
-          child: IconButton(
-            icon: const Icon(Icons.close, color: Colors.white, size: 28),
-            onPressed: () => Navigator.pop(context),
+    if (sku == 'single_page') {
+      description = "A single-entry travel document. Once a cuisine is assigned, this page is locked to that specific country forever.";
+      capacity = "1 Visa Page • 4 Stamps Max";
+      accentColor = Colors.blueAccent;
+    } else if (sku == 'standard_book') {
+      description = "The classic traveler's companion. Bound in Imperial Burgundy, it allows for multiple cuisines and border crossings.";
+      capacity = "5 Visa Pages • 20 Stamps Max";
+      accentColor = const Color(0xFF5C1026); // Burgundy
+    } else if (sku == 'diplomat_book') {
+      description = "For the culinary elite. An expansive, heavyweight book featuring the exclusive Navy & Gold Foil cover.";
+      capacity = "20 Visa Pages • 80 Stamps Max";
+      accentColor = const Color(0xFFFFD700); // Gold
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: const Color(0xFF1A1A1A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.style, size: 40, color: accentColor),
+              const SizedBox(height: 16),
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontFamily: 'AppleGaramond', 
+                  fontSize: 22, 
+                  fontWeight: FontWeight.bold, 
+                  color: Colors.white, 
+                  letterSpacing: 1.2
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: accentColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: accentColor.withOpacity(0.3)),
+                ),
+                child: Text(
+                  capacity,
+                  style: TextStyle(
+                    fontFamily: 'SFPro',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                    color: accentColor,
+                    letterSpacing: 1.0,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                description,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 14, 
+                  color: Colors.white70, 
+                  height: 1.5
+                ),
+              ),
+              const SizedBox(height: 28),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.black,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  child: const Text("CLOSE", style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              )
+            ],
           ),
         ),
       ),
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          const AnimatedBackground(sku: 'free_tier'),
-          
-          PageView.builder(
-            controller: _pageController,
-            scrollDirection: Axis.vertical,
-            onPageChanged: (index) {
-              setState(() => _currentShopIndex = index);
-            },
-            itemCount: _shopTiers.length,
-            itemBuilder: (context, index) {
-              final tier = _shopTiers[index];
-              
-              return Center(
-                // 👇 NEW: Shrinks the entire widget uniformly without altering the layout math
-                child: Transform.scale(
-                  scale: 0.85, // Tweak this number (0.8, 0.9) to get the perfect size
-                  child: SizedBox(
-                    width: cardWidth,
-                    height: cardHeight + 100, 
-                    child: PassportStackScreen(
-                      isDemo: true, 
-                      skuType: tier['sku'],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final double cardWidth = (MediaQuery.of(context).size.width * 0.85).clamp(300.0, 400.0);
+    final double cardHeight = cardWidth * (540 / 340);
+
+    // 👇 Task 3: Forces black status bar icons (battery, wifi, time)
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.dark, 
+      child: Scaffold(
+        backgroundColor: Colors.transparent, 
+        // 👈 Task 1: AppBar completely removed!
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            const AnimatedBackground(sku: 'free_tier'),
+            
+            PageView.builder(
+              controller: _pageController,
+              scrollDirection: Axis.vertical,
+              onPageChanged: (index) {
+                setState(() => _currentShopIndex = index);
+              },
+              itemCount: _shopTiers.length,
+              itemBuilder: (context, index) {
+                final tier = _shopTiers[index];
+                
+                return Align(
+                  // 👇 Task 4: Negative Y-alignment shifts the books & labels upwards
+                  alignment: const Alignment(0, -0.3), 
+                  child: Transform.scale(
+                    scale: 0.85, 
+                    child: Stack(
+                      alignment: Alignment.center,
+                      clipBehavior: Clip.none, 
+                      children: [
+                        // 1. THE 3D BOOK
+                        SizedBox(
+                          width: cardWidth,
+                          height: cardHeight + 100, 
+                          child: PassportStackScreen(
+                            isDemo: true, 
+                            skuType: tier['sku'],
+                          ),
+                        ),
+                        
+                        // 2. THE FLOATING INFO LABEL
+                        Positioned(
+                          top: 0, 
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque, 
+                            onTap: () => _showPurchaseInfo(tier['sku']!, tier['title']!),
+                            child: Padding(
+                              padding: const EdgeInsets.only(bottom: 24.0), 
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    tier['title']!,
+                                    style: const TextStyle(
+                                      fontFamily: 'SFPro', 
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 15,
+                                      color: Colors.black, 
+                                      letterSpacing: 1.2,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  const Icon(
+                                    Icons.info_outline, 
+                                    color: Colors.black, 
+                                    size: 18
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-              );
-            },
-          ),
-          
-          // 📍 LAYER 3: SIDE INDICATORS
-          _buildSideIndicators(),
+                );
+              },
+            ),
+            
+            // 📍 LAYER 3: SIDE INDICATORS
+            _buildSideIndicators(),
 
-          // 💳 & ⚖️ LAYERS 4 & 5: DYNAMIC BOTTOM CONTROLS
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: SafeArea(
-              child: Padding(
-                padding: EdgeInsets.symmetric(
-                  // Dynamic padding based on percentage of screen size
-                  horizontal: MediaQuery.of(context).size.width * 0.06, 
-                  vertical: MediaQuery.of(context).size.height * 0.02,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min, // Hugs the elements tightly
-                  children: [
-                    _buildBuyButton(),
-                    SizedBox(height: MediaQuery.of(context).size.height * 0.015), // Scalable gap
-                    _buildLegalFooter(),
-                  ],
+            // 💳 & ⚖️ LAYERS 4 & 5: DYNAMIC BOTTOM CONTROLS
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: SafeArea(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: MediaQuery.of(context).size.width * 0.06, 
+                    vertical: MediaQuery.of(context).size.height * 0.02,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min, 
+                    children: [
+                      // 👇 Task 4: Pushed text higher away from the button & made it dark
+                      const Padding(
+                        padding: EdgeInsets.only(bottom: 22.0), 
+                        child: Text(
+                          "No subscriptions. Pay once, own it forever.",
+                          style: TextStyle(
+                            color: Colors.black87, 
+                            fontSize: 18,
+                            fontStyle: FontStyle.italic,
+                            fontFamily: 'AppleGaramond',
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      _buildBuyButton(),
+                      SizedBox(height: MediaQuery.of(context).size.height * 0.015), 
+                      _buildLegalFooter(),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+
+            // ❌ LAYER 6: FROSTED GLASS CLOSE BUTTON (Task 2)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 16, // Safe area aware
+              left: 16,
+              child: GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.3), // Apple frosted glass base
+                        border: Border.all(color: Colors.white.withOpacity(0.4), width: 1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.close, 
+                        color: Colors.black, 
+                        size: 20
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -500,9 +680,10 @@ class _PaywallScreenState extends State<PaywallScreen> {
                 return Text(
                   label,
                   style: TextStyle(
-                    color: isActive ? Colors.white : Colors.white38,
+                    // 👇 Task 3: Switched to solid black and dark grey
+                    color: isActive ? Colors.black : Colors.black38,
                     fontSize: isActive ? 15 : 13,
-                    fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                    fontWeight: isActive ? FontWeight.w900 : FontWeight.w600,
                   ),
                 );
               }).toList(),

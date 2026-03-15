@@ -933,6 +933,151 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
     );
   }
 
+  Future<void> _handlePassportTap() async {
+    final prefs = await SharedPreferences.getInstance();
+    // Default is true so it shows the first time
+    final bool showNote = prefs.getBool('show_traveler_note') ?? true;
+
+    if (!showNote) {
+      _navigateToPassport();
+      return;
+    }
+
+    // Default state: Checked (ON)
+    bool doNotShowAgain = true; 
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false, // Forces them to hit the X
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return Dialog(
+              backgroundColor: const Color(0xFF1A1A1A), // Very dark grey
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 400),
+                child: Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min, // Hugs content, allows scroll if needed
+                    children: [
+                      // ❌ TOP LEFT CROSS BUTTON
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.start,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.close, color: Color(0xFFF5F5F5)),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ],
+                      ),
+                      
+                      // 📜 SCROLLABLE TEXT CONTENT
+                      Flexible(
+                        child: SingleChildScrollView(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              const Text(
+                                "A Note to the Travelers",
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontFamily: 'AppleGaramond',
+                                  fontStyle: FontStyle.italic,
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFFF5F5F5), // Off-white
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                              
+                              // Body Text with Paragraph Indentations
+                              const Text(
+                                "    No subscriptions. No ads.\n\n"
+                                "    I am tired of apps charging \$4.99 a month for eternity just to make the ads go away, or locking basic functionality behind a paywall. The core of this app—exploring 36,000+ restaurants across New York City—will always be free. It is a labor of love for a city I deeply admire, and a service for the people who make it great.\n\n"
+                                "    Collecting visas and immigration stamps is also free (limited to 4 on the Wild Card Visa page). If you wish to expand your collection, you can purchase a new Passport, and you will own it forever.\n\n"
+                                "    No hidden charges. No other BS. Just how a real passport works. Your visas and stamps are yours forever; a permanent memoir of your explorations.\n\n"
+                                "    Share your passport cards with the world (tag us @nyceats.passports if you’d like!). Bon Appétit, and Happy Journey!\n\n"
+                                "    – With love,\n"
+                                "    Barbell Apps",
+                                style: TextStyle(
+                                  fontFamily: 'AppleGaramond',
+                                  fontStyle: FontStyle.italic,
+                                  fontSize: 16,
+                                  color: Color(0xFFE0E0E0),
+                                  height: 1.5,
+                                ),
+                              ),
+                              const SizedBox(height: 32),
+                              
+                              // ✅ CHECKBOX (DO NOT SHOW AGAIN)
+                              GestureDetector(
+                                onTap: () {
+                                  setDialogState(() => doNotShowAgain = !doNotShowAgain);
+                                },
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    SizedBox(
+                                      height: 24,
+                                      width: 24,
+                                      child: Checkbox(
+                                        value: doNotShowAgain,
+                                        onChanged: (val) {
+                                          setDialogState(() => doNotShowAgain = val ?? true);
+                                        },
+                                        activeColor: Colors.white,
+                                        checkColor: Colors.black,
+                                        side: const BorderSide(color: Colors.white54),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    const Text(
+                                      "Do not show again",
+                                      style: TextStyle(
+                                        fontFamily: 'SFPro', // Utilitarian font for controls
+                                        fontSize: 14,
+                                        color: Colors.white70,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    // 💾 Save the preference when the dialog is closed
+    await prefs.setBool('show_traveler_note', !doNotShowAgain);
+    
+    // 🚀 Proceed to the Passport Collection
+    _navigateToPassport();
+  }
+
+  void _navigateToPassport() {
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const PassportCollectionScreen(
+          initialBookId: null,
+        )
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
@@ -1209,15 +1354,15 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
         backgroundColor: Colors.amber,
         child: const Icon(Icons.filter_none, color: Colors.black),
         onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const PassportCollectionScreen(
-                    initialBookId: null, 
-                  )
-                ),
-              );
-            },
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const PassportCollectionScreen(
+                initialBookId: null, 
+              )
+            ),
+          );
+        },
       ),
     );
   }
