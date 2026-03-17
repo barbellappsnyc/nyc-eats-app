@@ -8,7 +8,7 @@ import '../models/restaurant.dart';
 import '../widgets/animated_background.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'; // 👈 To check auth status
 import 'paywall_screen.dart'; // 👈 To go to shop
-import 'auth_screen.dart'; // 👈 To go to login
+import 'package:tutorial_coach_mark/tutorial_coach_mark.dart'; // 👈 ADD THIS
 
 class PassportCollectionScreen extends StatefulWidget {
   final String? initialBookId;
@@ -31,10 +31,12 @@ class _PassportCollectionScreenState extends State<PassportCollectionScreen> {
   bool _isLoading = true;
   String _currentSku = 'store';
   int _currentIndex = 0;
-  bool _hideStatusPill = false; // 👈 NEW STATE VAR
+  bool _hideStatusPill = false; 
+  bool _triggerDetailOpen = false; // 👈 ADD THIS STATE VARIABLE
   // 📨 HANDOFF STATE
   Restaurant? _pendingStampRestaurant;
   Restaurant? _activeStampRestaurant; // 👈 NEW: A mutable copy of the payload we can destroy
+  final GlobalKey _wildcardKey = GlobalKey(); // 👈 ADD THIS KEY
 
   @override
   void initState() {
@@ -43,10 +45,77 @@ class _PassportCollectionScreenState extends State<PassportCollectionScreen> {
     _activeStampRestaurant = widget.incomingRestaurant;
     _loadLibrary();
 
-    // 👇 ADD THIS BLOCK
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAndShowTravelerNote();
+      // ❌ DELETE _checkAndShowTutorial() FROM HERE entirely!
     });
+  }
+
+  Future<void> _checkAndShowTutorial() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String? stage = prefs.getString('tutorial_stage');
+    
+    if (stage == 'collection_screen') {
+      // ❌ No more blind timers here! Just execute immediately.
+      if (mounted) _showCollectionTutorial();
+    }
+  }
+
+  void _showCollectionTutorial() {
+    final size = MediaQuery.of(context).size; // 👈 Get screen dimensions
+
+    TutorialCoachMark(
+      targets: [
+        TargetFocus(
+          identify: "wildcard_target",
+          keyTarget: _wildcardKey,
+          shape: ShapeLightFocus.RRect,
+          radius: 20,
+          contents: [
+            TargetContent(
+              align: ContentAlign.custom, // 👈 BYPASS DEFAULT ALIGNMENT
+              customPosition: CustomTargetContentPosition(
+                top: size.height * 0.15, // 👈 Lock it 15% down from the top edge
+              ),
+              builder: (context, controller) => Container(
+                // 👈 Add a dark backing so it's readable floating OVER the card
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.85),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white24, width: 1),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("THE WILDCARD", style: TextStyle(fontFamily: 'AppleGaramond', fontWeight: FontWeight.bold, color: Colors.white, fontSize: 26, letterSpacing: 1.5)),
+                    const SizedBox(height: 12),
+                    const Text("This is your default travel document. It can hold up to 4 stamps from any cuisine.\n\nTap NEXT, then tap the passport to open it.", style: TextStyle(color: Colors.white70, fontSize: 16, height: 1.4, fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: () => controller.next(), 
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999))),
+                      child: const Text("NEXT", style: TextStyle(fontFamily: 'Courier', fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+      colorShadow: Colors.black,
+      paddingFocus: 10,
+      opacityShadow: 0.9,
+      hideSkip: true,
+      onFinish: () {
+        SharedPreferences.getInstance().then((prefs) {
+          prefs.setString('tutorial_stage', 'detail_screen');
+          setState(() => _triggerDetailOpen = true); 
+        });
+      },
+    ).show(context: context);
   }
 
   // 🔄 Updated Signature: Accepts {preservePage}
@@ -109,7 +178,10 @@ class _PassportCollectionScreenState extends State<PassportCollectionScreen> {
     } catch (e) {
       debugPrint("Library Load Error: $e");
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+        // ❌ REMOVE the Future.delayed tutorial trigger from here completely!
+      }
     }
   }
 
@@ -337,6 +409,10 @@ class _PassportCollectionScreenState extends State<PassportCollectionScreen> {
 
   Future<void> _checkAndShowTravelerNote() async {
     final prefs = await SharedPreferences.getInstance();
+    final String? stage = prefs.getString('tutorial_stage');
+    
+    // 🛑 SUPPRESS MANIFESTO DURING THE TOUR
+    if (stage == 'collection_screen') return;
     // Default to true so it shows the first time
     final bool showNote = prefs.getBool('show_traveler_note') ?? true;
 
@@ -506,42 +582,37 @@ class _PassportCollectionScreenState extends State<PassportCollectionScreen> {
                                           book['id'] == _library[_currentIndex - 1]['id'];
 
                 return Padding(
+                  // ❌ REMOVE the key from the Padding widget: key: bookIndex == (_currentIndex - 1) ? _wildcardKey : null, 
                   padding: const EdgeInsets.only(top: 45),
                   child: PassportStackScreen(
                     key: ValueKey(book['id']),
                     bookId: book['id'],
                     skuType: book['sku_type'] ?? 'free_tier',
                     isReadOnly: book['status'] != 'active',
-                    // 1. Swap widget.incomingRestaurant for our destructible version
-                    incomingRestaurant: (bookIndex == (_currentIndex - 1))
-                        ? _activeStampRestaurant 
-                        : null,
-
+                    triggerOpenDetail: bookIndex == (_currentIndex - 1) ? _triggerDetailOpen : false,
+                    onDetailOpened: () => setState(() => _triggerDetailOpen = false),
+                    incomingRestaurant: (bookIndex == (_currentIndex - 1)) ? _activeStampRestaurant : null,
                     autoTriggerRestaurant: isTargetBook ? _pendingStampRestaurant : null,
                     onAutoTriggerComplete: () {
                        _pendingStampRestaurant = null;
                     },
-
-                    // 2. Destroy the payload when stamping finishes
                     onStampComplete: () {
-                       _activeStampRestaurant = null; // 👈 NUKE IT
+                       _activeStampRestaurant = null; 
                        _loadLibrary(preservePage: true);
                     },
-
                     onButtonVisibilityChanged: (isVisible) {
                       if (_hideStatusPill != isVisible) {
                         setState(() => _hideStatusPill = isVisible);
                       }
                     },
-
-                    // 3. Destroy the payload before handing it off to the next book
                     onRequestBookSwitch: (targetId) {
-                      _activeStampRestaurant = null; // 👈 NUKE IT
-                      _switchToBook(
-                        targetId,
-                        stampPayload: widget.incomingRestaurant
-                      );
+                      _activeStampRestaurant = null; 
+                      _switchToBook(targetId, stampPayload: widget.incomingRestaurant);
                     },
+                    
+                    // 👇 ADD THESE TWO NEW LINES 👇
+                    tutorialKey: bookIndex == (_currentIndex - 1) ? _wildcardKey : null,
+                    onReady: bookIndex == (_currentIndex - 1) ? _checkAndShowTutorial : null,
                   ),
                 );
               },

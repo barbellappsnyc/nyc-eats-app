@@ -24,14 +24,18 @@ class PassportStackScreen extends StatefulWidget {
   final String? bookId; 
   final String? skuType;
   final bool isReadOnly; 
-  final bool isDemo; // 👈 NEW: Demo mode flag
-  // 👇 ADD THESE CALLBACKS
+  final bool isDemo; 
   final VoidCallback? onStampComplete;
   final ValueChanged<bool>? onButtonVisibilityChanged;
-  final ValueChanged<String>? onRequestBookSwitch; // 👈 NEW
-  final Restaurant? autoTriggerRestaurant; // 👈 NEW
-  final VoidCallback? onAutoTriggerComplete; // 👈 NEW
+  final ValueChanged<String>? onRequestBookSwitch; 
+  final Restaurant? autoTriggerRestaurant; 
+  final VoidCallback? onAutoTriggerComplete; 
+  final bool triggerOpenDetail; 
+  final VoidCallback? onDetailOpened; 
   
+  // 👇 ADD THESE TWO LINES
+  final GlobalKey? tutorialKey; 
+  final VoidCallback? onReady; 
 
   const PassportStackScreen({
     super.key,
@@ -40,11 +44,15 @@ class PassportStackScreen extends StatefulWidget {
     this.skuType = 'free_tier',
     this.isReadOnly = false,
     this.isDemo = false,
-    this.onStampComplete, // 👈 NEW CALLBACK
-    this.onButtonVisibilityChanged, // 👈 NEW CALLBACK
-    this.onRequestBookSwitch, // 👈 NEW CALLBACK
+    this.onStampComplete, 
+    this.onButtonVisibilityChanged, 
+    this.onRequestBookSwitch, 
     this.autoTriggerRestaurant,
     this.onAutoTriggerComplete,
+    this.triggerOpenDetail = false, 
+    this.onDetailOpened, 
+    this.tutorialKey, // 👈 ADD HERE
+    this.onReady,     // 👈 ADD HERE
   });
 
   @override
@@ -55,6 +63,8 @@ class _PassportStackScreenState extends State<PassportStackScreen>
     with TickerProviderStateMixin {
   
   bool _isLoading = true;
+  bool _hasCalledReady = false; // 👈 NEW: Ensures we only tell the tutorial we are ready once
+  // ... rest of your state variables
   String _passportSku = 'free_tier';
   String _userName = "TRAVELER";
 
@@ -85,6 +95,7 @@ class _PassportStackScreenState extends State<PassportStackScreen>
   bool _isHoldingRetrieve = false;
 
   final AudioPlayer _player = AudioPlayer();
+  final AudioPlayer _flipPlayer = AudioPlayer()..setPlayerMode(PlayerMode.lowLatency); // 👈 NEW: For physics sounds
   final GlobalKey _stackKey = GlobalKey();
   final List<GlobalKey> slotKeys = List.generate(4, (_) => GlobalKey());
   final GlobalKey _cardContainerKey = GlobalKey();
@@ -146,7 +157,26 @@ class _PassportStackScreenState extends State<PassportStackScreen>
     _buttonController.dispose();
     // _zoomController.dispose();
     _player.dispose();
+    _flipPlayer.dispose();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(PassportStackScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // If the parent says "Open!", and it wasn't saying it a millisecond ago...
+    if (widget.triggerOpenDetail && !oldWidget.triggerOpenDetail) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _onCardTap(); 
+        widget.onDetailOpened?.call(); 
+      });
+    }
+
+    // 👇 THE CRITICAL RECYCLING FIX 👇
+    // When PageView recycles this widget for a new shop tier, force it to reload the correct demo data!
+    if (widget.isDemo && widget.skuType != oldWidget.skuType) {
+      _applyDemoData();
+    }
   }
 
   // 🎭 MOCK DATA INJECTOR FOR THE SHOP
@@ -155,14 +185,14 @@ class _PassportStackScreenState extends State<PassportStackScreen>
     setState(() {
       _isLoading = false;
       _passportSku = widget.skuType ?? 'standard_book';
-      _userName = "TRAVELER"; // Dummy name
-      userVisas = []; // Blank pages
-      collectedStamps = []; // No stamps
+      _userName = "TRAVELER"; 
+      userVisas = []; 
+      collectedStamps = []; 
       _activeIndex = 0;
       
-      // 👇 CHANGED: Match the actual physical DB limits
+      // 👇 THIS IS THE FIX: Set the cards to the exact number of pages you want to show
       if (_passportSku == 'single_page') {
-        _totalCards = 1;  // Just the visa page
+        _totalCards = 1;  
       } else if (_passportSku == 'diplomat_book') {
         _totalCards = 21; // Cover + 20 pages
       } else {
@@ -719,6 +749,10 @@ class _PassportStackScreenState extends State<PassportStackScreen>
     }
   }
   void _animateCardAway() {
+
+    // 👇 Play the swipe sound immediately
+    _flipPlayer.play(AssetSource('sounds/whoosh.mp3'));
+
     final double screenHeight = MediaQuery.of(context).size.height;
     _slideAnim = Tween<double>(begin: _dragNotifier.value, end: -screenHeight).animate(
       CurvedAnimation(parent: _slideController, curve: Curves.easeIn),
@@ -1134,11 +1168,14 @@ class _PassportStackScreenState extends State<PassportStackScreen>
   
   Widget _buildCardContent(int index, {required bool useKeys, bool isFlyingStamp = false}) {
 
+    // 👇 ADD max_pages HERE SO THE BRAIN KNOWS IT'S NOT A SINGLE PAGE
     final Map<String, dynamic> fullBook = {
       'sku_type': _passportSku,
       'visas': userVisas,
       'stamps': collectedStamps,
+      'max_pages': _totalCards, // 👈 THE FIX: Pass the demo total directly
     };
+    
     final ctx = PassportBrain.instance.resolvePageContext(fullBook, index);
 
     bool isAssigned = !ctx.isVacant;
@@ -1270,7 +1307,18 @@ class _PassportStackScreenState extends State<PassportStackScreen>
     if (_isLoading) {
       return const Center(child: CupertinoActivityIndicator(color: Colors.white, radius: 16));
     }
-    // ... rest of the stack
+
+    // 👇 ADD THESE TWO LINES to calculate the strict card dimensions
+    final double cardWidth = (MediaQuery.of(context).size.width * 0.85).clamp(300.0, 400.0);
+    final double cardHeight = cardWidth * (540 / 340);
+
+    if (!_hasCalledReady) {
+// ...
+      _hasCalledReady = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        widget.onReady?.call();
+      });
+    }
 
     return SizedBox.expand(
       key: _stackKey, 
@@ -1291,9 +1339,15 @@ class _PassportStackScreenState extends State<PassportStackScreen>
                 child: ValueListenableBuilder<double>(
                   valueListenable: _dragNotifier,
                   child: RepaintBoundary(
-                    child: Hero(
-                      tag: 'passport_card_${widget.bookId}_${_activeIndex + 1}', 
-                      child: _buildActiveCard(_activeIndex),
+                    key: widget.tutorialKey,
+                    // 👇 ADD THIS SIZED BOX: This is the magic fix that stops the full-screen target
+                    child: SizedBox(
+                      width: cardWidth,
+                      height: cardHeight,
+                      child: Hero(
+                        tag: 'passport_card_${widget.bookId}_${_activeIndex + 1}', 
+                        child: _buildActiveCard(_activeIndex),
+                      ),
                     ),
                   ),
                   builder: (context, dragValue, cachedCard) {
@@ -1316,15 +1370,21 @@ class _PassportStackScreenState extends State<PassportStackScreen>
 
             if (_activeIndex > 0 && !_showStampButton && !_isStampingSequence)
               Positioned(
-                // 👇 Lock to the exact right edge of the card
-                right: (MediaQuery.of(context).size.width - (MediaQuery.of(context).size.width * 0.85).clamp(300.0, 400.0)) / 2,
-                // 👇 Push it down just above the stack
-                top: MediaQuery.of(context).size.height * 0.12, // Tweak this decimal slightly if it sits too high/low on your simulator
+                // 👇 THE FIX: Branch the layout math based on the screen context!
+                right: widget.isDemo 
+                    ? 0.0 // In the shop, it's inside a SizedBox exactly the width of the card
+                    : (MediaQuery.of(context).size.width - cardWidth) / 2, 
+                
+                top: widget.isDemo 
+                    ? 10.0 // In the shop, anchor it near the top of the local SizedBox
+                    : MediaQuery.of(context).size.height * 0.12, // Normal mode uses absolute screen math
+                
                 child: GestureDetector(
                   // 👆 Single Tap (Normal Retrieve)
                   onTap: () {
                     if (_activeIndex > 0) _animateCardRetrieve();
                   },
+// ... the rest remains exactly the same
                   // 🔫 Long Press (Machine Gun Mode)
                   onLongPressStart: (_) => _startMachineGunRetrieve(),
                   onLongPressEnd: (_) => _stopMachineGunRetrieve(),

@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:nyc_eats/screens/map_screen.dart';
 import 'package:nyc_eats/screens/passport_stack_screen.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import '../services/purchase_service.dart';
@@ -14,6 +15,8 @@ import 'dart:async'; // 👈 Don't forget to add this to the very top of your fi
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/gestures.dart'; // 👈 For the tap recognizers
 import 'package:url_launcher/url_launcher.dart'; // 👈 To open the browser
+import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class PaywallScreen extends StatefulWidget {
   final Restaurant? incomingRestaurant;
@@ -40,14 +43,145 @@ class _PaywallScreenState extends State<PaywallScreen> {
   late TapGestureRecognizer _tosRecognizer;
   late TapGestureRecognizer _privacyRecognizer;
 
+  // 👇 ADD THESE TWO KEYS
+  final GlobalKey _booksKey = GlobalKey();
+  final GlobalKey _controlsKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
     _loadOfferings();
     
-    // 👇 Initialize the tap listeners
     _tosRecognizer = TapGestureRecognizer()..onTap = _launchToS;
     _privacyRecognizer = TapGestureRecognizer()..onTap = _launchPrivacy;
+
+    // 👇 ADD THIS POST-FRAME CALLBACK
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndShowTutorial();
+    });
+  }
+
+  // 👇 ADD THESE TWO METHODS ANYWHERE IN THE STATE CLASS
+  Future<void> _checkAndShowTutorial() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String? stage = prefs.getString('tutorial_stage');
+    
+    if (stage == 'shop_screen') {
+      Future.delayed(const Duration(milliseconds: 600), () {
+        if (mounted) _showShopTutorial();
+      });
+    }
+  }
+
+  void _showShopTutorial() {
+    final size = MediaQuery.of(context).size; // 👈 Get screen dimensions
+
+    TutorialCoachMark(
+      targets: [
+        // 🎯 TARGET 1: THE BOOKS
+        TargetFocus(
+          identify: "books_target",
+          keyTarget: _booksKey,
+          shape: ShapeLightFocus.RRect,
+          radius: 20,
+          contents: [
+            TargetContent(
+              align: ContentAlign.custom, // 👈 Bypass default alignment
+              customPosition: CustomTargetContentPosition(
+                top: size.height * 0.15, // Lock it 15% down from the top
+              ),
+              builder: (context, controller) => Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.85),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white24, width: 1),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("THE CONSUMABLES", style: TextStyle(fontFamily: 'AppleGaramond', fontWeight: FontWeight.bold, color: Colors.white, fontSize: 26, letterSpacing: 1.5)),
+                    const SizedBox(height: 12),
+                    const Text("Passports are physical, one-time consumables. Swipe up and down to 'feel' the different tiers before you buy.", style: TextStyle(color: Colors.white70, fontSize: 16, height: 1.4, fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: () => controller.next(), // 👈 Safe to use next() here, there is another slide!
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999))),
+                      child: const Text("NEXT", style: TextStyle(fontFamily: 'Courier', fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+
+        // 🎯 TARGET 2: THE BOTTOM CONTROLS (THE PACT)
+        TargetFocus(
+          identify: "controls_target",
+          keyTarget: _controlsKey,
+          shape: ShapeLightFocus.RRect,
+          radius: 24,
+          contents: [
+            TargetContent(
+              align: ContentAlign.custom, // 👈 Bypass default alignment here too!
+              customPosition: CustomTargetContentPosition(
+                top: size.height * 0.15, // Keeps text in the exact same spot for a seamless transition
+              ),
+              builder: (context, controller) => Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.85),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white24, width: 1),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("THE PACT", style: TextStyle(fontFamily: 'AppleGaramond', fontWeight: FontWeight.bold, color: Colors.white, fontSize: 26, letterSpacing: 1.5)),
+                    const SizedBox(height: 12),
+                    const Text("No subscriptions. No recurring fees. You pay once, and the passport is yours forever.\n\nWelcome to Gourmet Passports.", style: TextStyle(color: Colors.white70, fontSize: 16, height: 1.4, fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: () {
+                        // 1. Pass the baton back to the map screen
+                        SharedPreferences.getInstance().then((prefs) {
+                          prefs.setString('tutorial_stage', 'final_map_screen'); 
+                        });
+                        
+                        // 2. Force the tutorial to close
+                        controller.skip(); 
+
+                        // 3. Jump to MapScreen and clear everything else
+                        Navigator.of(context).pushAndRemoveUntil(
+                          MaterialPageRoute(builder: (_) => const MapScreen()), 
+                          (route) => false
+                        );
+                      }, 
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999))),
+                      child: const Text("NEXT", style: TextStyle(fontFamily: 'Courier', fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+      colorShadow: Colors.black,
+      paddingFocus: 10,
+      opacityShadow: 0.9,
+      hideSkip: true,
+      onFinish: () {
+        // 🏁 DESTROY THE BATON: The tour is completely finished!
+        SharedPreferences.getInstance().then((prefs) {
+          prefs.setBool('has_seen_tutorial', true);
+          prefs.remove('tutorial_stage'); 
+        });
+      },
+    ).show(context: context);
   }
 
   @override
@@ -512,7 +646,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                 final tier = _shopTiers[index];
                 
                 return Align(
-                  // 👇 Task 4: Negative Y-alignment shifts the books & labels upwards
+                  // ❌ REMOVED KEY FROM HERE
                   alignment: const Alignment(0, -0.3), 
                   child: Transform.scale(
                     scale: 0.85, 
@@ -522,9 +656,11 @@ class _PaywallScreenState extends State<PaywallScreen> {
                       children: [
                         // 1. THE 3D BOOK
                         SizedBox(
+                          key: index == _currentShopIndex ? _booksKey : null, 
                           width: cardWidth,
                           height: cardHeight + 100, 
                           child: PassportStackScreen(
+                            key: ValueKey(tier['sku']), // 👈 ADD THIS: Forces a clean State instance for each unique SKU
                             isDemo: true, 
                             skuType: tier['sku'],
                           ),
@@ -576,6 +712,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
             Align(
               alignment: Alignment.bottomCenter,
               child: SafeArea(
+                key: _controlsKey, // 👈 ATTACH KEY HERE
                 child: Padding(
                   padding: EdgeInsets.symmetric(
                     horizontal: MediaQuery.of(context).size.width * 0.06, 

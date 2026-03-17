@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:nyc_eats/widgets/backgrounds/baggage_tag_background.dart';
 import 'package:nyc_eats/widgets/backgrounds/tablecloth_background.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
 import '../widgets/backgrounds/coordinate_collage_background.dart';
 import '../widgets/backgrounds/postage_stamp_background.dart';
 import 'package:screenshot/screenshot.dart';
@@ -17,6 +19,7 @@ import 'package:flutter/cupertino.dart';
 import '../widgets/backgrounds/mta_background.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../widgets/backgrounds/warhol_background.dart';
+import 'paywall_screen.dart'; // To navigate to the shop
 
 // 🗺️ FAST & FREE BOROUGH CALCULATOR
 String getBorough(double lat, double lng) {
@@ -74,6 +77,10 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
 
   bool _isPositionInitialized = false; 
 
+  // 👇 ADD THESE TWO KEYS
+  final GlobalKey _cardKey = GlobalKey();
+  final GlobalKey _actionsKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
@@ -91,6 +98,107 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
     );
 
     _fetchMtaStations(); 
+  // 👇 ADD THIS POST-FRAME CALLBACK
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndShowTutorial();
+    });
+  }
+  
+  Future<void> _checkAndShowTutorial() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String? stage = prefs.getString('tutorial_stage');
+    
+    if (stage == 'detail_screen') {
+      Future.delayed(const Duration(milliseconds: 600), () {
+        if (mounted) _showDetailTutorial();
+      });
+    }
+  }
+
+  void _showDetailTutorial() {
+    final size = MediaQuery.of(context).size; 
+
+    TutorialCoachMark(
+      targets: [
+        // 🎯 TARGET 1: THE CARD
+        TargetFocus(
+          identify: "card_target",
+          keyTarget: _cardKey,
+          shape: ShapeLightFocus.RRect,
+          radius: 20,
+          contents: [
+            TargetContent(
+              align: ContentAlign.custom, 
+              customPosition: CustomTargetContentPosition(top: size.height * 0.15),
+              builder: (context, controller) => Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.85),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white24, width: 1),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("THE SOUVENIR", style: TextStyle(fontFamily: 'AppleGaramond', fontWeight: FontWeight.bold, color: Colors.white, fontSize: 26, letterSpacing: 1.5)),
+                    const SizedBox(height: 12),
+                    const Text("Tap the background to change the artwork. Pinch and twist the passport to adjust its placement.", style: TextStyle(color: Colors.white70, fontSize: 16, height: 1.4, fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: () => controller.next(),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999))),
+                      child: const Text("NEXT", style: TextStyle(fontFamily: 'Courier', fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+        
+        // 🎯 TARGET 2: THE ACTIONS (NEW!)
+        TargetFocus(
+          identify: "actions_target",
+          keyTarget: _actionsKey,
+          shape: ShapeLightFocus.RRect,
+          radius: 30,
+          contents: [
+            TargetContent(
+              align: ContentAlign.top, // 👈 Perfect for bottom-anchored buttons
+              builder: (context, controller) => Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const Text("THE MEMORY", style: TextStyle(fontFamily: 'AppleGaramond', fontWeight: FontWeight.bold, color: Colors.white, fontSize: 26, letterSpacing: 1.5)),
+                  const SizedBox(height: 12),
+                  const Text("Save it to your camera roll or share it to your story.\n\nNow, let's visit the Shop.", textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 16, height: 1.4, fontWeight: FontWeight.w500)),
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: () => controller.next(), // Calls onFinish!
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999))),
+                    child: const Text("NEXT", style: TextStyle(fontFamily: 'Courier', fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ],
+      colorShadow: Colors.black,
+      paddingFocus: 10,
+      opacityShadow: 0.9,
+      hideSkip: true,
+      onFinish: () {
+        // 🏃‍♂️💨 PASS THE BATON TO THE SHOP SCREEN
+        SharedPreferences.getInstance().then((prefs) {
+          prefs.setString('tutorial_stage', 'shop_screen');
+        });
+        
+        Navigator.pop(context); // Close Detail Screen
+        Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PaywallScreen()));
+      },
+    ).show(context: context);
   }
 
   @override
@@ -350,6 +458,7 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
 
                   // 🪪 LAYER 2: THE CARD
                   AnimatedPositioned(
+                    key: _cardKey, // 👈 ATTACH KEY HERE
                     duration: _isDragging ? const Duration(milliseconds: 1) : const Duration(milliseconds: 450),
                     curve: _isDragging ? Curves.linear : Curves.easeInOutCubic,
                     left: _cardPosition.dx - (cardWidth / 2), 
@@ -434,75 +543,78 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
               ),
             ),
 
-            Positioned(
-              bottom: 100,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: Text(
-                  "Pinch to resize · Twist to rotate",
-                  style: TextStyle(
-                      color: isLightBg ? Colors.grey[600] : Colors.grey[400], 
-                      fontStyle: FontStyle.italic),
-                ),
-              ),
-            ),
-
+            // 👇 COMBINED: Text & Buttons Pill
             Positioned(
               bottom: 40 + MediaQuery.of(context).padding.bottom,
               left: 0,
               right: 0,
-              child: Center(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(40),
-                  child: BackdropFilter(
+              child: Column(
+                mainAxisSize: MainAxisSize.min, // Hugs the contents tightly
+                children: [
+                  // 1. The Instructional Text (🛑 HIDDEN ON MTA BACKGROUND)
+                  if (_currentBgIndex != 5) ...[
+                    Text(
+                      "Pinch to resize · Twist to rotate",
+                      style: TextStyle(
+                        color: isLightBg ? Colors.grey[600] : Colors.grey[400], 
+                        fontStyle: FontStyle.italic,
+                        letterSpacing: 0.5, 
+                      ),
+                    ),
+                    const SizedBox(height: 20), // Only show the gap if the text is visible
+                  ],
+                  
+                  // 2. The Buttons Pill
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(40),
+                    child: BackdropFilter(
                     filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30), 
                     child: AnimatedSize(
+                      key: _actionsKey, // 👈 ATTACH KEY HERE
                       duration: const Duration(milliseconds: 350),
-                      curve: Curves.easeOutCubic, 
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.15), 
-                          borderRadius: BorderRadius.circular(40),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.15), 
-                            width: 0.5,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _buildGroovedButton(
-                              icon: CupertinoIcons.arrow_down,
-                              onTap: _saveToCameraRoll,
+                        curve: Curves.easeOutCubic, 
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.15), 
+                            borderRadius: BorderRadius.circular(40),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.15), 
+                              width: 0.5,
                             ),
-                            
-                            // Hidden for Checkered Background (Index 6)
-                            if (_currentBgIndex != 6) 
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
                               _buildGroovedButton(
-                                icon: CupertinoIcons.share,
-                                onTap: _shareToStory,
+                                icon: CupertinoIcons.arrow_down,
+                                onTap: _saveToCameraRoll,
                               ),
+                              
+                              if (_currentBgIndex != 6) 
+                                _buildGroovedButton(
+                                  icon: CupertinoIcons.share,
+                                  onTap: _shareToStory,
+                                ),
 
-                            // Shows Day/Night Toggle for MTA Background (Index 5)
-                            if (_currentBgIndex == 5)
-                              _buildGroovedButton(
-                                icon: _isMtaNightMode ? CupertinoIcons.moon_stars_fill : CupertinoIcons.sun_max_fill,
-                                color: _isMtaNightMode ? Colors.indigo[300]! : Colors.amber,
-                                onTap: () {
-                                  setState(() {
-                                    _isMtaNightMode = !_isMtaNightMode;
-                                    _bgIsLight[5] = !_isMtaNightMode; 
-                                  });
-                                },
-                              ),
-                          ],
+                              if (_currentBgIndex == 5)
+                                _buildGroovedButton(
+                                  icon: _isMtaNightMode ? CupertinoIcons.moon_stars_fill : CupertinoIcons.sun_max_fill,
+                                  color: _isMtaNightMode ? Colors.indigo[300]! : Colors.amber,
+                                  onTap: () {
+                                    setState(() {
+                                      _isMtaNightMode = !_isMtaNightMode;
+                                      _bgIsLight[5] = !_isMtaNightMode; 
+                                    });
+                                  },
+                                ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
+                ],
               ),
             ),
           ],

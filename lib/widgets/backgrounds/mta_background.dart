@@ -31,6 +31,20 @@ class _MtaBackgroundState extends State<MtaBackground> {
   bool _isInitialized = false;
   Size _screenSize = Size.zero;
 
+  // 👇 NEW: Fallback logic for empty passports
+  List<Map<String, dynamic>> get _effectiveStations {
+    if (widget.stations.isEmpty) {
+      return [
+        {
+          'station_name': 'Grand Central - 42 St',
+          'lines': '4 5 6 7 S',
+          'borough': 'Manhattan',
+        }
+      ];
+    }
+    return widget.stations;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -46,13 +60,14 @@ class _MtaBackgroundState extends State<MtaBackground> {
   // 🛑 REMOVED: The entire _tick(Duration elapsed) function with the math
 
   void _initializeBlobsIfNeed(double width, double height) {
+    final stations = _effectiveStations; // 👈 NEW: Grab the active or fallback list
+
     // 🛠️ STEP 2 FIX: Also check if the number of stations has changed!
-    // If a new station arrives from the DB, this forces the blobs to recalculate.
-    if (_isInitialized && _screenSize.width == width && _blobs.length == widget.stations.length) return;
+    if (_isInitialized && _screenSize.width == width && _blobs.length == stations.length) return;
     _screenSize = Size(width, height);
     _blobs.clear();
     
-    int count = widget.stations.length;
+    int count = stations.length; // 👈 CHANGED: use the local variable
     double bW, bH;
     
     // 📏 SHAPE & HOME LOGIC
@@ -85,7 +100,9 @@ class _MtaBackgroundState extends State<MtaBackground> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.stations.isEmpty) return const SizedBox.shrink();
+    // 🛑 REMOVED: if (widget.stations.isEmpty) return const SizedBox.shrink();
+
+    final stations = _effectiveStations; // 👈 NEW: Get the stations to render
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -107,22 +124,17 @@ class _MtaBackgroundState extends State<MtaBackground> {
               children: List.generate(_blobs.length, (index) {
                 final blob = _blobs[index];
                 
-                // 🎯 THE SCALABILITY FIX: Mirror the clamp from the detail screen!
                 final double baseCardW = (constraints.maxWidth * 0.85).clamp(300.0, 400.0);
                 final double cardW = baseCardW * widget.passportScale;
                 final double cardH = cardW * (540 / 340);
                 
-                // Hitbox is slightly smaller (0.75) so it feels fair
                 final Rect cardHitbox = Rect.fromCenter(
                   center: widget.passportPosition, 
                   width: cardW * 0.75, 
                   height: cardH * 0.75,
                 );
                 
-                // The Blob's Hitbox
                 final Rect blobRect = Rect.fromLTWH(blob.x, blob.y, blob.width, blob.height);
-                
-                // Does the card overlap this specific blob?
                 final bool isOverlapped = cardHitbox.overlaps(blobRect);
 
                 return Positioned(
@@ -132,7 +144,7 @@ class _MtaBackgroundState extends State<MtaBackground> {
                   child: AnimatedOpacity(
                     duration: const Duration(milliseconds: 300),
                     curve: Curves.easeOutCubic,
-                    opacity: isOverlapped ? 0.3 : 1.0, // 👈 ONLY fades if overlapped!
+                    opacity: isOverlapped ? 0.3 : 1.0, 
                     child: TweenAnimationBuilder<double>(
                       tween: Tween<double>(begin: 0.0, end: isOverlapped ? 8.0 : 0.0),
                       duration: const Duration(milliseconds: 300),
@@ -143,7 +155,8 @@ class _MtaBackgroundState extends State<MtaBackground> {
                           child: child,
                         );
                       },
-                      child: _buildStationCard(widget.stations[index], blob.width, blob.height, widget.stations.length),
+                      // 👇 CHANGED: Passing the local 'stations' variable instead of widget.stations
+                      child: _buildStationCard(stations[index], blob.width, blob.height, stations.length),
                     ),
                   ),
                 );

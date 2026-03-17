@@ -780,15 +780,94 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
     }
   }
 
+  // --- 🚀 THE FINAL PRODUCTION CODE ---
   Future<void> _checkAndShowTutorial() async {
     final prefs = await SharedPreferences.getInstance();
-    final hasSeen = prefs.getBool('has_seen_tutorial') ?? false;
 
-    if (!hasSeen) {
+    // 🏆 1. ALWAYS CHECK FOR THE BATON FIRST (Overrides everything)
+    final String? stage = prefs.getString('tutorial_stage');
+    if (stage == 'final_map_screen') {
       Future.delayed(const Duration(milliseconds: 800), () {
-        if (mounted) _showTutorial();
+        if (mounted) _showFinalTutorial();
       });
+      return; 
     }
+
+    // 2. If they are not holding the final baton, check if they are a veteran.
+    // If they have fully completed the initial tour, do absolutely nothing.
+    final hasSeen = prefs.getBool('has_seen_tutorial') ?? false;
+    if (hasSeen) return;
+
+    // 3. If they haven't seen it, and aren't holding a baton, start the initial tour!
+    Future.delayed(const Duration(milliseconds: 800), () {
+      if (mounted) _showTutorial();
+    });
+  }
+
+  // Future<void> _checkAndShowTutorial() async {
+  //   final prefs = await SharedPreferences.getInstance();
+  //   final String? stage = prefs.getString('tutorial_stage');
+
+  //   // 🏆 CATCH THE FINAL BATON
+  //   if (stage == 'final_map_screen') {
+  //     Future.delayed(const Duration(milliseconds: 800), () {
+  //       if (mounted) _showFinalTutorial();
+  //     });
+  //     return; 
+  //   }
+
+  //   // --- 🧪 TESTING OVERRIDE: ALWAYS SHOW INITIAL ON BOOT ---
+  //   await prefs.remove('tutorial_stage'); 
+  //   Future.delayed(const Duration(milliseconds: 800), () {
+  //     if (mounted) _showTutorial();
+  //   });
+  // }
+
+  void _showFinalTutorial() {
+    TutorialCoachMark(
+      targets: [
+        TargetFocus(
+          identify: "search_target_final",
+          keyTarget: _searchKey,
+          shape: ShapeLightFocus.RRect,
+          radius: 10,
+          contents: [
+            TargetContent(
+              align: ContentAlign.bottom,
+              builder: (context, controller) => Padding(
+                padding: const EdgeInsets.only(top: 20.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("THE JOURNEY BEGINS", style: TextStyle(fontFamily: 'AppleGaramond', fontWeight: FontWeight.bold, color: Colors.white, fontSize: 32, letterSpacing: 1.5)),
+                    const SizedBox(height: 12),
+                    const Text("Collect a stamp from your favourite restaurant! Try it out!\n\nWelcome to NYC Eats, and Happy Journey!", style: TextStyle(color: Colors.white70, fontSize: 18, height: 1.4, fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 28),
+                    ElevatedButton(
+                      onPressed: () {
+                        // 🏁 DESTROY THE BATON PERMANENTLY
+                        SharedPreferences.getInstance().then((prefs) {
+                          prefs.setBool('has_seen_tutorial', true);
+                          prefs.remove('tutorial_stage'); 
+                        });
+                        controller.skip(); // Close overlay
+                      }, 
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black, elevation: 0, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999))),
+                      child: const Text("FINISH TOUR", style: TextStyle(fontFamily: 'Courier', fontWeight: FontWeight.bold, letterSpacing: 1.5, fontSize: 14)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        )
+      ],
+      colorShadow: Colors.black,
+      paddingFocus: 10,
+      opacityShadow: 0.9,
+      hideSkip: true,
+    ).show(context: context);
   }
 
   void _showTutorial() {
@@ -801,11 +880,15 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       onFinish: () {
         SharedPreferences.getInstance().then((prefs) {
           prefs.setBool('has_seen_tutorial', true);
+          // 🏃‍♂️💨 PASS THE BATON
+          prefs.setString('tutorial_stage', 'collection_screen'); 
+          _handlePassportTap(); // Push to the next screen immediately!
         });
       },
       onSkip: () {
         SharedPreferences.getInstance().then((prefs) {
           prefs.setBool('has_seen_tutorial', true);
+          prefs.remove('tutorial_stage'); // Kill the chain if they skip
         });
         return true; 
       },
@@ -840,17 +923,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
           ),
         ],
       ),
-      TargetFocus(
-        identify: "passport_target",
-        keyTarget: _passportKey,
-        shape: ShapeLightFocus.Circle,
-        contents: [
-          TargetContent(
-            align: ContentAlign.top,
-            builder: (context, controller) => _buildTutorialText("THE COLLECTION", "Your Gourmet Passport. Check in to spots, collect official stamps, and build your culinary visa.", controller),
-          ),
-        ],
-      ),
+      // 👇 SWAPPED: Profile is now the 3rd slide (isLast removed)
       TargetFocus(
         identify: "profile_target",
         keyTarget: _profileKey,
@@ -860,8 +933,20 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
             align: ContentAlign.bottom,
             builder: (context, controller) => Padding(
               padding: const EdgeInsets.only(top: 20.0),
-              child: _buildTutorialText("THE DIPLOMAT", "Upgrade your status. Manage your records, official ID photo, and passports here.", controller, isLast: true),
+              child: _buildTutorialText("THE DIPLOMAT", "Upgrade your status. Manage your records, official ID photo, and passports here.", controller), 
             ),
+          ),
+        ],
+      ),
+      // 👇 SWAPPED: Passport is now the 4th slide (isLast: true added)
+      TargetFocus(
+        identify: "passport_target",
+        keyTarget: _passportKey,
+        shape: ShapeLightFocus.Circle,
+        contents: [
+          TargetContent(
+            align: ContentAlign.top,
+            builder: (context, controller) => _buildTutorialText("THE COLLECTION", "Your Gourmet Passport. Check in to spots, collect official stamps, and build your culinary visa.", controller, isLast: true), 
           ),
         ],
       ),
@@ -898,7 +983,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
         Row(
           children: [
             ElevatedButton(
-              onPressed: () => isLast ? controller.skip() : controller.next(), 
+              // 👇 THE FIX: Always call next(). On the last slide, this triggers onFinish!
+              onPressed: () => controller.next(), 
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
                 foregroundColor: Colors.black,
@@ -935,10 +1021,11 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
 
   Future<void> _handlePassportTap() async {
     final prefs = await SharedPreferences.getInstance();
-    // Default is true so it shows the first time
     final bool showNote = prefs.getBool('show_traveler_note') ?? true;
+    final String? tutorialStage = prefs.getString('tutorial_stage');
 
-    if (!showNote) {
+    // 👇 If they are on the guided tour, suppress the note!
+    if (!showNote || tutorialStage == 'collection_screen') {
       _navigateToPassport();
       return;
     }
