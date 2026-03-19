@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
+import 'package:flutter/foundation.dart'; // 👈 1. Added this for kDebugMode and debugPrint
 
 class PurchaseService {
   // Singleton pattern
@@ -19,8 +20,10 @@ class PurchaseService {
     // Prevent double initialization
     if (_isInitialized) return;
 
-    // Enable debug logs (Great for seeing why a purchase failed in the console)
-    await Purchases.setLogLevel(LogLevel.debug);
+    // 👈 2. Protected RevenueCat's internal logger!
+    if (kDebugMode) {
+      await Purchases.setLogLevel(LogLevel.debug);
+    }
 
     PurchasesConfiguration? configuration;
 
@@ -34,7 +37,7 @@ class PurchaseService {
     if (configuration != null) {
       await Purchases.configure(configuration);
       _isInitialized = true;
-      print("✅ REAL PURCHASE SERVICE: Initialized");
+      if (kDebugMode) debugPrint("✅ REAL PURCHASE SERVICE: Initialized"); // 👈 3. Protected
     }
   }
 
@@ -47,11 +50,11 @@ class PurchaseService {
       if (offerings.current != null && offerings.current!.availablePackages.isNotEmpty) {
         return offerings.current!.availablePackages;
       } else {
-        print("⚠️ No offerings found. Check RevenueCat Dashboard setup.");
+        if (kDebugMode) debugPrint("⚠️ No offerings found. Check RevenueCat Dashboard setup."); // 👈 Protected
         return [];
       }
     } on PlatformException catch (e) {
-      print("❌ Error fetching offers: $e");
+      if (kDebugMode) debugPrint("❌ Error fetching offers: $e"); // 👈 Protected
       return [];
     }
   }
@@ -62,15 +65,15 @@ class PurchaseService {
       final CustomerInfo customerInfo = await Purchases.purchasePackage(package);
       
       // If code reaches here, the transaction was successful!
-      print("✅ PURCHASE SUCCESS: ${package.storeProduct.identifier}");
+      if (kDebugMode) debugPrint("✅ PURCHASE SUCCESS: ${package.storeProduct.identifier}"); // 👈 Protected
       return true;
       
     } on PlatformException catch (e) {
       final errorCode = PurchasesErrorHelper.getErrorCode(e);
       if (errorCode == PurchasesErrorCode.purchaseCancelledError) {
-        print("User cancelled purchase");
+        if (kDebugMode) debugPrint("User cancelled purchase"); // 👈 Protected
       } else {
-        print("❌ Purchase Error: $e");
+        if (kDebugMode) debugPrint("❌ Purchase Error: $e"); // 👈 Protected
       }
       return false;
     }

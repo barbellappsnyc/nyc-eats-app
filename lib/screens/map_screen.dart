@@ -907,7 +907,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
             align: ContentAlign.bottom,
             builder: (context, controller) => Padding(
               padding: const EdgeInsets.only(top: 20.0),
-              child: _buildTutorialText("THE VAULT", "17,000 hidden gems across all 5 boroughs.\n\nTap here to search or filter by Michelin stars, vegan, and more.", controller),
+              child: _buildTutorialText("THE VAULT", "36,000+ restaurants across all 5 boroughs.\n\nTap here to search or filter by Michelin stars, vegan, and more.", controller),
             ),
           ),
         ],

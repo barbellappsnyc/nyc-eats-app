@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'dart:math';
 import 'dart:ui';
@@ -58,6 +59,8 @@ class PhotoStripCard extends StatelessWidget {
   final List<int> photoRotations; // 👈 NEW: list of 0-3 values
   final Function(int) onPhotoTapped;
   final Function(int) onRotatePhoto; // 👈 NEW: Callback for the button
+  // In PhotoStripCard class:
+  final int? loadingSlotIndex; // Add this to constructor
 
   const PhotoStripCard({
     super.key,
@@ -68,6 +71,7 @@ class PhotoStripCard extends StatelessWidget {
     required this.photoRotations, // 👈 Required
     required this.onPhotoTapped,
     required this.onRotatePhoto, // 👈 Required
+    this.loadingSlotIndex, // 👈 2. ADD THIS TO CONSTRUCTOR
   });
 //... (build method stays the same, it just passes index to _buildPhotoSlot)
 
@@ -130,9 +134,9 @@ class PhotoStripCard extends StatelessWidget {
                 Expanded(
                   child: Row(
                     children: [
-                      _buildPhotoSlot(0),
+                      _buildPhotoSlot(0, loadingSlotIndex), // 👈 3. ADD IT HERE
                       const SizedBox(width: 12),
-                      _buildPhotoSlot(1),
+                      _buildPhotoSlot(1, loadingSlotIndex), // 👈 3. ADD IT HERE
                     ],
                   ),
                 ),
@@ -141,9 +145,9 @@ class PhotoStripCard extends StatelessWidget {
                 Expanded(
                   child: Row(
                     children: [
-                      _buildPhotoSlot(2),
+                      _buildPhotoSlot(2, loadingSlotIndex), // 👈 3. ADD IT HERE
                       const SizedBox(width: 12),
-                      _buildPhotoSlot(3),
+                      _buildPhotoSlot(3, loadingSlotIndex), // 👈 3. ADD IT HERE
                     ],
                   ),
                 ),
@@ -182,76 +186,81 @@ class PhotoStripCard extends StatelessWidget {
     );
   }
 
-  Widget _buildPhotoSlot(int index) {
+  Widget _buildPhotoSlot(int index, int? loadingSlotIndex) { // 👈 Fixed signature
     final path = photoPaths[index];
-    final turns = photoRotations[index]; // Get 0-3 turns
+    final turns = photoRotations[index];
+    final isLoading = loadingSlotIndex == index; // 👈 Check if this specific slot is loading
 
     return Expanded(
-      child: GestureDetector(
-        onTap: path == null ? () => onPhotoTapped(index) : null, // If photo exists, tap image doesn't open picker
-        child: Container(
-          clipBehavior: Clip.antiAlias, // REQUIRED for RotatedBox to crop correctly
-          decoration: BoxDecoration(
-            color: Colors.grey[800],
-            borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: Colors.white.withOpacity(0.15), width: 1.5),
-          ),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              // 🖼️ LAYER 1: THE VISUAL PHOTO (Handling rotation & cropping)
-              if (path != null)
-                RotatedBox(
-                  quarterTurns: turns, // Applies native cropping bounds
-                  child: Image.file(
-                    File(path),
-                    fit: BoxFit.cover, // Ensures slot is always full, even landscape
-                  ),
+      child: Container( 
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: Colors.grey[800],
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: Colors.white.withOpacity(0.15), width: 1.5),
+        ),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // 🖼️ LAYER 1: THE VISUAL PHOTO
+            if (path != null && !isLoading)
+              RotatedBox(
+                quarterTurns: turns,
+                child: Image.file(
+                  File(path),
+                  fit: BoxFit.cover,
                 ),
+              ),
 
-              // LAYER 1 (Empty State)
-              if (path == null)
-                const Center(
-                  child: Icon(Icons.add_a_photo, color: Colors.white30, size: 36),
+            // ➕ LAYER 2: THE EMPTY STATE ICON
+            if (path == null && !isLoading)
+              const Center(
+                child: Icon(Icons.add_a_photo, color: Colors.white30, size: 36),
+              ),
+
+            // 🎡 LAYER 3: THE CUPERTINO LOADER
+            if (isLoading)
+              const Center(
+                child: CupertinoActivityIndicator(color: Colors.white, radius: 15),
+              ),
+
+            // 🛡️ LAYER 4: THE 100% INVISIBLE TOUCH TARGET
+            // This creates a solid block over the entire grey square 
+            // so tapping anywhere triggers the gallery.
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => onPhotoTapped(index),
+                child: Container(
+                  color: Colors.transparent, 
                 ),
-            
-              // 🔄 LAYER 2: THE INVISIBLE SWAP OVERLAY 
-              // (Moved UP so it sits behind the rotate button)
-              if (path != null) 
-                 Positioned.fill(
-                   child: Material(
-                     color: Colors.transparent,
-                     child: InkWell(
-                       onTap: () => onPhotoTapped(index),
-                     )
-                   )
-                 ),
+              ),
+            ),
 
-              // 🔘 LAYER 3: THE ROTATE BUTTON 
-              // (Moved DOWN so it is the top-most touch target)
-              if (path != null)
-                Positioned(
-                  bottom: 8,
-                  right: 8,
-                  child: GestureDetector(
-                    onTap: () => onRotatePhoto(index), // Triggers the state update
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.5), 
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white70, width: 1),
-                      ),
-                      child: const Icon(
-                        Icons.rotate_90_degrees_ccw_outlined, 
-                        color: Colors.white,
-                        size: 20,
-                      ),
+            // 🔄 LAYER 5: THE ROTATE BUTTON 
+            // Placed last so it sits on top of the touch target.
+            if (path != null && !isLoading)
+              Positioned(
+                bottom: 8,
+                right: 8,
+                child: GestureDetector(
+                  onTap: () => onRotatePhoto(index),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.5),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white70, width: 1),
+                    ),
+                    child: const Icon(
+                      Icons.rotate_90_degrees_ccw_outlined,
+                      color: Colors.white,
+                      size: 20,
                     ),
                   ),
                 ),
-            ],
-          ),
+              ),
+          ],
         ),
       ),
     );

@@ -92,7 +92,8 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
 
   final GlobalKey _cardKey = GlobalKey();
   final GlobalKey _actionsKey = GlobalKey();
-
+  int? _loadingSlotIndex; // Tracks which slot is opening the gallery
+  
   @override
   void initState() {
     super.initState();
@@ -164,11 +165,14 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
 
   final ImagePicker _picker = ImagePicker();
 
-  // 📸 OPEN GALLERY & SAVE TO LOCAL APP STORAGE
   Future<void> _pickImage(int slotIndex) async {
+    setState(() => _loadingSlotIndex = slotIndex); // ⏳ Start loading
     try {
       final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
-      if (image == null) return; 
+      if (image == null) {
+        setState(() => _loadingSlotIndex = null); // 🛑 User cancelled
+        return; 
+      }
 
       final directory = await getApplicationDocumentsDirectory();
       final String fileName = '${widget.heroTag}_slot$slotIndex\_${DateTime.now().millisecondsSinceEpoch}.png';
@@ -188,6 +192,8 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
       await prefs.setString('${memoryKey}_slot$slotIndex', fileName);
     } catch (e) {
       debugPrint("Image Picker Error: $e");
+    } finally {
+      setState(() => _loadingSlotIndex = null); // ✅ Finish loading
     }
   }
 
@@ -656,7 +662,10 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
               ..scale(_currentBgIndex == 8 ? _cardScale : 0.85)
               ..rotateZ(_currentBgIndex == 8 ? 1.570796 : 0.0), 
             child: GestureDetector(
+              behavior: HitTestBehavior.opaque, // 🛡️ FORCES the layer to be "solid"
+              onTap: () {}, // 🛑 CONSUMES the tap so it doesn't hit the background
               onScaleStart: (details) {
+                // ... your existing code
                 setState(() {
                   _isDragging = true;
                   _startFocalPoint = details.focalPoint;
@@ -696,10 +705,11 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
                 borough: "MANHATTAN", 
                 dateText: _savedDateText.isEmpty ? "SELECT DATE" : _savedDateText,
                 photoPaths: _savedPhotoPaths,
-                photoRotations: _photoRotations, // 👈 PASS THE ROTATIONS
+                photoRotations: _photoRotations,
                 onDateTapped: _pickDate, 
                 onPhotoTapped: (index) => _pickImage(index),
-                onRotatePhoto: (index) => _rotatePhoto(index), // 👈 PASS THE CALLBACK
+                onRotatePhoto: (index) => _rotatePhoto(index), 
+                loadingSlotIndex: _loadingSlotIndex, // 👈 4. PASS THE STATE VARIABLE HERE
               ),
             ),
           ),
@@ -718,7 +728,10 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
       width: cardWidth,   
       height: cardHeight, 
       child: GestureDetector(
+        behavior: HitTestBehavior.opaque, // 🛡️ Intercepts the touch on iPad
+        onTap: () {}, // 🛑 Stops the "fall-through" to the background
         onScaleStart: (details) {
+          // ... your existing code
           setState(() {
             _isDragging = true; 
             _baseCardPosition = _cardPosition;

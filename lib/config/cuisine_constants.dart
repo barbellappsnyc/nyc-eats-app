@@ -559,6 +559,21 @@ class CuisineConstants {
     'dessert': _defaultAirports, 
     'cookie': _defaultAirports, 
     'pretzel': _defaultAirports,
+
+    // --- Add under Americana / Global ---
+    'australian': _auAirports,
+
+    // --- Add under Europe ---
+    'mediterranean': _medAirports,
+
+    // --- Add under Asia ---
+    'hong_kong': _hkAirports,
+
+    // --- Add under Central Asia & Middle East ---
+    'kazakh': _kzAirports,
+    'uzbek': _uzAirports,
+    'syrian': _syAirports,
+    'druze': _druzeAirports,
   };
 
   // ===========================================================================
