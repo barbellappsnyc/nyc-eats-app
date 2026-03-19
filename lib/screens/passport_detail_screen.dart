@@ -19,7 +19,9 @@ import 'package:flutter/cupertino.dart';
 import '../widgets/backgrounds/mta_background.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../widgets/backgrounds/warhol_background.dart';
-import 'paywall_screen.dart'; // To navigate to the shop
+import 'paywall_screen.dart'; 
+import '../widgets/backgrounds/photobooth_background.dart';
+import 'package:image_picker/image_picker.dart';
 
 // 🗺️ FAST & FREE BOROUGH CALCULATOR
 String getBorough(double lat, double lng) {
@@ -56,6 +58,9 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
   double _cardScale = 0.85;
   double _cardRotation = 0.0;
 
+  Offset _stripPosition = Offset.zero;
+  Offset _baseStripPosition = Offset.zero;
+
   Offset _baseCardPosition = Offset.zero;
   double _baseScale = 0.85;
   double _baseRotation = 0.0;
@@ -67,7 +72,8 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
   int _currentBgIndex = 0;
   bool _isMtaNightMode = true; 
   bool _isDragging = false;
-  
+  bool _isPassportOnTop = true; 
+
   late List<bool> _bgIsLight;   
   final ScreenshotController _cardOnlyController = ScreenshotController();
   final ScreenshotController _fullScreenController = ScreenshotController();
@@ -75,9 +81,15 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
   List<Map<String, dynamic>> _mtaStations = [];
   bool _isLoadingStations = true;
 
+  // 📸 PHOTOBOOTH MEMORY VARIABLES
+  List<String?> _savedPhotoPaths = [null, null, null, null]; 
+  List<int> _photoRotations = [0, 0, 0, 0]; // 👈 NEW: Tracks 90-degree turns for each slot
+  String _savedDateText = "";
+  
+  bool _isPassportInTopSlot = true; // 👈 Replaced _isPassportOnLeft
+
   bool _isPositionInitialized = false; 
 
-  // 👇 ADD THESE TWO KEYS
   final GlobalKey _cardKey = GlobalKey();
   final GlobalKey _actionsKey = GlobalKey();
 
@@ -85,8 +97,7 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
   void initState() {
     super.initState();
 
-    // 8 items to exactly match the 8 backgrounds left in the list
-    _bgIsLight = [true, true, true, false, true, false, true, false];
+    _bgIsLight = [true, true, true, false, true, false, true, false, false]; 
 
     _squishController = AnimationController(
       vsync: this,
@@ -98,10 +109,139 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
     );
 
     _fetchMtaStations(); 
-  // 👇 ADD THIS POST-FRAME CALLBACK
+    _loadPhotoboothMemories(); // 👈 ADD THIS
+    
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAndShowTutorial();
     });
+  }
+
+  // 🧠 SILENTLY LOAD SAVED PHOTOS FROM DEVICE CACHE
+  Future<void> _loadPhotoboothMemories() async {
+    final prefs = await SharedPreferences.getInstance();
+    final directory = await getApplicationDocumentsDirectory();
+    final String basePath = directory.path;
+    
+    final String memoryKey = "photobooth_${widget.heroTag}"; 
+
+    // 🛡️ Helper to dynamically reconstruct the path and prevent grey box crashes
+    String? getValidPath(String? storedValue) {
+      if (storedValue == null || storedValue.isEmpty) return null;
+      
+      // If an old absolute path is lingering in memory, we extract just the file name
+      final String fileName = storedValue.split('/').last;
+      final String fullPath = '$basePath/$fileName';
+      
+      // Only return the path if the image actually survived the cache clear
+      if (File(fullPath).existsSync()) {
+        return fullPath;
+      }
+      return null; 
+    }
+
+    setState(() {
+      _savedPhotoPaths[0] = getValidPath(prefs.getString('${memoryKey}_slot0'));
+      _savedPhotoPaths[1] = getValidPath(prefs.getString('${memoryKey}_slot1'));
+      _savedPhotoPaths[2] = getValidPath(prefs.getString('${memoryKey}_slot2'));
+      // Load photo slots... existing code
+      _savedPhotoPaths[3] = getValidPath(prefs.getString('${memoryKey}_slot3')); 
+      
+      // 👇 NEW: Load Rotations (0-3)
+      _photoRotations[0] = prefs.getInt('${memoryKey}_rot0') ?? 0;
+      _photoRotations[1] = prefs.getInt('${memoryKey}_rot1') ?? 0;
+      _photoRotations[2] = prefs.getInt('${memoryKey}_rot2') ?? 0;
+      _photoRotations[3] = prefs.getInt('${memoryKey}_rot3') ?? 0;
+      
+      _savedDateText = prefs.getString('${memoryKey}_date') ?? 
+          "${_getShortMonth(DateTime.now().month)} ${DateTime.now().day}, ${DateTime.now().year}";
+    });
+  }
+
+  String _getShortMonth(int month) {
+    const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+    return months[month - 1];
+  }
+
+  final ImagePicker _picker = ImagePicker();
+
+  // 📸 OPEN GALLERY & SAVE TO LOCAL APP STORAGE
+  Future<void> _pickImage(int slotIndex) async {
+    try {
+      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+      if (image == null) return; 
+
+      final directory = await getApplicationDocumentsDirectory();
+      final String fileName = '${widget.heroTag}_slot$slotIndex\_${DateTime.now().millisecondsSinceEpoch}.png';
+      final String permanentPath = '${directory.path}/$fileName';
+      
+      await File(image.path).copy(permanentPath);
+
+      final prefs = await SharedPreferences.getInstance();
+      final String memoryKey = "photobooth_${widget.heroTag}";
+      
+      setState(() {
+        // We still use the absolute path for the immediate UI state so it displays instantly
+        _savedPhotoPaths[slotIndex] = permanentPath;
+      });
+      
+      // 🚨 FIX: We ONLY save the file name to the database!
+      await prefs.setString('${memoryKey}_slot$slotIndex', fileName);
+    } catch (e) {
+      debugPrint("Image Picker Error: $e");
+    }
+  }
+
+  // 🔄 ROTATE PHOTO 90 DEGREES CLOCKWISE
+  Future<void> _rotatePhoto(int index) async {
+    // Cycles from 0 -> 1 -> 2 -> 3 -> 0
+    int newRotation = (_photoRotations[index] + 1) % 4; 
+    
+    final prefs = await SharedPreferences.getInstance();
+    final String memoryKey = "photobooth_${widget.heroTag}";
+    
+    setState(() {
+      _photoRotations[index] = newRotation;
+    });
+    
+    // Save the rotation state locally
+    await prefs.setInt('${memoryKey}_rot$index', newRotation);
+  }
+
+  // 📅 OPEN NATIVE DATE PICKER & SAVE
+  Future<void> _pickDate() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        // A custom dark theme to match your cinematic app aesthetic
+        return Theme(
+          data: ThemeData.dark().copyWith(
+            colorScheme: const ColorScheme.dark(
+              primary: Colors.white,
+              onPrimary: Colors.black,
+              surface: Color(0xFF0A192F), // Matches your photo strip blue!
+              onSurface: Colors.white,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      final formattedDate = "${_getShortMonth(picked.month)} ${picked.day}, ${picked.year}";
+      
+      final prefs = await SharedPreferences.getInstance();
+      final String memoryKey = "photobooth_${widget.heroTag}";
+      
+      setState(() {
+        _savedDateText = formattedDate;
+      });
+      
+      await prefs.setString('${memoryKey}_date', formattedDate);
+    }
   }
   
   Future<void> _checkAndShowTutorial() async {
@@ -120,7 +260,6 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
 
     TutorialCoachMark(
       targets: [
-        // 🎯 TARGET 1: THE CARD
         TargetFocus(
           identify: "card_target",
           keyTarget: _cardKey,
@@ -157,7 +296,6 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
           ],
         ),
         
-        // 🎯 TARGET 2: THE ACTIONS (NEW!)
         TargetFocus(
           identify: "actions_target",
           keyTarget: _actionsKey,
@@ -165,7 +303,7 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
           radius: 30,
           contents: [
             TargetContent(
-              align: ContentAlign.top, // 👈 Perfect for bottom-anchored buttons
+              align: ContentAlign.top, 
               builder: (context, controller) => Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.center,
@@ -175,7 +313,7 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
                   const Text("Save it to your camera roll or share it to your story.\n\nNow, let's visit the Shop.", textAlign: TextAlign.center, style: TextStyle(color: Colors.white70, fontSize: 16, height: 1.4, fontWeight: FontWeight.w500)),
                   const SizedBox(height: 24),
                   ElevatedButton(
-                    onPressed: () => controller.next(), // Calls onFinish!
+                    onPressed: () => controller.next(), 
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999))),
                     child: const Text("NEXT", style: TextStyle(fontFamily: 'Courier', fontWeight: FontWeight.bold, letterSpacing: 1.5)),
                   ),
@@ -190,12 +328,11 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
       opacityShadow: 0.9,
       hideSkip: true,
       onFinish: () {
-        // 🏃‍♂️💨 PASS THE BATON TO THE SHOP SCREEN
         SharedPreferences.getInstance().then((prefs) {
           prefs.setString('tutorial_stage', 'shop_screen');
         });
         
-        Navigator.pop(context); // Close Detail Screen
+        Navigator.pop(context); 
         Navigator.of(context).push(MaterialPageRoute(builder: (_) => const PaywallScreen()));
       },
     ).show(context: context);
@@ -208,6 +345,8 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
       final size = MediaQuery.of(context).size;
       _cardPosition = Offset(size.width / 2, size.height / 2);
       _cardScale = 0.85; 
+      // 👇 FIX: Start the strip completely off-screen on boot
+      _stripPosition = Offset(size.width * 1.5, size.height / 2);
       _isPositionInitialized = true;
     }
   }
@@ -215,6 +354,10 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
   void _updateDefaultCardPosition(int previousIndex) {
     final size = MediaQuery.of(context).size;
     setState(() {
+      if (_currentBgIndex != 8) {
+        _stripPosition = Offset(size.width * 1.5, size.height / 2);
+      }
+      
       // 1. ENTERING MTA (Index 5)
       if (_currentBgIndex == 5) { 
         double targetY = size.height / 2; 
@@ -225,11 +368,50 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
         _cardScale = 1.0; 
         _cardRotation = 0.0; 
       } 
-      // 2. EXITING MTA (Index 5)
-      else if (previousIndex == 5) {
+      
+      // 2. ENTERING PHOTOBOOTH TABLETHROW (Index 8)
+      else if (_currentBgIndex == 8) {
+        _cardRotation = 1.570796; // 👈 90 degrees
+        
+        double screenW = size.width;
+        double screenH = size.height;
+        
+        double cardW = (screenW * 0.85).clamp(300.0, 400.0);
+        double cardH = cardW * (540 / 340);
+        
+        _cardScale = (screenW * 0.88) / cardH; 
+        
+        // Calculate the actual visual height of the rotated passport
+        double visualCardH = cardW * _cardScale;
+        
+        // Exact Padding Metrics
+        double topPadding = MediaQuery.of(context).padding.top + 20; 
+        double bottomPadding = 120.0; // Room for the action pill
+        double gap = 20.0; // The space between the passport and strip
+        
+        // Calculate remaining vertical space for the strip to fill
+        double availableH = screenH - topPadding - bottomPadding;
+        double visualStripH = availableH - visualCardH - gap;
+        
+        double centerX = size.width / 2;
+        
+        // 👇 FIX: Dynamically calculate centers based on which item's height is on top
+        if (_isPassportInTopSlot) {
+          // Passport on top, Strip on bottom
+          _cardPosition = Offset(centerX, topPadding + (visualCardH / 2));
+          _stripPosition = Offset(centerX, topPadding + visualCardH + gap + (visualStripH / 2));
+        } else {
+          // Strip on top, Passport on bottom
+          _stripPosition = Offset(centerX, topPadding + (visualStripH / 2));
+          _cardPosition = Offset(centerX, topPadding + visualStripH + gap + (visualCardH / 2));
+        }
+      }
+      
+      // 3. EXITING SPECIAL BACKGROUNDS
+      else if (previousIndex == 5 || previousIndex == 8) {
         _cardPosition = Offset(size.width / 2, size.height / 2);
         _cardScale = 0.85; 
-        _cardRotation = 0.0; 
+        _cardRotation = 0.0; // 👈 Animates beautifully back to straight!
       }
     });
   }
@@ -238,7 +420,6 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
     try {
       Uint8List? imageBytes;
 
-      // Checkered Background is now at Index 6
       if (_currentBgIndex == 6) { 
         imageBytes = await _cardOnlyController.capture(pixelRatio: 3.0);
       } else {
@@ -390,24 +571,42 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
 
     final double cardWidth = (MediaQuery.of(context).size.width * 0.85).clamp(300.0, 400.0);
     final double cardHeight = cardWidth * (540 / 340);
+    
+    // 🧮 EXACT FIT VERTICAL MATH
+    final double screenW = MediaQuery.of(context).size.width;
+    final double screenH = MediaQuery.of(context).size.height;
+    final double currentScale = (screenW * 0.88) / cardHeight;
+    final double visualCardH = cardWidth * currentScale;
+    
+    final double topPadding = MediaQuery.of(context).padding.top + 20;
+    final double bottomPadding = 120.0;
+    final double gap = 20.0;
+    final double availableH = screenH - topPadding - bottomPadding;
+    final double visualStripH = availableH - visualCardH - gap;
+    
+    // 👇 FIX 1: Restore original portrait dimensions so the label has room to breathe
+    final double stripWidth = visualStripH / currentScale; // Short side
+    final double stripHeight = cardHeight; // Long side
 
     final List<Widget> bgDesigns = [
-      Container(color: widget.backgroundColor), // Index 0
-      BaggageTagBackground(cuisine: widget.cuisine, stamps: widget.stamps), // Index 1
-      const PizzeriaTableclothBackground(), // Index 2
-      CoordinateCollageBackground(stamps: widget.stamps), // Index 3
+       // ...
+      Container(color: widget.backgroundColor), 
+      BaggageTagBackground(cuisine: widget.cuisine, stamps: widget.stamps), 
+      const PizzeriaTableclothBackground(), 
+      CoordinateCollageBackground(stamps: widget.stamps), 
       RepaintBoundary(
         child: PostageStampBackground(cuisine: widget.cuisine), 
-      ), // Index 4
-      MtaBackground( // Index 5
+      ), 
+      MtaBackground( 
         stations: _mtaStations, 
         isDarkMode: _isMtaNightMode, 
         passportPosition: _cardPosition,
         passportScale: _cardScale,
         isDragging: _isDragging, 
       ),
-      const CheckeredBackground(), // Index 6
-      WarholBackground(cuisine: widget.cuisine), // Index 7
+      const CheckeredBackground(), 
+      WarholBackground(cuisine: widget.cuisine), 
+      const PhotoboothBackground(), 
     ];
 
     bool isLightBg = _bgIsLight[_currentBgIndex];
@@ -415,6 +614,175 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
     final overlayStyle = isLightBg 
         ? SystemUiOverlayStyle.dark.copyWith(statusBarColor: Colors.transparent)
         : SystemUiOverlayStyle.light.copyWith(statusBarColor: Colors.transparent);
+
+    
+    // 🧱 CALCULATE INTERACTION BOUNDARIES (SCALABLE)
+    double clampTopPadding = MediaQuery.of(context).padding.top + 20;
+    double clampBottomPadding = 120.0;
+    double clampGap = 20.0;
+    double derivedVisualCardH = cardWidth * ((MediaQuery.of(context).size.width * 0.88) / cardHeight);
+
+    double safeTopY = clampTopPadding;
+    double safeBottomY = MediaQuery.of(context).size.height - clampBottomPadding;
+    
+    // 👇 FIX: Give the card and strip their own exact center-point buffers
+    double cardHalfHeight = derivedVisualCardH / 2;
+    double stripHalfHeight = visualStripH / 2;
+
+    // We add buffer so the center coordinate can't push visual elements off-screen
+    double topClampBuffer = derivedVisualCardH / 2;
+    double bottomClampBuffer = stripWidth / 2; // (Since strip is rotated, stripWidth is visual height)
+
+    // 📦 PACKING THE PHOTO STRIP
+    final Widget photoStripLayer = AnimatedPositioned(
+      duration: _isDragging ? Duration.zero : const Duration(milliseconds: 450),
+      curve: _isDragging ? Curves.linear : Curves.easeInOutCubic,
+      left: _stripPosition.dx - (stripWidth / 2),
+      top: _stripPosition.dy - (stripHeight / 2), 
+      width: stripWidth,
+      height: stripHeight, 
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 300),
+        opacity: _currentBgIndex == 8 ? 1.0 : 0.0,
+        child: IgnorePointer(
+          ignoring: _currentBgIndex != 8,
+          child: AnimatedContainer(
+            duration: _isDragging ? Duration.zero : const Duration(milliseconds: 450),  
+            curve: _isDragging ? Curves.linear : Curves.easeInOutCubic,
+            alignment: Alignment.center,
+            transformAlignment: Alignment.center,
+            // 👇 FIX 2: Restore the 90-degree right tilt!
+            transform: Matrix4.identity()
+              ..scale(_currentBgIndex == 8 ? _cardScale : 0.85)
+              ..rotateZ(_currentBgIndex == 8 ? 1.570796 : 0.0), 
+            child: GestureDetector(
+              onScaleStart: (details) {
+                setState(() {
+                  _isDragging = true;
+                  _startFocalPoint = details.focalPoint;
+                  _baseStripPosition = _stripPosition;
+                  _isPassportOnTop = false; // 👈 PULLS STRIP TO FRONT
+                });
+              },
+              onScaleUpdate: (details) {
+                setState(() {
+                  final Offset delta = details.focalPoint - _startFocalPoint;
+                  // Lock X-axis, Drag smoothly on Y-axis
+                  double rawY = _baseStripPosition.dy + delta.dy;
+                  
+                  // 🛡️ APPLY DRAG CONSTRAINTS FOR STRIP (Using the fixes from last time)
+                  double constrainedY = rawY.clamp(
+                      safeTopY + stripHalfHeight, 
+                      safeBottomY - stripHalfHeight
+                  );
+                  
+                  _stripPosition = Offset(_baseStripPosition.dx, constrainedY);
+                });
+              },
+              onScaleEnd: (details) {
+                setState(() {
+                  _isDragging = false;
+                  final size = MediaQuery.of(context).size;
+                  // 👇 VERTICAL SWAP LOGIC
+                  if (_stripPosition.dy < size.height / 2) {
+                    _isPassportInTopSlot = false; 
+                  } else {
+                    _isPassportInTopSlot = true; 
+                  }
+                  _updateDefaultCardPosition(-1);
+                });
+              },
+              child: PhotoStripCard(
+                borough: "MANHATTAN", 
+                dateText: _savedDateText.isEmpty ? "SELECT DATE" : _savedDateText,
+                photoPaths: _savedPhotoPaths,
+                photoRotations: _photoRotations, // 👈 PASS THE ROTATIONS
+                onDateTapped: _pickDate, 
+                onPhotoTapped: (index) => _pickImage(index),
+                onRotatePhoto: (index) => _rotatePhoto(index), // 👈 PASS THE CALLBACK
+              ),
+            ),
+          ),
+        )
+      )
+    );
+
+    // 📦 PACKING THE PASSPORT
+    final Widget passportLayer = AnimatedPositioned(
+      key: _cardKey,
+      // Change this in both layers (AnimatedPositioned AND AnimatedContainer)
+      duration: _isDragging ? Duration.zero : const Duration(milliseconds: 450),
+      curve: _isDragging ? Curves.linear : Curves.easeInOutCubic,
+      left: _cardPosition.dx - (cardWidth / 2), 
+      top: _cardPosition.dy - (cardHeight / 2),
+      width: cardWidth,   
+      height: cardHeight, 
+      child: GestureDetector(
+        onScaleStart: (details) {
+          setState(() {
+            _isDragging = true; 
+            _baseCardPosition = _cardPosition;
+            _startFocalPoint = details.focalPoint;
+            _baseScale = _cardScale;
+            _baseRotation = _cardRotation;
+            _isPassportOnTop = true; // 👈 PULLS PASSPORT TO FRONT
+          });
+        },
+        onScaleUpdate: (details) {
+          setState(() {
+            final Offset delta = details.focalPoint - _startFocalPoint;
+            if (_currentBgIndex == 8) {
+              // Lock X-axis, Drag smoothly on Y-axis
+              double rawY = _baseCardPosition.dy + delta.dy;
+              
+              // 🛡️ APPLY DRAG CONSTRAINTS FOR PASSPORT
+              double constrainedY = rawY.clamp(
+                   safeTopY + cardHalfHeight, // Uses card's own height
+                   safeBottomY - cardHalfHeight
+              );
+              
+              _cardPosition = Offset(_baseCardPosition.dx, constrainedY);
+            } else {
+              _cardPosition = _baseCardPosition + delta;
+              _cardScale = (_baseScale * details.scale).clamp(0.4, 2.0);
+              _cardRotation = _baseRotation + details.rotation;
+            }
+          });
+        },
+        // Inside passportLayer's GestureDetector:
+        onScaleEnd: (details) {
+          setState(() {
+             _isDragging = false; 
+             final size = MediaQuery.of(context).size;
+             if (_currentBgIndex == 5) {
+                _updateDefaultCardPosition(-1); 
+             } else if (_currentBgIndex == 8) {
+                // 👇 VERTICAL SWAP LOGIC
+                if (_cardPosition.dy > size.height / 2) {
+                  _isPassportInTopSlot = false; // Passport dragged to bottom
+                } else {
+                  _isPassportInTopSlot = true;  
+                }
+                _updateDefaultCardPosition(-1); 
+             }
+          });
+        },
+        child: AnimatedContainer(
+          // Change this in both layers (AnimatedPositioned AND AnimatedContainer)
+          duration: _isDragging ? Duration.zero : const Duration(milliseconds: 450),
+          curve: _isDragging ? Curves.linear : Curves.easeInOutCubic,
+          alignment: Alignment.center,
+          transformAlignment: Alignment.center, 
+          transform: Matrix4.identity()
+            ..scale(_cardScale)
+            ..rotateZ(_cardRotation),
+          child: Screenshot( 
+            controller: _cardOnlyController,
+            child: Hero(tag: widget.heroTag, child: widget.cardWidget),
+          ),
+        ),
+      ),
+    );
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: overlayStyle,
@@ -429,7 +797,6 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
                 fit: StackFit.expand,
                 children: [
                   Positioned(
-                    // Remove overflow only for MTA at Index 5
                     top: _currentBgIndex == 5 ? 0 : -100,
                     bottom: _currentBgIndex == 5 ? 0 : -100,
                     left: _currentBgIndex == 5 ? 0 : -100,
@@ -456,62 +823,9 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
                     ),
                   ),
 
-                  // 🪪 LAYER 2: THE CARD
-                  AnimatedPositioned(
-                    key: _cardKey, // 👈 ATTACH KEY HERE
-                    duration: _isDragging ? const Duration(milliseconds: 1) : const Duration(milliseconds: 450),
-                    curve: _isDragging ? Curves.linear : Curves.easeInOutCubic,
-                    left: _cardPosition.dx - (cardWidth / 2), 
-                    top: _cardPosition.dy - (cardHeight / 2),
-                    width: cardWidth,   
-                    height: cardHeight, 
-                    child: GestureDetector(
-                      onTapDown: (_) {},
-                      onTapUp: (_) {},
-                      onTapCancel: () {},
-                      onTap: () {},
-                      onScaleStart: (details) {
-                        setState(() => _isDragging = true); 
-                        _baseCardPosition = _cardPosition;
-                        _startFocalPoint = details.focalPoint;
-                        _baseScale = _cardScale;
-                        _baseRotation = _cardRotation;
-                      },
-                      onScaleUpdate: (details) {
-                        setState(() {
-                          final Offset delta = details.focalPoint - _startFocalPoint;
-                          _cardPosition = _baseCardPosition + delta;
-                          _cardScale = (_baseScale * details.scale).clamp(0.4, 2.0);
-                          _cardRotation = _baseRotation + details.rotation;
-                        });
-                      },
-                      onScaleEnd: (details) {
-                        setState(() {
-                           _isDragging = false; 
-                           // Trigger MTA return logic if let go on Index 5
-                           if (_currentBgIndex == 5) {
-                              _updateDefaultCardPosition(-1); 
-                           }
-                        });
-                      },
-                      child: AnimatedContainer(
-                        duration: _isDragging ? const Duration(milliseconds: 1) : const Duration(milliseconds: 450),
-                        curve: _isDragging ? Curves.linear : Curves.easeInOutCubic,
-                        alignment: Alignment.center,
-                        transformAlignment: Alignment.center, 
-                        transform: Matrix4.identity()
-                          ..scale(_cardScale)
-                          ..rotateZ(_cardRotation),
-                        child: Screenshot( 
-                          controller: _cardOnlyController,
-                          child: Hero(
-                            tag: widget.heroTag,
-                            child: widget.cardWidget,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
+                  // 🔀 THE DYNAMIC Z-INDEX LAYERS
+                  _isPassportOnTop ? photoStripLayer : passportLayer,
+                  _isPassportOnTop ? passportLayer : photoStripLayer,
                 ],
               ),
             ),
@@ -543,15 +857,13 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
               ),
             ),
 
-            // 👇 COMBINED: Text & Buttons Pill
             Positioned(
               bottom: 40 + MediaQuery.of(context).padding.bottom,
               left: 0,
               right: 0,
               child: Column(
-                mainAxisSize: MainAxisSize.min, // Hugs the contents tightly
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  // 1. The Instructional Text (🛑 HIDDEN ON MTA BACKGROUND)
                   if (_currentBgIndex != 5) ...[
                     Text(
                       "Pinch to resize · Twist to rotate",
@@ -561,16 +873,15 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
                         letterSpacing: 0.5, 
                       ),
                     ),
-                    const SizedBox(height: 20), // Only show the gap if the text is visible
+                    const SizedBox(height: 20),
                   ],
                   
-                  // 2. The Buttons Pill
                   ClipRRect(
                     borderRadius: BorderRadius.circular(40),
                     child: BackdropFilter(
                     filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30), 
                     child: AnimatedSize(
-                      key: _actionsKey, // 👈 ATTACH KEY HERE
+                      key: _actionsKey,
                       duration: const Duration(milliseconds: 350),
                         curve: Curves.easeOutCubic, 
                         child: Container(

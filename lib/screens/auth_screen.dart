@@ -216,7 +216,7 @@ class _AuthScreenState extends State<AuthScreen> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  "We sent a 6-digit code to $email. Enter it below to activate your account.",
+                  "We sent a 8-digit code to $email. Enter it below to activate your account.",
                   style: TextStyle(color: textColor.withOpacity(0.8), height: 1.4),
                 ),
                 const SizedBox(height: 16),
@@ -224,7 +224,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   controller: otpController,
                   keyboardType: TextInputType.number,
                   style: TextStyle(color: textColor),
-                  decoration: _inputDecoration("6-Digit Code", Icons.numbers),
+                  decoration: _inputDecoration("8-Digit Code", Icons.numbers),
                 ),
                 if (isDialogLoading) ...[
                   const SizedBox(height: 16),
@@ -370,7 +370,7 @@ class _AuthScreenState extends State<AuthScreen> {
               children: [
                 if (!isCodeSent) ...[
                   Text(
-                    "Enter your email address and we'll send you a secure 6-digit reset code.",
+                    "Enter your email address and we'll send you a secure 8-digit reset code.",
                     style: TextStyle(color: textColor.withOpacity(0.8), height: 1.4),
                   ),
                   const SizedBox(height: 16),
@@ -382,7 +382,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   ),
                 ] else ...[
                   Text(
-                    "Enter the 6-digit code sent to ${resetEmailController.text}",
+                    "Enter the 8-digit code sent to ${resetEmailController.text}",
                     style: TextStyle(color: textColor.withOpacity(0.8), height: 1.4),
                   ),
                   const SizedBox(height: 16),
@@ -390,7 +390,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     controller: otpController,
                     keyboardType: TextInputType.number,
                     style: TextStyle(color: textColor),
-                    decoration: _inputDecoration("6-Digit Code", Icons.numbers),
+                    decoration: _inputDecoration("8-Digit Code", Icons.numbers),
                   ),
                   const SizedBox(height: 16),
                   TextField(

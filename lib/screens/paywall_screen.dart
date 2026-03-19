@@ -513,7 +513,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
   Future<void> _launchToS() async {
     // Replace with your actual Terms of Service URL later
-    final Uri url = Uri.parse('https://yourwebsite.com/terms'); 
+    final Uri url = Uri.parse('https://gourmetpassports.com/terms.html'); 
     if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
       debugPrint('Could not launch $url');
     }
@@ -521,7 +521,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
   Future<void> _launchPrivacy() async {
     // Replace with your actual Privacy Policy URL later
-    final Uri url = Uri.parse('https://yourwebsite.com/privacy'); 
+    final Uri url = Uri.parse('https://gourmetpassports.com/privacy.html'); 
     if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
       debugPrint('Could not launch $url');
     }
