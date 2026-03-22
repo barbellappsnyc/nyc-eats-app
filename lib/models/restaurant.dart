@@ -45,8 +45,10 @@ class Restaurant {
     this.bibGourmand = false,
   });
 
-  factory Restaurant.fromMap(Map<String, dynamic> map) {
-    // 🛡️ THE SHIELD: Converts strings, ints, or nulls into real booleans
+  factory Restaurant.fromMap(Map<dynamic, dynamic> rawMap) {
+    // 🛡️ THE SHIELD: Safely convert any Map type (Supabase or Mapbox) into a usable one
+    final Map<String, dynamic> map = Map<String, dynamic>.from(rawMap);
+
     bool toBool(dynamic value) {
       if (value == null) return false;
       if (value is bool) return value;
@@ -57,16 +59,23 @@ class Restaurant {
       return false;
     }
 
+    // 🛡️ NUMERIC SHIELD: Handles cases where a number might be an int OR a double
+    double toDouble(dynamic value) {
+      if (value == null) return 0.0;
+      if (value is num) return value.toDouble();
+      return double.tryParse(value.toString()) ?? 0.0;
+    }
+
     return Restaurant(
-      id: map['id'] ?? 0,
+      id: int.tryParse(map['id']?.toString() ?? '0') ?? 0,
       name: map['name'] ?? 'Unknown Restaurant',
       cuisine: map['cuisine'] ?? 'other',
-      price: map['price']?.toString() ?? '\$\$', // 👈 Cleaned up price
-      rating: (map['rating'] ?? 0.0).toDouble(),
+      price: map['price']?.toString() ?? '\$\$', 
+      rating: toDouble(map['rating']),
       hasMichelin: toBool(map['has_michelin']),
       location: LatLng(
-        (map['lat'] ?? 0.0).toDouble(),
-        (map['lng'] ?? 0.0).toDouble(),
+        toDouble(map['lat']),
+        toDouble(map['lng']),
       ),
       imageUrl: map['image_url'] ?? '',
       phone: map['phone']?.toString(),

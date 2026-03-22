@@ -1,33 +1,33 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
-import 'dart:ui';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart'; // Required for compute()
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
-import 'package:geolocator/geolocator.dart';
+// 🌟 FIX 1: Added 'as geo' to prevent collisions with Mapbox's Position class
+import 'package:geolocator/geolocator.dart' as geo; 
 import 'package:latlong2/latlong.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
+import 'package:nyc_eats/config/cuisine_constants.dart';
+import 'package:nyc_eats/models/restaurant.dart';
+import 'package:nyc_eats/services/pill_cache.dart';
+import 'package:nyc_eats/services/vault_builder.dart';
+import 'package:nyc_eats/widgets/restaurant_detail_sheet.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 // --- IMPORTS ---
-import '../models/restaurant.dart';
-import '../widgets/restaurant_detail_sheet.dart';
 import '../widgets/country_wheel_modal.dart';
-import '../widgets/map_filter_bar.dart';
 import 'search_screen.dart';
-import 'auth_screen.dart'; 
 import 'profile_edit_screen.dart'; 
 import 'passport_collection_screen.dart'; 
 import '../services/passport_service.dart'; 
 import 'package:connectivity_plus/connectivity_plus.dart'; 
-import '../services/tile_provider.dart';
 import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+import 'package:flutter/services.dart'; // Required for HapticFeedback
+import '../widgets/map_filter_bar.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -37,45 +37,42 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, WidgetsBindingObserver {
-  final MapController _mapController = MapController();
+  MapboxMap? _mapboxController;
 
   bool _isJumpingToLocation = false;
+  bool _isBuildingVault = false;
+  bool _hasPerformedInitialCameraFly = false;
+  Map<String, String>? _vaultPaths; // 👈 Changed from String? _localVaultPath
 
   // --- STATE VARIABLES ---
   bool isDarkMode = false;
-  bool showOpenOnly = false;
-  bool savedOnly = false;
-
-  Set<String> _selectedMichelin = {}; 
-  Set<String> _selectedPrices = {}; 
   
   String? selectedCategory;
   String? selectedRestaurantName;
   LatLng? myLocation;
-  final LatLng _defaultLocation = const LatLng(40.735, -73.99);
-  List<Restaurant> allRestaurants = [];
-  Set<String> savedRestaurantNames = {};
-  bool isLoading = true;
-  bool hasError = false;
-
-  int _fetchedCount = 0;
-  int _totalToFetch = 0;
   
-  // 🌟 NEW: The "Fake" smooth counter variables
-  int _displayFetchedCount = 0;
-  Timer? _simulationTimer;
+  // Start closer to the target to save network bandwidth on startup
+  final CameraOptions initialCamera = CameraOptions(
+    center: Point(coordinates: Position(-73.99, 40.75)), 
+    zoom: 9.0, // Reduced from 1.0
+    pitch: 0.0,
+  );
+  // The target destination: Mid-Manhattan in flat 2D
+  final CameraOptions targetCamera = CameraOptions(
+    center: Point(coordinates: Position(-73.98, 40.75)), // Centered exactly on Manhattan
+    zoom: 11.5, // The exact zoom level from your screenshot
+    pitch: 0.0, // Flat
+    bearing: 0.0, // Pointing straight North
+  );
 
   bool _isCheckingLocation = false;
 
-  bool _showVegetarian = false;
-  bool _showVegan = false;
+  // 🌟 FIX 1: Applied 'geo.' prefix
+  StreamSubscription<geo.Position>? _positionStreamSubscription;
+  StreamSubscription<geo.ServiceStatus>? _serviceStatusStreamSubscription;
 
-  StreamSubscription<Position>? _positionStreamSubscription;
-  StreamSubscription<ServiceStatus>? _serviceStatusStreamSubscription;
-
-  final Set<String> _savedRestaurants = {};
-
-  // 🔌 CONNECTIVITY STATE
+  Set<String> savedRestaurantNames = {};
+  
   bool _isOffline = false;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   bool _isGpsDisabled = false; 
@@ -85,18 +82,26 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
   String? _userGender;
   int? _userAge;
 
-  // 🔦 TUTORIAL KEYS
   final GlobalKey _searchKey = GlobalKey();
   final GlobalKey _profileKey = GlobalKey();
   final GlobalKey _wheelKey = GlobalKey();
   final GlobalKey _passportKey = GlobalKey();
 
-  // --- ANIMATED TEXT VARIABLES ---
   int _currentPhraseIndex = 0;
   Timer? _textTimer;
   final List<String> _searchPhrases = [
     "Hungry?", "Nom nom nom...", "Where to next?", "Craving something?", "Let's eat!", "Find a hidden gem..."
   ];
+
+  // --- FILTER STATE ---
+  bool showOpenOnly = false;
+  bool savedOnly = false;
+  bool _showVegetarian = false;
+  bool _showVegan = false;
+  Set<String> _selectedMichelin = {};
+  Set<String> _selectedPrices = {};
+  
+  Map<String, String> _restaurantHours = {};
 
   @override
   void initState() {
@@ -112,19 +117,13 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
   Future<void> _safeInit() async {
     _fetchUserProfile(); 
     PassportService.prewarmCache();
-
     await _loadTheme();
-    await _loadFavorites();
-    await _fetchRestaurants();
-    
     _initLocationService();
   }
 
   @override
   void dispose() {
-    _simulationTimer?.cancel(); // 👈 ADD THIS
     _textTimer?.cancel();
-    // ... rest of your dispose method
     WidgetsBinding.instance.removeObserver(this);
     _positionStreamSubscription?.cancel();
     _serviceStatusStreamSubscription?.cancel();
@@ -137,7 +136,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
     if (state == AppLifecycleState.resumed) {
       if (!_isCheckingLocation) {
         _checkLocationOnResume();
-        if (allRestaurants.isEmpty) _fetchRestaurants();
       }
     }
   }
@@ -148,19 +146,37 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
 
     _fetchUserProfile();
     PassportService.prewarmCache();
-    await _loadFavorites();
-    await _fetchRestaurants();
+    await _loadFavorites(); 
+    
+    if (mounted) setState(() => _isBuildingVault = true);
+    try {
+      // 🌟 THE FIX: Force it to true just for this run to download the hours!
+      // (You can change this back to false tomorrow)
+      _vaultPaths = await VaultBuilder.buildVaultIfNeeded();
+      
+      // NEW: Load the Time Dictionary into memory
+      if (_vaultPaths != null && _vaultPaths!['hours'] != null) {
+        final hoursFile = File(_vaultPaths!['hours']!);
+        if (await hoursFile.exists()) {
+          final hoursStr = await hoursFile.readAsString();
+          final decoded = jsonDecode(hoursStr) as Map<String, dynamic>;
+          _restaurantHours = decoded.map((key, value) => MapEntry(key, value.toString()));
+        }
+      }
+
+      if (_mapboxController != null && _vaultPaths != null) {
+        _setupMapboxLayers(_vaultPaths!); 
+      }
+    } catch (e) {
+      debugPrint("🚨 Vault creation failed: $e");
+    } finally {
+      if (mounted) setState(() => _isBuildingVault = false);
+    }
     
     _initLocationService();
-
-    Future.delayed(const Duration(seconds: 3), () {
-      MapHeater.preCacheTiles(40.735, -73.99, true); 
-      debugPrint("🌑 Dark Mode Map warming up in background...");
-    });
-
     _checkAndShowTutorial(); 
   }
-
+  
   Future<void> _loadCachedLocation() async {
     final prefs = await SharedPreferences.getInstance();
     final double? lat = prefs.getDouble('last_known_lat');
@@ -170,9 +186,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       if (mounted) {
         setState(() {
           myLocation = LatLng(lat, lng);
-        });
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _mapController.move(myLocation!, 14.0);
         });
       }
     }
@@ -191,10 +204,10 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
 
     _connectivitySubscription = Connectivity().onConnectivityChanged.listen(_updateConnectionStatus);
     
-    _serviceStatusStreamSubscription = Geolocator.getServiceStatusStream().listen((ServiceStatus status) {
+    _serviceStatusStreamSubscription = geo.Geolocator.getServiceStatusStream().listen((geo.ServiceStatus status) {
       if (mounted) {
         setState(() {
-          _isGpsDisabled = (status == ServiceStatus.disabled);
+          _isGpsDisabled = (status == geo.ServiceStatus.disabled);
           if (_isGpsDisabled) myLocation = null; 
         });
       }
@@ -203,15 +216,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
 
   void _updateConnectionStatus(List<ConnectivityResult> results) {
     bool hasConnection = results.any((r) => r != ConnectivityResult.none);
-    
     if (mounted) {
       setState(() => _isOffline = !hasConnection);
-      
-      // 🚀 AUTO-RESUME: If connection is restored and the dataset is incomplete
-      if (hasConnection && allRestaurants.length < 36252) {
-        debugPrint("🌐 Connection restored! Resuming background sync...");
-        _fetchRestaurants(); 
-      }
     }
   }
 
@@ -224,34 +230,25 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
     final prefs = await SharedPreferences.getInstance();
     setState(() => isDarkMode = !isDarkMode);
     await prefs.setBool('is_dark_mode', isDarkMode);
-  }
 
-  Future<void> _loadFavorites() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() => savedRestaurantNames = (prefs.getStringList('saved_restaurants') ?? []).toSet());
-  }
-
-  Future<void> _toggleFavorite(String restaurantName) async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      if (savedRestaurantNames.contains(restaurantName)) {
-        savedRestaurantNames.remove(restaurantName);
-      } else {
-        savedRestaurantNames.add(restaurantName);
-      }
-    });
-    await prefs.setStringList('saved_restaurants', savedRestaurantNames.toList());
+    // 🌟 THE FIX: Instantly command Mapbox to swap the base tiles.
+    // We use STANDARD for the colorful light mode, and DARK for dark mode.
+    if (_mapboxController != null) {
+      _mapboxController!.loadStyleURI(
+        isDarkMode ? MapboxStyles.DARK : MapboxStyles.STANDARD
+      );
+    }
   }
 
   Future<void> _checkLocationOnResume() async {
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    bool serviceEnabled = await geo.Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled && mounted && myLocation == null) _showLocationDialog();
     else _checkPermissionAndListen();
   }
 
   Future<void> _initLocationService() async {
-    final permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.whileInUse || permission == LocationPermission.always) {
+    final permission = await geo.Geolocator.checkPermission();
+    if (permission == geo.LocationPermission.whileInUse || permission == geo.LocationPermission.always) {
       _startListening();
     } else {
       _checkPermissionAndListen();
@@ -262,12 +259,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
     if (_isCheckingLocation) return;
     _isCheckingLocation = true;
     try {
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) return;
+      geo.LocationPermission permission = await geo.Geolocator.checkPermission();
+      if (permission == geo.LocationPermission.denied) {
+        permission = await geo.Geolocator.requestPermission();
+        if (permission == geo.LocationPermission.denied) return;
       }
-      if (permission == LocationPermission.deniedForever) return;
+      if (permission == geo.LocationPermission.deniedForever) return;
       
       _startListening();
     } finally {
@@ -276,15 +273,15 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
   }
 
   void _startListening() {
-    Geolocator.getLastKnownPosition().then((pos) {
+    geo.Geolocator.getLastKnownPosition().then((pos) {
       if (pos != null && myLocation == null) {
          setState(() => myLocation = LatLng(pos.latitude, pos.longitude));
       }
     });
 
-    _positionStreamSubscription = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, distanceFilter: 10)
-    ).listen((Position position) {
+    _positionStreamSubscription = geo.Geolocator.getPositionStream(
+      locationSettings: const geo.LocationSettings(accuracy: geo.LocationAccuracy.high, distanceFilter: 10)
+    ).listen((geo.Position position) {
       final newLoc = LatLng(position.latitude, position.longitude);
       
       if (mounted) {
@@ -302,196 +299,10 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
         title: const Text("Location Disabled"),
         content: const Text("Turn on location to see spots near you."),
         actions: [
-          TextButton(child: const Text("Turn On"), onPressed: () { Navigator.pop(context); Geolocator.openLocationSettings(); }),
+          TextButton(child: const Text("Turn On"), onPressed: () { Navigator.pop(context); geo.Geolocator.openLocationSettings(); }),
         ],
       ),
     );
-  }
-
-  List<String> get dynamicCuisines {
-    final Set<String> uniqueCuisines = {};
-    for (var r in allRestaurants) {
-      r.cuisine.split(RegExp(r'[;,/]')).forEach((part) {
-        var clean = part.trim().replaceAll('_', ' ');
-        if (clean.isNotEmpty && clean.toLowerCase() != "other" && clean.toLowerCase() != "n/a") {
-          uniqueCuisines.add(clean.split(' ').map((w) => w.isNotEmpty ? w[0].toUpperCase() + w.substring(1).toLowerCase() : "").join(' '));
-        }
-      });
-    }
-    return uniqueCuisines.toList()..sort();
-  }
-
-  Future<File> get _localFile async {
-    final directory = await getApplicationDocumentsDirectory();
-    return File('${directory.path}/restaurants_cache.json');
-  }
-
-  static List<Restaurant> _parseRestaurantsInBackground(String jsonString) {
-    final List<dynamic> jsonList = jsonDecode(jsonString);
-    return jsonList.map((json) => Restaurant.fromMap(json)).toList();
-  }
-
-  Future<List<Restaurant>> _loadFromCache() async {
-    try {
-      final file = await _localFile;
-      if (await file.exists()) {
-        final contents = await file.readAsString();
-        return await compute(_parseRestaurantsInBackground, contents);
-      }
-    } catch (e) { debugPrint("Error reading cache: $e"); }
-    return [];
-  }
-
-  Future<void> _fetchRestaurants() async {
-    setState(() { 
-      isLoading = true; 
-      hasError = false; 
-    });
-
-    List<dynamic> fullList = []; 
-
-    // 1. 🔍 TRY THE LOCAL CACHE FIRST (FULL OR PARTIAL)
-    try {
-      debugPrint("🔍 Checking local device cache...");
-      final cachedRestaurants = await _loadFromCache();
-      
-      if (cachedRestaurants.length >= 36252) { 
-        debugPrint("⚡ BOOM! Full cache found!");
-        if (mounted) {
-          setState(() {
-            allRestaurants = cachedRestaurants;
-            isLoading = false;
-          });
-        }
-        return; 
-      } else if (cachedRestaurants.isNotEmpty) {
-        debugPrint("⚠️ Partial cache found (${cachedRestaurants.length}). Resuming fetch...");
-        // Pre-populate UI with what we have for a seamless resume experience
-        if (mounted) setState(() => allRestaurants = cachedRestaurants);
-        // Load the raw JSON back into fullList to append the missing batches
-        final file = await _localFile;
-        fullList = jsonDecode(await file.readAsString());
-      }
-    } catch (e) {
-      debugPrint("⚠️ Cache miss or error: $e");
-    }
-
-    // 2. ☁️ FETCH FROM SUPABASE (RESUMEABLE)
-    try {
-      debugPrint("☁️ Fetching from database...");
-      
-      const int totalRecords = 36252;
-      const int batchSize = 1000;
-      
-      // Calculate starting page based on existing cached data
-      int startPage = (fullList.length / batchSize).floor();
-      int totalPages = (totalRecords / batchSize).ceil();
-
-      // Initialize counters to the current progress point
-      if (mounted) {
-        setState(() {
-          _fetchedCount = fullList.length;
-          _displayFetchedCount = fullList.length;
-          _totalToFetch = totalRecords;
-        });
-      }
-      
-      _startSimulationTimer();
-
-      for (int i = startPage; i < totalPages; i++) {
-        final start = i * batchSize;
-        final end = start + batchSize - 1;
-        
-        final batch = await Supabase.instance.client
-            .from('restaurants')
-            .select() 
-            .range(start, end)
-            .order('id', ascending: true); 
-            
-        fullList.addAll(batch as List<dynamic>);
-        
-        if (mounted) {
-          setState(() {
-            _fetchedCount = fullList.length; 
-          });
-        }
-      }
-
-      // 🛑 STOP THE SIMULATION WHEN FETCHING IS COMPLETELY DONE
-      _simulationTimer?.cancel();
-      if (mounted) {
-        setState(() {
-          _displayFetchedCount = 36252; 
-        });
-      }
-
-      await _saveToCache(fullList);
-
-      final List<Restaurant> mappedRestaurants = await compute(parseRestaurantsInBackground, fullList);
-
-      if (mounted) {
-        setState(() {
-          allRestaurants = mappedRestaurants;
-          isLoading = false;
-          hasError = false;
-        });
-      }
-      
-    } catch (e) {
-      debugPrint('🚨 ERROR FETCHING RESTAURANTS: $e');
-      
-      // 3. 🛡️ SALVAGE LOGIC: If connection drops, use what we managed to grab
-      _simulationTimer?.cancel(); 
-
-      if (fullList.isNotEmpty) {
-        debugPrint('⚠️ Connection lost, but salvaging ${fullList.length} spots!');
-        
-        await _saveToCache(fullList);
-        final List<Restaurant> partialRestaurants = await compute(parseRestaurantsInBackground, fullList);
-        
-        if (mounted) {
-          setState(() {
-            allRestaurants = partialRestaurants;
-            isLoading = false;
-            hasError = false; 
-          });
-          
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text("Connection lost. Showing partial map data."),
-              backgroundColor: isDarkMode ? Colors.redAccent : Colors.red,
-              behavior: SnackBarBehavior.floating,
-              duration: const Duration(seconds: 4),
-            ),
-          );
-        }
-      } else {
-        if (mounted) {
-          setState(() { 
-            isLoading = false; 
-            hasError = true; 
-          });
-        }
-      }
-    }
-  }
-
-  void _startSimulationTimer() {
-    _simulationTimer?.cancel();
-    _simulationTimer = Timer.periodic(const Duration(milliseconds: 35), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-      setState(() {
-        // Cap the fake counter so it never passes the ACTUAL fetched data + 950
-        int maxSimulated = _fetchedCount + 950; 
-        if (_displayFetchedCount < maxSimulated && _displayFetchedCount < 36252) {
-          _displayFetchedCount += Random().nextInt(34) + 12; 
-          if (_displayFetchedCount > 36252) _displayFetchedCount = 36252;
-        }
-      });
-    });
   }
 
   Future<void> _fetchUserProfile({bool forceRefresh = false}) async {
@@ -506,90 +317,41 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       });
     }
   }
-
-  List<Restaurant> get visibleRestaurants {
-    return allRestaurants.where((r) {
-      if (savedOnly && !savedRestaurantNames.contains(r.name)) return false;
-      if (showOpenOnly && !r.isOpenNow) return false;
-      if (_showVegetarian && !r.isVegetarian) return false;
-      if (_showVegan && !r.isVegan) return false;
-
-      if (_selectedMichelin.isNotEmpty) {
-        bool matches = false;
-        if (_selectedMichelin.contains("1 Star") && r.michelinStars == 1) matches = true;
-        if (_selectedMichelin.contains("2 Stars") && r.michelinStars == 2) matches = true;
-        if (_selectedMichelin.contains("3 Stars") && r.michelinStars == 3) matches = true;
-        if (_selectedMichelin.contains("Bib Gourmand") && r.bibGourmand) matches = true;
-        if (!matches) return false;
-      }
-
-      if (_selectedPrices.isNotEmpty && !_selectedPrices.contains(r.price)) return false;
-
-      if (selectedRestaurantName != null && !r.name.toLowerCase().contains(selectedRestaurantName!.toLowerCase())) return false;
-      if (selectedCategory != null && !r.cuisine.toLowerCase().contains(selectedCategory!.toLowerCase())) return false;
-      
-      return true;
-    }).toList();
-  }
-
-  // 🌟 NEW: Dedicated jump method with Cupertino spinner
-  Future<void> _jumpToRestaurant(Restaurant restaurant) async {
-    setState(() { _isJumpingToLocation = true; });
-
-    // Give UI thread a breather to render the Cupertino spinner
-    await Future.delayed(const Duration(milliseconds: 300));
-
-    if (mounted) {
-      setState(() { 
-        selectedRestaurantName = restaurant.name; 
-        selectedCategory = null; 
-      });
-      _zoomToResults(visibleRestaurants);
-    }
-
-    // Give map tiles time to load into memory
-    await Future.delayed(const Duration(milliseconds: 600));
-
-    if (mounted) {
-      setState(() { _isJumpingToLocation = false; });
-      
-      // Auto-open the detail sheet for the premium feel
-      showModalBottomSheet(
-        context: context, 
-        isScrollControlled: true, 
-        useSafeArea: true, 
-        clipBehavior: Clip.antiAlias,
-        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
-        backgroundColor: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
-        builder: (context) => RestaurantDetailSheet(
-          restaurant: restaurant, 
-          isDarkMode: isDarkMode, 
-          isSaved: savedRestaurantNames.contains(restaurant.name),
-          myLocation: myLocation, 
-          onFavoriteToggle: () => _toggleFavorite(restaurant.name),
-        ),
-      );
-    }
-  }
   
+  // map_screen.dart
+
   void _openSearchPage() {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => SearchScreen(
-          allRestaurants: allRestaurants,
-          availableCategories: dynamicCuisines,
+          // ⚠️ We no longer pass allRestaurants!
+          // We pass the static categories from your constants
+          availableCategories: CuisineConstants.emojiPalettes.keys.toList(), 
           isDarkMode: isDarkMode,
           onCategorySelected: (category) {
             setState(() { selectedCategory = category; selectedRestaurantName = null; });
-            _zoomToResults(visibleRestaurants);
+            _fetchRestaurants(); // 🌟 ADD THIS
           },
           onRestaurantSelected: (restaurant) {
-            _jumpToRestaurant(restaurant); // 🌟 Implemented here
+            setState(() { selectedRestaurantName = restaurant.name; selectedCategory = null; }); // Make sure state is updated
+            _fetchRestaurants(); // 🌟 ADD THIS
+            _jumpToRestaurant(restaurant);
           },
         ),
       ),
     );
+  }
+
+  Future<void> _jumpToRestaurant(Restaurant restaurant) async {
+    // Uses setCamera instead of flyTo to instantly snap to the coordinates
+    _mapboxController?.setCamera(
+      CameraOptions(
+        center: Point(coordinates: Position(restaurant.location.longitude, restaurant.location.latitude)),
+        zoom: 16.0,
+      ),
+    );
+    _fetchAndShowRestaurant(restaurant.id);
   }
 
   void _openCountryWheel() {
@@ -599,38 +361,31 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       backgroundColor: Colors.transparent,
       builder: (context) => CountryWheelModal(
         isDarkMode: isDarkMode,
-        availableCuisines: dynamicCuisines, 
+        availableCuisines: const [], // Empty for now
         onCountrySelected: (country) {
           setState(() { selectedCategory = country; selectedRestaurantName = null; });
-          _zoomToResults(visibleRestaurants);
+          _fetchRestaurants(); // 🌟 ADD THIS
         },
       ),
     );
   }
 
-  void _zoomToResults(List<Restaurant> restaurants) {
-    if (restaurants.isEmpty) return;
-    if (restaurants.length == 1) { _animatedMapMove(restaurants.first.location, 15.0); return; }
-    
-    final bounds = LatLngBounds.fromPoints(restaurants.map((r) => r.location).toList());
-    try { _mapController.fitCamera(CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(80))); } 
-    catch (e) { _animatedMapMove(restaurants.first.location, 14.0); }
+  void _animatedMapMove(LatLng destLocation, double destZoom) {
+     _mapboxController?.flyTo(
+        CameraOptions(
+          center: Point(coordinates: Position(destLocation.longitude, destLocation.latitude)),
+          zoom: destZoom,
+        ),
+        MapAnimationOptions(duration: 1500)
+     );
   }
 
-  void _animatedMapMove(LatLng destLocation, double destZoom) {
-    final latTween = Tween<double>(begin: _mapController.camera.center.latitude, end: destLocation.latitude);
-    final lngTween = Tween<double>(begin: _mapController.camera.center.longitude, end: destLocation.longitude);
-    final zoomTween = Tween<double>(begin: _mapController.camera.zoom, end: destZoom);
-
-    final controller = AnimationController(duration: const Duration(milliseconds: 500), vsync: this);
-    final Animation<double> animation = CurvedAnimation(parent: controller, curve: Curves.fastOutSlowIn);
-
-    controller.addListener(() {
-      _mapController.move(LatLng(latTween.evaluate(animation), lngTween.evaluate(animation)), zoomTween.evaluate(animation));
-    });
-
-    animation.addStatusListener((status) { if (status == AnimationStatus.completed) controller.dispose(); });
-    controller.forward();
+  // 🌟 ADD THIS HELPER TO MAP SCREEN
+  String _formatCategoryDisplay(String category) {
+    String formatted = category.split('_').map((word) => word.isNotEmpty ? '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}' : '').join(' ');
+    String emoji = CuisineConstants.emojiPalettes[category]?.first ?? '🍽️';
+    if (category.toLowerCase() == 'hot_dog') emoji = '🌭';
+    return '$formatted $emoji';
   }
 
   void _recenterMap() {
@@ -639,12 +394,15 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
   }
 
   void _zoom(double amount) {
-    _animatedMapMove(_mapController.camera.center, _mapController.camera.zoom + amount);
-  }
-
-  String _getNoResultsMessage() {
-    if (selectedCategory != null) return "We couldn't find any $selectedCategory places.";
-    return "Try adjusting your filters.";
+    if (_mapboxController != null) {
+      _mapboxController!.getCameraState().then((cameraState) {
+        final currentZoom = cameraState.zoom;
+        _mapboxController!.flyTo(
+          CameraOptions(zoom: currentZoom + amount),
+          MapAnimationOptions(duration: 300)
+        );
+      });
+    }
   }
 
   void _startTextAnimation() {
@@ -654,30 +412,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       }
     });
   }
-
-  List<Marker> _buildMarkers() {
-    return visibleRestaurants.map((restaurant) {
-      return Marker(
-        point: restaurant.location, width: 50, height: 50,
-        child: GestureDetector(
-          onTap: () {
-            showModalBottomSheet(
-              context: context, isScrollControlled: true, useSafeArea: true, clipBehavior: Clip.antiAlias,
-              shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
-              backgroundColor: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
-              builder: (context) => RestaurantDetailSheet(
-                restaurant: restaurant, isDarkMode: isDarkMode, isSaved: savedRestaurantNames.contains(restaurant.name),
-                myLocation: myLocation, onFavoriteToggle: () => _toggleFavorite(restaurant.name),
-              ),
-            );
-          },
-          child: Icon(Icons.location_on, color: isDarkMode ? Colors.white : Colors.black, size: 50, shadows: [Shadow(color: Colors.black.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4))]),
-        ),
-      );
-    }).toList();
-  }
-
-  String _formatClusterCount(int count) => count < 1000 ? count.toString() : '${(count / 1000).floor()}k+';
 
   Widget _buildAvatarContent() {
     if (_userName == null) {
@@ -755,7 +489,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
             if (!_isOffline && _isGpsDisabled) ...[
                const SizedBox(width: 12),
                GestureDetector(
-                 onTap: Geolocator.openLocationSettings,
+                 onTap: geo.Geolocator.openLocationSettings,
                  child: Container(
                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                    decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(4)),
@@ -769,22 +503,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
     );
   }
 
-  Future<void> _saveToCache(List<dynamic> jsonList) async {
-    try {
-      final file = await _localFile;
-      final jsonString = jsonEncode(jsonList);
-      await file.writeAsString(jsonString);
-      debugPrint("💾 SUCCESS: Saved ${jsonList.length} restaurants to local device storage!");
-    } catch (e) {
-      debugPrint("🚨 Error saving to cache: $e");
-    }
-  }
-
-  // --- 🚀 THE FINAL PRODUCTION CODE ---
   Future<void> _checkAndShowTutorial() async {
     final prefs = await SharedPreferences.getInstance();
 
-    // 🏆 1. ALWAYS CHECK FOR THE BATON FIRST (Overrides everything)
     final String? stage = prefs.getString('tutorial_stage');
     if (stage == 'final_map_screen') {
       Future.delayed(const Duration(milliseconds: 800), () {
@@ -793,35 +514,13 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       return; 
     }
 
-    // 2. If they are not holding the final baton, check if they are a veteran.
-    // If they have fully completed the initial tour, do absolutely nothing.
     final hasSeen = prefs.getBool('has_seen_tutorial') ?? false;
     if (hasSeen) return;
 
-    // 3. If they haven't seen it, and aren't holding a baton, start the initial tour!
     Future.delayed(const Duration(milliseconds: 800), () {
       if (mounted) _showTutorial();
     });
   }
-
-  // Future<void> _checkAndShowTutorial() async {
-  //   final prefs = await SharedPreferences.getInstance();
-  //   final String? stage = prefs.getString('tutorial_stage');
-
-  //   // 🏆 CATCH THE FINAL BATON
-  //   if (stage == 'final_map_screen') {
-  //     Future.delayed(const Duration(milliseconds: 800), () {
-  //       if (mounted) _showFinalTutorial();
-  //     });
-  //     return; 
-  //   }
-
-  //   // --- 🧪 TESTING OVERRIDE: ALWAYS SHOW INITIAL ON BOOT ---
-  //   await prefs.remove('tutorial_stage'); 
-  //   Future.delayed(const Duration(milliseconds: 800), () {
-  //     if (mounted) _showTutorial();
-  //   });
-  // }
 
   void _showFinalTutorial() {
     TutorialCoachMark(
@@ -846,12 +545,11 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
                     const SizedBox(height: 28),
                     ElevatedButton(
                       onPressed: () {
-                        // 🏁 DESTROY THE BATON PERMANENTLY
                         SharedPreferences.getInstance().then((prefs) {
                           prefs.setBool('has_seen_tutorial', true);
                           prefs.remove('tutorial_stage'); 
                         });
-                        controller.skip(); // Close overlay
+                        controller.skip(); 
                       }, 
                       style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black, elevation: 0, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999))),
                       child: const Text("FINISH TOUR", style: TextStyle(fontFamily: 'Courier', fontWeight: FontWeight.bold, letterSpacing: 1.5, fontSize: 14)),
@@ -880,15 +578,14 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       onFinish: () {
         SharedPreferences.getInstance().then((prefs) {
           prefs.setBool('has_seen_tutorial', true);
-          // 🏃‍♂️💨 PASS THE BATON
           prefs.setString('tutorial_stage', 'collection_screen'); 
-          _handlePassportTap(); // Push to the next screen immediately!
+          _handlePassportTap(); 
         });
       },
       onSkip: () {
         SharedPreferences.getInstance().then((prefs) {
           prefs.setBool('has_seen_tutorial', true);
-          prefs.remove('tutorial_stage'); // Kill the chain if they skip
+          prefs.remove('tutorial_stage'); 
         });
         return true; 
       },
@@ -923,7 +620,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
           ),
         ],
       ),
-      // 👇 SWAPPED: Profile is now the 3rd slide (isLast removed)
       TargetFocus(
         identify: "profile_target",
         keyTarget: _profileKey,
@@ -938,7 +634,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
           ),
         ],
       ),
-      // 👇 SWAPPED: Passport is now the 4th slide (isLast: true added)
       TargetFocus(
         identify: "passport_target",
         keyTarget: _passportKey,
@@ -983,7 +678,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
         Row(
           children: [
             ElevatedButton(
-              // 👇 THE FIX: Always call next(). On the last slide, this triggers onFinish!
               onPressed: () => controller.next(), 
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
@@ -1024,32 +718,29 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
     final bool showNote = prefs.getBool('show_traveler_note') ?? true;
     final String? tutorialStage = prefs.getString('tutorial_stage');
 
-    // 👇 If they are on the guided tour, suppress the note!
     if (!showNote || tutorialStage == 'collection_screen') {
       _navigateToPassport();
       return;
     }
 
-    // Default state: Checked (ON)
     bool doNotShowAgain = true; 
 
     await showDialog(
       context: context,
-      barrierDismissible: false, // Forces them to hit the X
+      barrierDismissible: false,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return Dialog(
-              backgroundColor: const Color(0xFF1A1A1A), // Very dark grey
+              backgroundColor: const Color(0xFF1A1A1A), 
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 400),
                 child: Padding(
                   padding: const EdgeInsets.all(20.0),
                   child: Column(
-                    mainAxisSize: MainAxisSize.min, // Hugs content, allows scroll if needed
+                    mainAxisSize: MainAxisSize.min, 
                     children: [
-                      // ❌ TOP LEFT CROSS BUTTON
                       Row(
                         mainAxisAlignment: MainAxisAlignment.start,
                         children: [
@@ -1060,7 +751,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
                         ],
                       ),
                       
-                      // 📜 SCROLLABLE TEXT CONTENT
                       Flexible(
                         child: SingleChildScrollView(
                           child: Column(
@@ -1074,12 +764,11 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
                                   fontStyle: FontStyle.italic,
                                   fontSize: 26,
                                   fontWeight: FontWeight.bold,
-                                  color: Color(0xFFF5F5F5), // Off-white
+                                  color: Color(0xFFF5F5F5), 
                                 ),
                               ),
                               const SizedBox(height: 24),
                               
-                              // Body Text with Paragraph Indentations
                               const Text(
                                 "    No subscriptions. No ads.\n\n"
                                 "    I am tired of apps charging \$4.99 a month for eternity just to make the ads go away, or locking basic functionality behind a paywall. The core of this app—exploring 36,000+ restaurants across New York City—will always be free. It is a labor of love for a city I deeply admire, and a service for the people who make it great.\n\n"
@@ -1098,7 +787,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
                               ),
                               const SizedBox(height: 32),
                               
-                              // ✅ CHECKBOX (DO NOT SHOW AGAIN)
                               GestureDetector(
                                 onTap: () {
                                   setDialogState(() => doNotShowAgain = !doNotShowAgain);
@@ -1123,7 +811,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
                                     const Text(
                                       "Do not show again",
                                       style: TextStyle(
-                                        fontFamily: 'SFPro', // Utilitarian font for controls
+                                        fontFamily: 'SFPro', 
                                         fontSize: 14,
                                         color: Colors.white70,
                                       ),
@@ -1146,10 +834,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       },
     );
 
-    // 💾 Save the preference when the dialog is closed
     await prefs.setBool('show_traveler_note', !doNotShowAgain);
-    
-    // 🚀 Proceed to the Passport Collection
     _navigateToPassport();
   }
 
@@ -1165,8 +850,396 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
     );
   }
 
+  Future<void> _loadFavorites() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() => savedRestaurantNames = (prefs.getStringList('saved_restaurants') ?? []).toSet());
+  }
+
+  Future<void> _toggleFavorite(String restaurantName) async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      if (savedRestaurantNames.contains(restaurantName)) {
+        savedRestaurantNames.remove(restaurantName);
+      } else {
+        savedRestaurantNames.add(restaurantName);
+      }
+    });
+    await prefs.setStringList('saved_restaurants', savedRestaurantNames.toList());
+  }
+
+  // =========================================================================
+  // 🗺️ THE MASTER LAYER SETUP (Mapbox Style Engine)
+  // =========================================================================
+  Future<void> _setupMapboxLayers(Map<String, String> paths) async {
+    if (_mapboxController == null) return;
+
+    try {
+      // --- 1. THE SOURCES ---
+      if (!(await _mapboxController?.style.styleSourceExists("regular-source") ?? false)) {
+        await _mapboxController?.style.addSource(GeoJsonSource(id: "regular-source", data: "file://${paths['regular']}", cluster: true, clusterRadius: 50, clusterMaxZoom: 14.0, buffer: 128.0));
+      }
+      
+      // 🌟 THE FIX 1: The "Shadow Source" (No clustering rules applied)
+      if (!(await _mapboxController?.style.styleSourceExists("regular-source-unclustered") ?? false)) {
+        await _mapboxController?.style.addSource(GeoJsonSource(id: "regular-source-unclustered", data: "file://${paths['regular']}"));
+      }
+
+      if (!(await _mapboxController?.style.styleSourceExists("heroes-source") ?? false)) {
+        await _mapboxController?.style.addSource(GeoJsonSource(id: "heroes-source", data: "file://${paths['heroes']}", buffer: 128.0));
+      }
+
+      // --- 2. DEFAULT CLUSTERS ---
+      if (!(await _mapboxController?.style.styleLayerExists("cluster-circles") ?? false)) {
+        await _mapboxController?.style.addLayer(CircleLayer(id: "cluster-circles", sourceId: "regular-source"));
+      }
+      await _mapboxController?.style.setStyleLayerProperty("cluster-circles", "filter", ["has", "point_count"]);
+      await _mapboxController?.style.setStyleLayerProperty("cluster-circles", "circle-color", isDarkMode ? "#1E1E1E" : "#FFFFFF");
+      await _mapboxController?.style.setStyleLayerProperty("cluster-circles", "circle-stroke-color", isDarkMode ? "#FFFFFF" : "#000000"); 
+      await _mapboxController?.style.setStyleLayerProperty("cluster-circles", "circle-stroke-width", 3.5); 
+      await _mapboxController?.style.setStyleLayerProperty("cluster-circles", "circle-radius", ["step", ["get", "point_count"], 18, 100, 22, 1000, 26]);
+
+      if (!(await _mapboxController?.style.styleLayerExists("cluster-text") ?? false)) {
+        await _mapboxController?.style.addLayer(SymbolLayer(id: "cluster-text", sourceId: "regular-source"));
+      }
+      await _mapboxController?.style.setStyleLayerProperty("cluster-text", "filter", ["has", "point_count"]);
+      await _mapboxController?.style.setStyleLayerProperty("cluster-text", "text-field", ["case", ["<", ["get", "point_count"], 1000], ["to-string", ["get", "point_count"]], ["concat", ["to-string", ["floor", ["/", ["get", "point_count"], 1000]]], "k+"]]);
+      await _mapboxController?.style.setStyleLayerProperty("cluster-text", "text-font", ["Source Code Pro Bold", "Open Sans Bold", "Arial Unicode MS Bold"]);
+      await _mapboxController?.style.setStyleLayerProperty("cluster-text", "text-size", 14.0);
+      await _mapboxController?.style.setStyleLayerProperty("cluster-text", "text-color", isDarkMode ? "#FFFFFF" : "#000000");
+      await _mapboxController?.style.setStyleLayerProperty("cluster-text", "text-allow-overlap", true);
+      await _mapboxController?.style.setStyleLayerProperty("cluster-text", "text-ignore-placement", true);
+
+      // --- 3. EMOJI LOGIC ---
+      final starsVal = ["to-number", ["get", "michelin_stars"], 0];
+      final bibCheck = ["==", ["downcase", ["to-string", ["get", "bib_gourmand"]]], "true"];
+      final ringType = ["case", [">", starsVal, 0], "gold", bibCheck, "red", "black"];
+      
+      List<dynamic> emojiCode = ["case"];
+      for (var cuisineKeyword in CuisineConstants.emojiPalettes.keys) {
+        emojiCode.add(["in", cuisineKeyword.toLowerCase(), ["downcase", ["to-string", ["get", "cuisine"]]]]);
+        emojiCode.add(cuisineKeyword); 
+      }
+      emojiCode.add("default");
+      final dynamicIconImage = ["concat", "pill-", emojiCode, "-", ringType, "-", ["to-string", starsVal]];
+      final dynamicIconSize = ["interpolate", ["linear"], ["zoom"], 8.0, 0.40, 11.0, 0.55, 14.0, 0.75, 16.0, 0.90];
+
+      // --- 4. REGULAR HIERARCHY LAYERS ---
+      if (!(await _mapboxController?.style.styleLayerExists("regular-bubbles") ?? false)) {
+        await _mapboxController?.style.addLayer(SymbolLayer(id: "regular-bubbles", sourceId: "regular-source", minZoom: 14.0, iconAllowOverlap: false, iconPitchAlignment: IconPitchAlignment.VIEWPORT));
+      }
+      await _mapboxController?.style.setStyleLayerProperty("regular-bubbles", "filter", ["!", ["has", "point_count"]]);
+      await _mapboxController?.style.setStyleLayerProperty("regular-bubbles", "icon-image", dynamicIconImage);
+      await _mapboxController?.style.setStyleLayerProperty("regular-bubbles", "icon-size", dynamicIconSize);
+
+      if (!(await _mapboxController?.style.styleLayerExists("heroes-bib-bubbles") ?? false)) {
+        await _mapboxController?.style.addLayer(SymbolLayer(id: "heroes-bib-bubbles", sourceId: "heroes-source", minZoom: 13.0, iconAllowOverlap: true, iconPitchAlignment: IconPitchAlignment.VIEWPORT));
+      }
+      await _mapboxController?.style.setStyleLayerProperty("heroes-bib-bubbles", "filter", ["all", bibCheck, ["==", starsVal, 0]]);
+      await _mapboxController?.style.setStyleLayerProperty("heroes-bib-bubbles", "icon-image", dynamicIconImage);
+      await _mapboxController?.style.setStyleLayerProperty("heroes-bib-bubbles", "icon-size", dynamicIconSize);
+
+      if (!(await _mapboxController?.style.styleLayerExists("heroes-1-bubbles") ?? false)) {
+        await _mapboxController?.style.addLayer(SymbolLayer(id: "heroes-1-bubbles", sourceId: "heroes-source", minZoom: 12.0, iconAllowOverlap: true, iconPitchAlignment: IconPitchAlignment.VIEWPORT));
+      }
+      await _mapboxController?.style.setStyleLayerProperty("heroes-1-bubbles", "filter", ["==", starsVal, 1]);
+      await _mapboxController?.style.setStyleLayerProperty("heroes-1-bubbles", "icon-image", dynamicIconImage);
+      await _mapboxController?.style.setStyleLayerProperty("heroes-1-bubbles", "icon-size", dynamicIconSize);
+
+      if (!(await _mapboxController?.style.styleLayerExists("heroes-3-2-bubbles") ?? false)) {
+        await _mapboxController?.style.addLayer(SymbolLayer(id: "heroes-3-2-bubbles", sourceId: "heroes-source", minZoom: 8.0, iconAllowOverlap: true, iconPitchAlignment: IconPitchAlignment.VIEWPORT));
+      }
+      await _mapboxController?.style.setStyleLayerProperty("heroes-3-2-bubbles", "filter", [">=", starsVal, 2]);
+      await _mapboxController?.style.setStyleLayerProperty("heroes-3-2-bubbles", "symbol-sort-key", ["case", ["==", starsVal, 3], 2, ["==", starsVal, 2], 1, 0]); 
+      await _mapboxController?.style.setStyleLayerProperty("heroes-3-2-bubbles", "icon-image", dynamicIconImage);
+      await _mapboxController?.style.setStyleLayerProperty("heroes-3-2-bubbles", "icon-size", dynamicIconSize);
+
+      // --- 5. FILTER OVERRIDE LAYERS (Zoom 1.0+) ---
+      final hideCommand = ["==", ["get", "id"], -1];
+
+      // 🌟 THE FIX 2: Point the filtered regular bubbles to the new "Shadow Source"
+      if (!(await _mapboxController?.style.styleLayerExists("filtered-regular-bubbles") ?? false)) {
+        await _mapboxController?.style.addLayer(SymbolLayer(id: "filtered-regular-bubbles", sourceId: "regular-source-unclustered", minZoom: 1.0, iconAllowOverlap: false, iconPitchAlignment: IconPitchAlignment.VIEWPORT));
+      }
+      await _mapboxController?.style.setStyleLayerProperty("filtered-regular-bubbles", "filter", hideCommand); 
+      await _mapboxController?.style.setStyleLayerProperty("filtered-regular-bubbles", "icon-image", dynamicIconImage);
+      await _mapboxController?.style.setStyleLayerProperty("filtered-regular-bubbles", "icon-size", dynamicIconSize);
+
+      if (!(await _mapboxController?.style.styleLayerExists("filtered-bib-bubbles") ?? false)) {
+        await _mapboxController?.style.addLayer(SymbolLayer(id: "filtered-bib-bubbles", sourceId: "heroes-source", minZoom: 1.0, iconAllowOverlap: true, iconPitchAlignment: IconPitchAlignment.VIEWPORT));
+      }
+      await _mapboxController?.style.setStyleLayerProperty("filtered-bib-bubbles", "filter", hideCommand);
+      await _mapboxController?.style.setStyleLayerProperty("filtered-bib-bubbles", "icon-image", dynamicIconImage);
+      await _mapboxController?.style.setStyleLayerProperty("filtered-bib-bubbles", "icon-size", dynamicIconSize);
+
+      if (!(await _mapboxController?.style.styleLayerExists("filtered-1-bubbles") ?? false)) {
+        await _mapboxController?.style.addLayer(SymbolLayer(id: "filtered-1-bubbles", sourceId: "heroes-source", minZoom: 1.0, iconAllowOverlap: true, iconPitchAlignment: IconPitchAlignment.VIEWPORT));
+      }
+      await _mapboxController?.style.setStyleLayerProperty("filtered-1-bubbles", "filter", hideCommand);
+      await _mapboxController?.style.setStyleLayerProperty("filtered-1-bubbles", "icon-image", dynamicIconImage);
+      await _mapboxController?.style.setStyleLayerProperty("filtered-1-bubbles", "icon-size", dynamicIconSize);
+
+    } catch (e) {
+      debugPrint("🚨 Layer Error: $e");
+    }
+  }
+
+  // =========================================================================
+  // 👆 4. THE INTERACTION BRIDGE (Mapbox Tap Listener)
+  // =========================================================================
+  Future<void> _handleMapTap(MapContentGestureContext context) async {
+    if (_mapboxController == null) return;
+
+    try {
+      final screenCoord = await _mapboxController!.pixelForCoordinate(context.point);
+
+      // Increased back to 25.0 to ensure it catches fat-finger taps 
+      // on the far edges of your wide custom pills.
+      final double tapRadius = 25.0; 
+      final Map<String, dynamic> tapBoxMap = {
+        "min": {"x": screenCoord.x - tapRadius, "y": screenCoord.y - tapRadius},
+        "max": {"x": screenCoord.x + tapRadius, "y": screenCoord.y + tapRadius}
+      };
+
+      final geometry = RenderedQueryGeometry(
+        value: jsonEncode(tapBoxMap),
+        type: Type.SCREEN_BOX, 
+      );
+
+      final options = RenderedQueryOptions(layerIds: [
+        "heroes-3-2-bubbles", 
+        "filtered-1-bubbles",       // 🌟 ADDED
+        "heroes-1-bubbles",   
+        "filtered-bib-bubbles",     // 🌟 ADDED
+        "heroes-bib-bubbles", 
+        "filtered-regular-bubbles", // 🌟 ADDED
+        "regular-bubbles",    
+        "cluster-circles"     
+      ]);
+      
+      final features = await _mapboxController!.queryRenderedFeatures(geometry, options);
+
+      if (features.isNotEmpty) {
+        
+        // 🌟 THE FIX: The Priority Funnel updated with overrides
+        final List<String> layerPriority = [
+          "heroes-3-2-bubbles",
+          "filtered-1-bubbles",       // 🌟 ADDED
+          "heroes-1-bubbles",
+          "filtered-bib-bubbles",     // 🌟 ADDED
+          "heroes-bib-bubbles",
+          "filtered-regular-bubbles", // 🌟 ADDED
+          "regular-bubbles",
+          "cluster-circles"
+        ];
+
+        Map<String, dynamic>? selectedFeatureProps;
+        Map<String, dynamic>? selectedFeatureGeom;
+        bool isClusterTap = false;
+
+        // Funnel through our strict hierarchy
+        for (String layerId in layerPriority) {
+          
+          // 🌟 THE FIX: Mapbox stores layers in a list on the parent object
+          final match = features.firstWhere(
+            (f) => f?.layers?.contains(layerId) == true, 
+            orElse: () => null
+          );
+
+          if (match != null) {
+            final rawFeature = match.queriedFeature?.feature as Map?;
+            if (rawFeature != null) {
+              final featureMap = Map<String, dynamic>.from(rawFeature);
+              
+              final rawProps = featureMap['properties'] as Map?;
+              selectedFeatureProps = rawProps != null ? Map<String, dynamic>.from(rawProps) : null;
+              
+              final rawGeom = featureMap['geometry'] as Map?;
+              selectedFeatureGeom = rawGeom != null ? Map<String, dynamic>.from(rawGeom) : null;
+              
+              isClusterTap = layerId == "cluster-circles";
+              break; // Found the absolute highest-priority target! Stop looking.
+            }
+          }
+        }
+
+        if (selectedFeatureProps == null) return;
+
+        // --- Execute the Interaction ---
+        final isCluster = isClusterTap || selectedFeatureProps['cluster'] == true || selectedFeatureProps.containsKey('point_count');
+        
+        if (isCluster) {
+            final coords = selectedFeatureGeom?['coordinates'] as List<dynamic>?;
+            if (coords != null && coords.length >= 2) {
+              final currentZoom = await _mapboxController!.getCameraState().then((s) => s.zoom);
+              _mapboxController!.flyTo(
+                CameraOptions(
+                  center: Point(coordinates: Position((coords[0] as num).toDouble(), (coords[1] as num).toDouble())), 
+                  zoom: currentZoom + 2.5 
+                ),
+                MapAnimationOptions(duration: 500)
+              );
+            }
+            return; 
+        }
+
+        // Must be a restaurant! Open the sheet.
+        if (selectedFeatureProps['id'] != null) {
+          final int restaurantId = int.parse(selectedFeatureProps['id'].toString());
+          _fetchAndShowRestaurant(restaurantId);
+        }
+      }
+    } catch (e) {
+      debugPrint("🚨 Tap query error: $e");
+    }
+  }
+
+  // =========================================================================
+  // 📡 5. SUPABASE SINGLE QUERY & UI TRIGGER
+  // =========================================================================
+  Future<void> _fetchAndShowRestaurant(int restaurantId) async {
+    // 🌟 THE FIX: Removed the _isJumpingToLocation = true loader!
+    
+    try {
+      final data = await Supabase.instance.client
+          .from('restaurants')
+          .select()
+          .eq('id', restaurantId)
+          .single();
+
+      final restaurant = Restaurant.fromMap(data);
+
+      if (mounted) {
+        // Slide up your beautiful Detail Sheet instantly
+        showModalBottomSheet(
+          context: context, 
+          isScrollControlled: true, 
+          useSafeArea: true, 
+          clipBehavior: Clip.antiAlias,
+          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(25))),
+          backgroundColor: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+          builder: (context) => RestaurantDetailSheet(
+            restaurant: restaurant, 
+            isDarkMode: isDarkMode, 
+            isSaved: savedRestaurantNames.contains(restaurant.name),
+            myLocation: myLocation, 
+            onFavoriteToggle: () => _toggleFavorite(restaurant.name),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint("🚨 Supabase single fetch error: $e");
+    }
+  }
+
+  // =========================================================================
+  // 🔍 INSTANT MAPBOX FILTER ENGINE
+  // =========================================================================
+  void _fetchRestaurants() async {
+    if (_mapboxController == null) return;
+
+    final clusterBase = ["has", "point_count"];
+    final starsVal = ["to-number", ["get", "michelin_stars"], 0];
+    final bibCheck = ["==", ["downcase", ["to-string", ["get", "bib_gourmand"]]], "true"];
+
+    final regularBase = ["!", ["has", "point_count"]];
+    final bibBase = ["all", bibCheck, ["==", starsVal, 0]];
+    final star1Base = ["==", starsVal, 1];
+    final star32Base = [">=", starsVal, 2];
+
+    List<dynamic> userFilters = ["all"]; 
+
+    if (selectedRestaurantName != null) {
+      userFilters.add(["==", ["get", "name"], selectedRestaurantName]);
+    } else if (selectedCategory != null) {
+      userFilters.add(["==", ["downcase", ["to-string", ["get", "cuisine"]]], selectedCategory!.toLowerCase()]);
+    }
+
+    if (_showVegetarian) userFilters.add(["==", ["downcase", ["to-string", ["get", "is_vegetarian"]]], "true"]);
+    if (_showVegan) userFilters.add(["==", ["downcase", ["to-string", ["get", "is_vegan"]]], "true"]);
+
+    if (savedOnly) {
+      if (savedRestaurantNames.isEmpty) {
+        userFilters.add(["==", ["get", "id"], -1]); 
+      } else {
+        userFilters.add(["in", ["get", "name"], ["literal", savedRestaurantNames.toList()]]);
+      }
+    }
+
+    if (_selectedPrices.isNotEmpty) {
+      userFilters.add(["in", ["get", "price"], ["literal", _selectedPrices.toList()]]);
+    }
+
+    if (_selectedMichelin.isNotEmpty) {
+      List<dynamic> michelinOr = ["any"]; 
+      if (_selectedMichelin.contains("Bib Gourmand")) michelinOr.add(bibCheck);
+      if (_selectedMichelin.contains("1 Star")) michelinOr.add(["==", starsVal, 1]);
+      if (_selectedMichelin.contains("2 Stars")) michelinOr.add(["==", starsVal, 2]);
+      if (_selectedMichelin.contains("3 Stars")) michelinOr.add(["==", starsVal, 3]);
+      userFilters.add(michelinOr);
+    }
+
+    // 🌟 THE FIX: "Open Now" Engine
+    if (showOpenOnly) {
+       List<int> openIds = [];
+       final nycTime = DateTime.now().toUtc().subtract(const Duration(hours: 4)); 
+       
+       _restaurantHours.forEach((id, hoursString) {
+          if (OSMTimeParser.isOpen(hoursString, nycTime)) {
+             openIds.add(int.parse(id));
+          }
+       });
+
+       if (openIds.isEmpty) {
+          userFilters.add(["==", ["get", "id"], -1]); 
+       } else {
+          userFilters.add(["in", ["get", "id"], ["literal", openIds]]);
+       }
+    }
+
+    // 🌟 THE FIX: Flatten the array so Mapbox doesn't crash on nested "all" statements
+    List<dynamic> combine(List<dynamic> base) {
+      if (userFilters.length == 1) return base;
+      return ["all", base, ...userFilters.sublist(1)];
+    }
+
+    try {
+      bool hasActiveFilters = userFilters.length > 1;
+      final hideCommand = ["==", ["get", "id"], -1];
+
+      if (hasActiveFilters) {
+        // 1. HIDE DEFAULT HIERARCHY
+        await _mapboxController?.style.setStyleLayerProperty("cluster-circles", "filter", hideCommand);
+        await _mapboxController?.style.setStyleLayerProperty("cluster-text", "filter", hideCommand);
+        await _mapboxController?.style.setStyleLayerProperty("regular-bubbles", "filter", hideCommand);
+        await _mapboxController?.style.setStyleLayerProperty("heroes-bib-bubbles", "filter", hideCommand);
+        await _mapboxController?.style.setStyleLayerProperty("heroes-1-bubbles", "filter", hideCommand);
+
+        // 2. SHOW OVERRIDE LAYERS GLOBALLY
+        await _mapboxController?.style.setStyleLayerProperty("filtered-regular-bubbles", "filter", combine(regularBase));
+        await _mapboxController?.style.setStyleLayerProperty("filtered-bib-bubbles", "filter", combine(bibBase));
+        await _mapboxController?.style.setStyleLayerProperty("filtered-1-bubbles", "filter", combine(star1Base));
+        await _mapboxController?.style.setStyleLayerProperty("heroes-3-2-bubbles", "filter", combine(star32Base)); 
+      } else {
+        // 1. RESTORE DEFAULT HIERARCHY
+        await _mapboxController?.style.setStyleLayerProperty("cluster-circles", "filter", clusterBase);
+        await _mapboxController?.style.setStyleLayerProperty("cluster-text", "filter", clusterBase);
+        await _mapboxController?.style.setStyleLayerProperty("regular-bubbles", "filter", regularBase);
+        await _mapboxController?.style.setStyleLayerProperty("heroes-bib-bubbles", "filter", bibBase);
+        await _mapboxController?.style.setStyleLayerProperty("heroes-1-bubbles", "filter", star1Base);
+        await _mapboxController?.style.setStyleLayerProperty("heroes-3-2-bubbles", "filter", star32Base);
+
+        // 2. HIDE OVERRIDE LAYERS
+        await _mapboxController?.style.setStyleLayerProperty("filtered-regular-bubbles", "filter", hideCommand);
+        await _mapboxController?.style.setStyleLayerProperty("filtered-bib-bubbles", "filter", hideCommand);
+        await _mapboxController?.style.setStyleLayerProperty("filtered-1-bubbles", "filter", hideCommand);
+      }
+    } catch (e) {
+      debugPrint("🚨 Filter Update Error: $e");
+    }
+  }
+
   @override
-  Widget build(BuildContext context) {
+  build(BuildContext context) {
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       statusBarIconBrightness: isDarkMode ? Brightness.light : Brightness.dark,
@@ -1176,206 +1249,199 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       floatingActionButtonLocation: FloatingActionButtonLocation.startFloat, 
       body: Stack(
         children: [
-          // --- MAP LAYER ---
-          GestureDetector(
-            onDoubleTapDown: (details) {
-              final latlng = _mapController.camera.pointToLatLng(Point(details.localPosition.dx, details.localPosition.dy));
-              _animatedMapMove(latlng, min(_mapController.camera.zoom + 1, 18.0));
+          // --- 1. MAP LAYER ---
+          MapWidget(
+            key: const ValueKey("mapboxWidget"),
+            cameraOptions: initialCamera,
+            // 🌟 Use STANDARD instead of LIGHT to keep the vibrant colors
+            styleUri: isDarkMode ? MapboxStyles.DARK : MapboxStyles.STANDARD, 
+            onMapCreated: (MapboxMap map) {
+              _mapboxController = map; 
+              
+              // 🌟 THE FIX: Added the 's' to GesturesSettings
+              _mapboxController?.gestures.updateSettings(GesturesSettings(
+                pitchEnabled: false,
+              ));
+
+              // 🌟 Hide the Scale Bar
+              _mapboxController?.scaleBar.updateSettings(ScaleBarSettings(
+                enabled: false,
+              ));
+
+              // 🌟 Move the Compass down to clear the Search Pill
+              _mapboxController?.compass.updateSettings(CompassSettings(
+                position: OrnamentPosition.TOP_RIGHT,
+                marginTop: 100.0, 
+              ));
+
+              // 🌟 Move the Mapbox Logo up to clear the Passport button
+              _mapboxController?.logo.updateSettings(LogoSettings(
+                position: OrnamentPosition.BOTTOM_LEFT,
+                marginBottom: 90.0,
+              ));
+
+              // 🌟 Move the Attribution 'i' next to the Logo
+              _mapboxController?.attribution.updateSettings(AttributionSettings(
+                position: OrnamentPosition.BOTTOM_LEFT,
+                marginBottom: 90.0,
+                marginLeft: 90.0, // Adjusted slightly to sit perfectly next to the logo
+              ));
             },
-            child: FlutterMap(
-              mapController: _mapController,
-              options: MapOptions(initialCenter: const LatLng(40.735, -73.99), initialZoom: 12.5, backgroundColor: Colors.transparent, interactionOptions: const InteractionOptions(flags: InteractiveFlag.all & ~InteractiveFlag.doubleTapZoom)),
-              children: [
-                TileLayer(
-                  urlTemplate: isDarkMode ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png' : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png',
-                  subdomains: const ['a', 'b', 'c'], retinaMode: true,
-                  tileProvider: CachedTileProvider(), 
-                ),
-                MarkerClusterLayerWidget(
-                  options: MarkerClusterLayerOptions(
-                    maxClusterRadius: 45, size: const Size(40, 40), alignment: Alignment.center, padding: const EdgeInsets.all(50),
-                    markers: _buildMarkers(),
-                    onClusterTap: (cluster) => _mapController.fitCamera(CameraFit.bounds(bounds: LatLngBounds.fromPoints(cluster.markers.map((m) => m.point).toList()), padding: const EdgeInsets.all(50))),
-                    builder: (context, markers) => Container(
-                      decoration: BoxDecoration(color: isDarkMode ? Colors.white : Colors.black, shape: BoxShape.circle, border: Border.all(color: isDarkMode ? Colors.black : Colors.white, width: 2)),
-                      child: Center(child: FittedBox(child: Padding(padding: const EdgeInsets.all(4.0), child: Text(_formatClusterCount(markers.length), style: TextStyle(color: isDarkMode ? Colors.black : Colors.white, fontWeight: FontWeight.bold, fontSize: 14))))),
-                    ),
+            onTapListener: _handleMapTap,
+            onStyleImageMissingListener: (StyleImageMissingEventData event) async {
+              final String missingId = event.id; 
+              if (!missingId.startsWith("pill-")) return;
+              final parts = missingId.split("-");
+              if (parts.length >= 4) {
+                final int stars = int.tryParse(parts.last) ?? 0;
+                final String ringType = parts[parts.length - 2];
+                final String cuisine = parts.sublist(1, parts.length - 2).join("-");
+                // The PillCache naturally respects the isDarkMode flag!
+                final pillData = await PillCache.getOrGeneratePill(missingId, cuisine, ringType, stars, isDarkMode);
+                await _mapboxController?.style.addStyleImage(
+                  missingId, 1.0, MbxImage(width: pillData.width, height: pillData.height, data: pillData.data), 
+                  false, [], [], null
+                );
+              }
+            },
+            onStyleLoadedListener: (StyleLoadedEventData data) {
+              // 1. Instantly rebuild the data layers on top of the new base map
+              if (_vaultPaths != null) _setupMapboxLayers(_vaultPaths!); 
+              
+              // 2. 🌟 THE FIX: Only jump the camera on the very first app launch
+              if (!_hasPerformedInitialCameraFly) {
+                _hasPerformedInitialCameraFly = true;
+                _mapboxController?.flyTo(
+                  CameraOptions(
+                    center: myLocation != null 
+                      ? Point(coordinates: Position(myLocation!.longitude, myLocation!.latitude))
+                      : targetCamera.center,
+                    zoom: 14.0,
                   ),
-                ),
-                if (myLocation != null) MarkerLayer(markers: [Marker(point: myLocation!, width: 20, height: 20, child: Container(decoration: BoxDecoration(color: Colors.blue, shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 3), boxShadow: [BoxShadow(color: Colors.blue.withOpacity(0.4), blurRadius: 10, spreadRadius: 2)])))]),
-              ],
-            ),
+                  MapAnimationOptions(duration: 1500), 
+                );
+              }
+            },
           ),
-
-          // 🌟 NEW: FIRST LOAD PREMIUM PROGRESS BAR
-          if (isLoading && allRestaurants.isEmpty)
-            Positioned.fill(
-              child: Container(
-                color: isDarkMode ? const Color(0xFF121212) : const Color(0xFFF9F9F9),
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const CupertinoActivityIndicator(radius: 14),
-                      const SizedBox(height: 16),
-                      // ... inside the first load loading block
-                      SizedBox(
-                        width: 200,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: LinearProgressIndicator(
-                            // 👈 UPDATE THIS TO USE THE DISPLAY COUNT
-                            value: _displayFetchedCount / 36252, 
-                            backgroundColor: Colors.grey.withOpacity(0.2),
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              isDarkMode ? Colors.white : Colors.black,
-                            ),
-                            minHeight: 4,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        // 👈 UPDATE THIS TO USE THE DISPLAY COUNT
-                        "Fetching $_displayFetchedCount of 36252 restaurants...",
-                        style: TextStyle(
-                          color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                          fontSize: 12,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-          // --- EMPTY STATE ---
-          if (!isLoading && !hasError && visibleRestaurants.isEmpty)
-             Positioned.fill(
-              child: Stack(
-                children: [
-                  BackdropFilter(filter: ImageFilter.blur(sigmaX: 5.0, sigmaY: 5.0), child: Container(color: Colors.black.withOpacity(0.0))),
-                  Center(
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 40), padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-                      decoration: BoxDecoration(color: isDarkMode ? const Color(0xFF1E1E1E).withOpacity(0.85) : Colors.white.withOpacity(0.85), borderRadius: BorderRadius.circular(25), border: Border.all(color: isDarkMode ? Colors.white12 : Colors.white54, width: 1), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 30, spreadRadius: 10)]),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.explore_off_rounded, size: 48, color: isDarkMode ? Colors.grey[400] : Colors.grey[500]),
-                          const SizedBox(height: 16),
-                          Text("No Spots Found", style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: isDarkMode ? Colors.white : Colors.black)),
-                          const SizedBox(height: 8),
-                          Text(_getNoResultsMessage(), textAlign: TextAlign.center, style: TextStyle(color: isDarkMode ? Colors.grey[400] : Colors.grey[600], fontSize: 16)),
-                          const SizedBox(height: 24),
-                          TextButton(
-                            style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12), backgroundColor: isDarkMode ? Colors.white : Colors.black, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30))),
-                            onPressed: () => setState(() { selectedCategory = null; selectedRestaurantName = null; _selectedMichelin.clear(); _selectedPrices.clear(); showOpenOnly = false; savedOnly = false; _showVegetarian = false; _showVegan = false; _fetchRestaurants(); }),
-                            child: Text("Clear Filters", style: TextStyle(color: isDarkMode ? Colors.black : Colors.white, fontWeight: FontWeight.bold)),
-                          )
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-          // --- LOADING / ERROR ---
-          if (hasError) Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(Icons.wifi_off, size: 64, color: Colors.grey), const SizedBox(height: 16), const Text("No Connection", style: TextStyle(fontSize: 20)), ElevatedButton(onPressed: _fetchRestaurants, child: const Text("Retry"))])),
           
-          // --- UI: SEARCH & FILTER BAR ---
-          if (!hasError)
-          Align(
-            alignment: Alignment.topCenter,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 600),
-              child: SafeArea(
-                child: Column(
-                  children: [
-                    GestureDetector(
-                      key: _searchKey, 
-                      onTap: _openSearchPage,
-                      child: Container(
-                        margin: const EdgeInsets.all(16), 
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-                        decoration: BoxDecoration(
-                          color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white, 
-                          borderRadius: BorderRadius.circular(10), 
-                          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 20, offset: const Offset(0, 5))]
-                        ),
-                        child: Row(
+          // ===================================================================
+          // 2. UI: DYNAMIC PILL SEARCH BAR & FILTERS
+          // ===================================================================
+                  Align(
+                    alignment: Alignment.topCenter,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 600),
+                      child: SafeArea(
+                        child: Column(
                           children: [
-                            Icon(Icons.search, color: isDarkMode ? Colors.white : Colors.black),
-                            const SizedBox(width: 8),
-                            
-                            Expanded(
-                              child: (selectedCategory == null && selectedRestaurantName == null)
-                                  ? SizedBox(
-                                      height: 24, 
-                                      child: AnimatedSwitcher(
-                                        duration: const Duration(milliseconds: 800), 
+                            Container(
+                              key: _searchKey, // 🌟 THE FIX: Put the tutorial key back!
+                              margin: const EdgeInsets.fromLTRB(16, 20, 16, 6), 
+                              height: 64, 
+                              // ... (Keep the rest of your beautiful styling exactly as is)
+                      padding: const EdgeInsets.only(left: 24, right: 12), 
+                      decoration: BoxDecoration(
+                      // 🌟 1. Lighten the dark mode grey slightly (from 2C2C2E to 3A3A3C)
+                      color: isDarkMode ? const Color(0xFF3A3A3C) : Colors.white,
+                      borderRadius: BorderRadius.circular(100), 
+                      
+                      // 🌟 2. The "Hairline Border" (Only visible in Dark Mode)
+                      border: isDarkMode 
+                          ? Border.all(color: Colors.white.withOpacity(0.15), width: 1.0) 
+                          : null,
+                          
+                      boxShadow: [
+                        BoxShadow(
+                          // 🌟 3. Make the dark mode shadow much wider and darker to create a "void" around the pill
+                          color: Colors.black.withOpacity(isDarkMode ? 0.4 : 0.12), 
+                          blurRadius: isDarkMode ? 24 : 12, 
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.search, size: 22, color: isDarkMode ? Colors.white : Colors.black),
+                          const SizedBox(width: 14), 
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: _openSearchPage,
+                              child: Container(
+                                color: Colors.transparent, 
+                                child: (selectedCategory == null && selectedRestaurantName == null)
+                                    ? AnimatedSwitcher(
+                                        duration: const Duration(milliseconds: 400),
+                                        transitionBuilder: (Widget child, Animation<double> animation) {
+                                          return FadeTransition(
+                                            opacity: animation,
+                                            child: SlideTransition(
+                                              position: Tween<Offset>(begin: const Offset(-0.03, 0), end: Offset.zero).animate(animation),
+                                              child: Align(alignment: Alignment.centerLeft, child: child),
+                                            ),
+                                          );
+                                        },
                                         child: Text(
-                                          _searchPhrases[_currentPhraseIndex], 
-                                          key: ValueKey(_searchPhrases[_currentPhraseIndex]), 
-                                          style: const TextStyle(color: Colors.grey, fontSize: 16, fontWeight: FontWeight.w500)
-                                        )
+                                          _searchPhrases[_currentPhraseIndex],
+                                          key: ValueKey(_searchPhrases[_currentPhraseIndex]),
+                                          style: TextStyle(color: isDarkMode ? Colors.white70 : Colors.black.withOpacity(0.6), fontSize: 17, fontFamily: 'SF Pro Text', fontWeight: FontWeight.w600, letterSpacing: -0.4),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
                                       )
-                                    )
-                                  : Text(
-                                      selectedRestaurantName != null ? "Searching: \"$selectedRestaurantName\"" : "Filtering: $selectedCategory", 
-                                      style: TextStyle(color: isDarkMode ? Colors.white : Colors.black, fontSize: 16, fontWeight: FontWeight.bold), 
-                                      overflow: TextOverflow.ellipsis
-                                    ),
-                            ),
-
-                            if (selectedCategory != null || selectedRestaurantName != null)
-                              GestureDetector(
-                                onTap: () => setState(() { selectedCategory = null; selectedRestaurantName = null; }), 
-                                child: Container(
-                                  padding: const EdgeInsets.all(4), 
-                                  margin: const EdgeInsets.only(left: 8), 
-                                  decoration: BoxDecoration(color: Colors.grey.withOpacity(0.2), shape: BoxShape.circle), 
-                                  child: Icon(Icons.close, size: 16, color: isDarkMode ? Colors.white : Colors.black)
-                                )
+                                      : Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: Text(
+                                          // 🌟 THE FIX: Pass the raw category through the visual formatter!
+                                          selectedRestaurantName != null 
+                                              ? "Searching: \"$selectedRestaurantName\"" 
+                                              : "Filtering: ${_formatCategoryDisplay(selectedCategory!)}",
+                                          style: TextStyle(color: isDarkMode ? Colors.white : Colors.black, fontSize: 17, fontFamily: 'SF Pro Text', fontWeight: FontWeight.w800, letterSpacing: -0.4),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
                               ),
+                            ),
+                          ),
 
-                            const SizedBox(width: 8),
-
+                          // 🌟 CLEAR BUTTON
+                          if (selectedCategory != null || selectedRestaurantName != null)
                             GestureDetector(
-                              key: _profileKey, 
-                              onTap: () async {
-                                await openProfileScreen(
-                                  context, 
-                                  name: _userName,
-                                  photoUrl: _userPhotoUrl,
-                                  gender: _userGender,
-                                  age: _userAge
-                                );
-                                
-                                await _fetchUserProfile(forceRefresh: true);
+                              onTap: () {
+                                HapticFeedback.mediumImpact(); 
+                                setState(() {
+                                  selectedCategory = null;
+                                  selectedRestaurantName = null;
+                                });
+                                _fetchRestaurants(); // 🌟 Instantly syncs the map back to default!
                               },
                               child: Container(
-                                width: 32,
-                                height: 32,
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[300],
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: Colors.white, width: 1.5),
-                                ),
-                                child: ClipOval(
-                                  child: _buildAvatarContent(),
-                                ),
+                                padding: const EdgeInsets.all(6),
+                                margin: const EdgeInsets.only(right: 8),
+                                decoration: BoxDecoration(color: isDarkMode ? Colors.white10 : Colors.black12, shape: BoxShape.circle),
+                                child: Icon(Icons.close, size: 16, color: isDarkMode ? Colors.white : Colors.black),
                               ),
                             ),
-                          ],
-                        ),
+
+                          // PROFILE AVATAR
+                          GestureDetector(
+                            key: _profileKey,
+                            onTap: () async {
+                              HapticFeedback.lightImpact(); 
+                              await openProfileScreen(context, name: _userName, photoUrl: _userPhotoUrl, gender: _userGender, age: _userAge);
+                              await _fetchUserProfile(forceRefresh: true);
+                            },
+                            child: Container(
+                              width: 44, height: 44,
+                              decoration: BoxDecoration(color: Colors.grey[200], shape: BoxShape.circle, border: Border.all(color: isDarkMode ? Colors.white12 : Colors.black.withOpacity(0.05), width: 1)),
+                              child: ClipOval(child: _buildAvatarContent()),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
 
                     _buildSystemStatus(),
 
+                    // 🌟 HORIZONTAL FILTER BAR (Hooked up to fetchRestaurants)
                     MapFilterBar(
                       isDarkMode: isDarkMode,
                       showOpenOnly: showOpenOnly,
@@ -1385,11 +1451,11 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
                       selectedMichelin: _selectedMichelin,
                       selectedPrices: _selectedPrices,
                       onOpenChanged: (v) { setState(() => showOpenOnly = v); _fetchRestaurants(); },
-                      onSavedChanged: (v) => setState(() => savedOnly = v),
-                      onVegChanged: (v) => setState(() => _showVegetarian = v),
-                      onVeganChanged: (v) => setState(() => _showVegan = v),
-                      onMichelinChanged: (v) => setState(() => _selectedMichelin = v),
-                      onPriceChanged: (v) => setState(() => _selectedPrices = v),
+                      onSavedChanged: (v) { setState(() => savedOnly = v); _fetchRestaurants(); },
+                      onVegChanged: (v) { setState(() => _showVegetarian = v); _fetchRestaurants(); },
+                      onVeganChanged: (v) { setState(() => _showVegan = v); _fetchRestaurants(); },
+                      onMichelinChanged: (v) { setState(() => _selectedMichelin = v); _fetchRestaurants(); },
+                      onPriceChanged: (v) { setState(() => _selectedPrices = v); _fetchRestaurants(); },
                     ),
                   ],
                 ),
@@ -1397,8 +1463,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
             ),
           ),
 
-          // --- BOTTOM RIGHT BUTTONS ---
-          if (!hasError)
+          // ===================================================================
+          // 3. BOTTOM RIGHT BUTTONS
+          // ===================================================================
           Align(
             alignment: Alignment.bottomRight,
             child: SafeArea(
@@ -1423,7 +1490,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
             ),
           ),
 
-          // 🌟 NEW: JUMPING TO LOCATION OVERLAY
+          // ===================================================================
+          // 4. OVERLAYS
+          // ===================================================================
           if (_isJumpingToLocation)
             Positioned.fill(
               child: Container(
@@ -1433,9 +1502,45 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
                 ),
               ),
             ),
+
+          if (_isBuildingVault)
+            Positioned.fill(
+              child: Container(
+                color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const CupertinoActivityIndicator(radius: 20),
+                    const SizedBox(height: 24),
+                    Text(
+                      "Stamping your initial visa...",
+                      style: TextStyle(
+                        fontFamily: 'AppleGaramond',
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        fontStyle: FontStyle.italic,
+                        color: isDarkMode ? Colors.white : Colors.black,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      "Securing local coordinates. This only happens once.",
+                      style: TextStyle(
+                        color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
       
+      // =======================================================================
+      // 5. FAB (PASSPORT)
+      // =======================================================================
       floatingActionButton: FloatingActionButton(
         key: _passportKey, 
         backgroundColor: Colors.amber,
@@ -1455,7 +1560,62 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
   }
 }
 
-// 🛠️ THIS MUST LIVE OUTSIDE OF ANY CLASS
-List<Restaurant> parseRestaurantsInBackground(List<dynamic> responseData) {
-  return responseData.map((json) => Restaurant.fromMap(json)).toList();
+// Put this at the very bottom of map_screen.dart
+class OSMTimeParser {
+  static bool isOpen(String hoursStr, DateTime now) {
+    if (hoursStr.contains('24/7')) return true;
+    
+    final days = ['mo', 'tu', 'we', 'th', 'fr', 'sa', 'su'];
+    final todayIdx = now.weekday - 1;
+    final todayStr = days[todayIdx];
+    final currentMinutes = now.hour * 60 + now.minute;
+    
+    final lowerStr = hoursStr.toLowerCase();
+    
+    // 1. Check if the string applies to today
+    final hasDays = RegExp(r'[a-z]{2}').hasMatch(lowerStr);
+    bool matchesDay = false;
+    
+    if (!hasDays) {
+       matchesDay = true; // No days specified, assume everyday
+    } else {
+       if (lowerStr.contains(todayStr)) {
+         matchesDay = true;
+       } else {
+         // Check ranges like "mo-fr" or "fr-su"
+         final rangeReg = RegExp(r'([a-z]{2})\s*-\s*([a-z]{2})');
+         for (final match in rangeReg.allMatches(lowerStr)) {
+            final d1 = days.indexOf(match.group(1)!);
+            final d2 = days.indexOf(match.group(2)!);
+            if (d1 != -1 && d2 != -1) {
+               if (d1 <= d2 && todayIdx >= d1 && todayIdx <= d2) matchesDay = true;
+               else if (d1 > d2 && (todayIdx >= d1 || todayIdx <= d2)) matchesDay = true; // Crosses Sunday
+            }
+         }
+       }
+    }
+    
+    if (!matchesDay) return false;
+    
+    // 2. Extract times and check cross-midnight logic
+    final timeReg = RegExp(r'(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})');
+    final matches = timeReg.allMatches(lowerStr);
+    
+    if (matches.isEmpty) return true; // Unparseable, default to open
+    
+    for (final m in matches) {
+      final start = int.parse(m.group(1)!) * 60 + int.parse(m.group(2)!);
+      int end = int.parse(m.group(3)!) * 60 + int.parse(m.group(4)!);
+      
+      if (end < start) end += 24 * 60; // Opens past midnight
+      
+      int checkTime = currentMinutes;
+      if (currentMinutes < start && end > 24*60 && currentMinutes < (end - 24*60)) {
+         checkTime += 24 * 60; // Push current time to "tomorrow" context
+      }
+      
+      if (checkTime >= start && checkTime <= end) return true;
+    }
+    return false;
+  }
 }

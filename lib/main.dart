@@ -8,6 +8,9 @@ import 'services/revenuecat_service.dart';
 import 'package:flutter/services.dart'; 
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
+// 👇 1. ADD THE MAPBOX IMPORT HERE
+import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
@@ -31,6 +34,10 @@ Future<void> main() async {
     }
   });
 
+  
+  // OR, if you just want to hardcode it for this test branch:
+  // Load the PUBLIC key from your .env file
+  MapboxOptions.setAccessToken(dotenv.env['MAPBOX_PUBLIC_KEY'] ?? '');
   runApp(const NycEatsApp());
 }
 
@@ -46,10 +53,8 @@ class NycEatsApp extends StatelessWidget {
         brightness: Brightness.light, 
         scaffoldBackgroundColor: Colors.black,
         useMaterial3: true,
-        // 👇 Set the default fallback font for the entire app
-        fontFamily: 'SFPro', // (Or omit if you want the native iOS system font)
+        fontFamily: 'SFPro', 
       ),
-      // 👇 2. SET THE HOME SCREEN TO YOUR NEW SPLASH SCREEN
       home: const SplashScreen(), 
     );
   }

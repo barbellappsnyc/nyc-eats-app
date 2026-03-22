@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart'; // 🌟 ADDED FOR NATIVE iOS LOADER
 import '../models/restaurant.dart';
-import '../config/constants.dart'; // <--- 🌟 IMPORT YOUR CONSTANTS FILE
+import '../config/constants.dart'; 
+import 'dart:async'; 
+import 'package:supabase_flutter/supabase_flutter.dart'; 
 
 class SearchScreen extends StatefulWidget {
-  final List<Restaurant> allRestaurants;
   final List<String> availableCategories;
   final bool isDarkMode;
   final Function(String category) onCategorySelected;
@@ -11,7 +13,6 @@ class SearchScreen extends StatefulWidget {
 
   const SearchScreen({
     super.key,
-    required this.allRestaurants,
     required this.availableCategories,
     required this.isDarkMode,
     required this.onCategorySelected,
@@ -27,8 +28,11 @@ class _SearchScreenState extends State<SearchScreen> {
   final FocusNode _searchFocus = FocusNode();
   
   List<Restaurant> _filteredRestaurants = [];
-  List<String> _filteredCategories = []; // 👈 ADD THIS NEW VARIABLE
+  List<String> _filteredCategories = []; 
   String _query = "";
+  
+  Timer? _debounce;
+  bool _isSearchingDB = false;
   
   @override
   void initState() {
@@ -36,53 +40,86 @@ class _SearchScreenState extends State<SearchScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       FocusScope.of(context).requestFocus(_searchFocus);
     });
+    _filteredCategories = widget.availableCategories;
   }
 
   @override
   void dispose() {
+    _debounce?.cancel(); 
     _searchController.dispose();
     _searchFocus.dispose();
     super.dispose();
   }
 
+  String _formatCategoryName(String category) {
+    return category
+        .split('_')
+        .map((word) => word.isNotEmpty 
+            ? '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}' 
+            : '')
+        .join(' ');
+  }
+
   void _onSearchChanged(String query) {
     setState(() {
       _query = query;
+      
       if (query.isEmpty) {
         _filteredRestaurants = [];
-        _filteredCategories = []; // 👈 Reset this too
+        _filteredCategories = widget.availableCategories; 
+        _isSearchingDB = false;
+        _debounce?.cancel();
       } else {
-        // 1. Filter Restaurants
-        _filteredRestaurants = widget.allRestaurants.where((r) {
-          final nameMatch = r.name.toLowerCase().contains(query.toLowerCase());
-          final cuisineMatch = r.cuisine.toLowerCase().contains(query.toLowerCase());
-          return nameMatch || cuisineMatch;
+        _filteredCategories = widget.availableCategories.where((c) {
+          return _formatCategoryName(c).toLowerCase().contains(query.toLowerCase());
         }).toList();
 
-        // 2. 👈 NEW: Filter Categories
-        _filteredCategories = widget.availableCategories.where((c) {
-          return c.toLowerCase().contains(query.toLowerCase());
-        }).toList();
+        if (_debounce?.isActive ?? false) _debounce!.cancel();
+        
+        setState(() => _isSearchingDB = true); 
+        
+        _debounce = Timer(const Duration(milliseconds: 500), () {
+          _searchSupabase(query);
+        });
       }
     });
   }
 
-  // 🌟 NEW: Helper to look up emoji from your constant file
+  Future<void> _searchSupabase(String searchQuery) async {
+    try {
+      final data = await Supabase.instance.client
+          .from('restaurants')
+          .select()
+          .ilike('name', '%$searchQuery%') 
+          .limit(20);
+
+      if (mounted) {
+        setState(() {
+          _filteredRestaurants = data.map((json) => Restaurant.fromMap(json)).toList();
+          _isSearchingDB = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("🚨 Search Query Error: $e");
+      if (mounted) setState(() => _isSearchingDB = false);
+    }
+  }
+  
   String? _getEmojiForCategory(String category) {
-    // 1. Try exact match
+    if (category.toLowerCase() == 'hot_dog' || category.toLowerCase() == 'hot dog') {
+      return '🌭';
+    }
+
     if (categoryFlags.containsKey(category)) {
       return categoryFlags[category];
     }
     
-    // 2. Try case-insensitive match
-    // (Your map has keys like "Italian", but data might be "italian")
     final key = categoryFlags.keys.firstWhere(
       (k) => k.toLowerCase() == category.toLowerCase(), 
       orElse: () => ""
     );
     if (key.isNotEmpty) return categoryFlags[key];
 
-    // 3. Try partial match (e.g. "Italian Pizza" -> matches "Pizza")
     for (var entry in categoryFlags.entries) {
       if (category.toLowerCase().contains(entry.key.toLowerCase())) {
         return entry.value;
@@ -104,7 +141,6 @@ class _SearchScreenState extends State<SearchScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // --- TOP SEARCH BAR AREA ---
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Row(
@@ -146,8 +182,6 @@ class _SearchScreenState extends State<SearchScreen> {
                 ],
               ),
             ),
-
-            // --- CONTENT AREA ---
             Expanded(
               child: _query.isEmpty
                   ? _buildCategoriesList(textColor, isDark)
@@ -194,11 +228,11 @@ class _SearchScreenState extends State<SearchScreen> {
                     shape: BoxShape.circle,
                   ),
                   child: emoji != null
-                      ? Text(emoji, style: const TextStyle(fontSize: 24)) // 🌟 Clean, large emoji
+                      ? Text(emoji, style: const TextStyle(fontSize: 24)) 
                       : Icon(Icons.restaurant, size: 20, color: textColor),
                 ),
                 title: Text(
-                  cat, 
+                  _formatCategoryName(cat), 
                   style: TextStyle(
                     color: textColor, 
                     fontSize: 16, 
@@ -206,7 +240,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   )
                 ),
                 onTap: () {
-                  widget.onCategorySelected(cat);
+                  widget.onCategorySelected(cat); 
                   Navigator.pop(context);
                 },
               );
@@ -218,7 +252,14 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildSearchResults(Color textColor, bool isDark) {
-    if (_filteredRestaurants.isEmpty && _filteredCategories.isEmpty) {
+    if (_isSearchingDB && _filteredRestaurants.isEmpty) {
+      return const Center(
+        // 🌟 THE FIX: Replaced standard Material loader with the native iOS spinner
+        child: CupertinoActivityIndicator(radius: 16),
+      );
+    }
+
+    if (!_isSearchingDB && _filteredRestaurants.isEmpty && _filteredCategories.isEmpty) {
       return Center(
         child: Text("No results found", style: TextStyle(color: textColor)),
       );
@@ -227,7 +268,6 @@ class _SearchScreenState extends State<SearchScreen> {
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: 8),
       children: [
-        // --- 🌍 MATCHING CUISINES SECTION ---
         if (_filteredCategories.isNotEmpty) ...[
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
@@ -251,20 +291,21 @@ class _SearchScreenState extends State<SearchScreen> {
                     ? Text(emoji, style: const TextStyle(fontSize: 24))
                     : Icon(Icons.restaurant, size: 20, color: textColor),
               ),
-              title: Text(cat, style: TextStyle(color: textColor, fontSize: 16, fontWeight: FontWeight.w500)),
+              title: Text(
+                _formatCategoryName(cat), 
+                style: TextStyle(color: textColor, fontSize: 16, fontWeight: FontWeight.w500)
+              ),
               onTap: () {
-                widget.onCategorySelected(cat);
+                widget.onCategorySelected(cat); 
                 Navigator.pop(context);
               },
             );
           }),
           
-          // Add a divider if we also have restaurants below it
           if (_filteredRestaurants.isNotEmpty)
              Divider(height: 32, color: isDark ? Colors.grey[800] : Colors.grey[200], indent: 24, endIndent: 24),
         ],
 
-        // --- 🍽️ MATCHING RESTAURANTS SECTION ---
         if (_filteredRestaurants.isNotEmpty) ...[
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
@@ -275,10 +316,10 @@ class _SearchScreenState extends State<SearchScreen> {
           ),
           ..._filteredRestaurants.map((r) {
             return ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4), // Added padding to align with cuisines
+              contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4), 
               title: Text(r.name, style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
               subtitle: Text(
-                "${r.cuisine} • ${r.price}",
+                "${_formatCategoryName(r.cuisine)} • ${r.price}", 
                 style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600]),
               ),
               leading: Container(

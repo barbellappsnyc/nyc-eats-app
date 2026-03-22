@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 class MapFilterBar extends StatefulWidget {
@@ -164,17 +166,18 @@ class _MapFilterBarState extends State<MapFilterBar> {
       },
       {
         'selected': widget.selectedMichelin.isNotEmpty,
-        'widget': FilterChip(
-          label: _buildMichelinLabelContent(),
-          avatar: widget.selectedMichelin.isEmpty ? Icon(Icons.star, size: 16, color: isDark ? Colors.white : Colors.black) : null,
-          selected: widget.selectedMichelin.isNotEmpty,
-          showCheckmark: false,
-          onSelected: (_) => _showMultiSelectSheet(title: "Michelin Rating", options: ["Bib Gourmand", "1 Star", "2 Stars", "3 Stars"], currentSelection: widget.selectedMichelin, onApply: (s) { widget.onMichelinChanged(s); _scrollToStart(); }),
-          backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
-          selectedColor: isDark ? Colors.white : Colors.black,
-          labelStyle: TextStyle(color: widget.selectedMichelin.isNotEmpty ? (isDark ? Colors.black : Colors.white) : (isDark ? Colors.white : Colors.black), fontWeight: FontWeight.bold),
-          side: BorderSide(color: widget.selectedMichelin.isNotEmpty ? (isDark ? Colors.white : Colors.black) : Colors.transparent, width: 2),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+        'widget': AnimatedMichelinButton(
+          isDarkMode: isDark,
+          selectedMichelin: widget.selectedMichelin,
+          onTap: () => _showMultiSelectSheet(
+            title: "Michelin Rating", 
+            options: ["Bib Gourmand", "1 Star", "2 Stars", "3 Stars"], 
+            currentSelection: widget.selectedMichelin, 
+            onApply: (s) { 
+              widget.onMichelinChanged(s); 
+              _scrollToStart(); 
+            }
+          ),
         )
       },
       {
@@ -229,6 +232,128 @@ class _MapFilterBarState extends State<MapFilterBar> {
       controller: _scrollController,
       padding: const EdgeInsets.only(left: 16),
       child: Row(children: filters.map((f) => Padding(padding: const EdgeInsets.only(right: 8.0), child: f['widget'] as Widget)).toList()),
+    );
+  }
+}
+
+// =========================================================================
+// 🌟 CUSTOM ANIMATED MICHELIN CHIP (The "Cartoon Gleam")
+// =========================================================================
+class AnimatedMichelinButton extends StatefulWidget {
+  final bool isDarkMode;
+  final Set<String> selectedMichelin;
+  final VoidCallback onTap;
+
+  const AnimatedMichelinButton({
+    super.key,
+    required this.isDarkMode,
+    required this.selectedMichelin,
+    required this.onTap,
+  });
+
+  @override
+  State<AnimatedMichelinButton> createState() => _AnimatedMichelinButtonState();
+}
+
+class _AnimatedMichelinButtonState extends State<AnimatedMichelinButton> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    // 2-second loop for the lap
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 2000));
+    
+    // easeInOutCubic creates the "Zap and Slow down" cartoon physics
+    _animation = CurvedAnimation(parent: _controller, curve: Curves.easeInOutCubic);
+    _controller.repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Light mode: Matte Black, Dark mode: Crisp White
+    final bgColor = widget.isDarkMode ? Colors.white : const Color(0xFF1E1E1E);
+    final textColor = widget.isDarkMode ? Colors.black : Colors.white;
+
+    Widget content;
+    if (widget.selectedMichelin.isEmpty) {
+      content = Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.star, size: 16, color: Colors.red),
+          const SizedBox(width: 6),
+          Text("Michelin", style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
+        ],
+      );
+    } else if (widget.selectedMichelin.length > 1) {
+      content = Text("${widget.selectedMichelin.length} Selected", style: TextStyle(color: textColor, fontWeight: FontWeight.bold));
+    } else {
+      String selection = widget.selectedMichelin.first;
+      if (selection == "Bib Gourmand") {
+         content = Row(
+           mainAxisSize: MainAxisSize.min,
+           children: [
+             const Icon(Icons.restaurant, color: Colors.red, size: 16),
+             const SizedBox(width: 6),
+             Text("Bib Gourmand", style: TextStyle(color: textColor, fontWeight: FontWeight.bold))
+           ]
+         );
+      } else {
+         int count = selection.contains("1") ? 1 : selection.contains("2") ? 2 : 3;
+         content = Row(
+           mainAxisSize: MainAxisSize.min,
+           children: [
+             ...List.generate(count, (_) => const Icon(Icons.star, color: Colors.red, size: 16)),
+             const SizedBox(width: 6),
+             Text(selection, style: TextStyle(color: textColor, fontWeight: FontWeight.bold))
+           ]
+         );
+      }
+    }
+
+    return GestureDetector(
+      onTap: widget.onTap,
+      child: AnimatedBuilder(
+        animation: _animation,
+        builder: (context, child) {
+          return Container(
+            // The 2px padding acts as the border width!
+            padding: const EdgeInsets.all(2),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(30),
+              // The spinning SweepGradient creates the gleam
+              gradient: SweepGradient(
+                transform: GradientRotation(_animation.value * 2 * math.pi),
+                colors: const [
+                  Color(0xFFFFD700), // Gold
+                  Color(0xFFFFD700), // Gold
+                  Colors.white,      // 🌟 The bright white zap
+                  Color(0xFFFFD700), // Gold
+                  Color(0xFFFFD700), // Gold
+                ],
+                // Tightly cluster the white stop to make a sharp gleam
+                stops: const [0.0, 0.85, 0.9, 0.95, 1.0], 
+              ),
+            ),
+            child: child, // Inner container
+          );
+        },
+        child: Container(
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: BorderRadius.circular(28),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: content,
+        ),
+      ),
     );
   }
 }
