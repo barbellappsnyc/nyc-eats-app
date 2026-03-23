@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 // 🌟 FIX 1: Added 'as geo' to prevent collisions with Mapbox's Position class
@@ -154,16 +155,17 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       // (You can change this back to false tomorrow)
       _vaultPaths = await VaultBuilder.buildVaultIfNeeded();
       
-      // NEW: Load the Time Dictionary into memory
       if (_vaultPaths != null && _vaultPaths!['hours'] != null) {
         final hoursFile = File(_vaultPaths!['hours']!);
         if (await hoursFile.exists()) {
           final hoursStr = await hoursFile.readAsString();
-          final decoded = jsonDecode(hoursStr) as Map<String, dynamic>;
+          
+          // 🌟 THE FIX: Pass jsonDecode to a background isolate!
+          final decoded = await compute(jsonDecode, hoursStr) as Map<String, dynamic>; 
+          
           _restaurantHours = decoded.map((key, value) => MapEntry(key, value.toString()));
         }
       }
-
       if (_mapboxController != null && _vaultPaths != null) {
         _setupMapboxLayers(_vaultPaths!); 
       }
@@ -971,17 +973,25 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       await _mapboxController?.style.setStyleLayerProperty("filtered-bib-bubbles", "icon-image", dynamicIconImage);
       await _mapboxController?.style.setStyleLayerProperty("filtered-bib-bubbles", "icon-size", dynamicIconSize);
 
-      if (!(await _mapboxController?.style.styleLayerExists("filtered-1-bubbles") ?? false)) {
-        await _mapboxController?.style.addLayer(SymbolLayer(id: "filtered-1-bubbles", sourceId: "heroes-source", minZoom: 1.0, iconAllowOverlap: true, iconPitchAlignment: IconPitchAlignment.VIEWPORT));
-      }
-      await _mapboxController?.style.setStyleLayerProperty("filtered-1-bubbles", "filter", hideCommand);
-      await _mapboxController?.style.setStyleLayerProperty("filtered-1-bubbles", "icon-image", dynamicIconImage);
-      await _mapboxController?.style.setStyleLayerProperty("filtered-1-bubbles", "icon-size", dynamicIconSize);
-
-    } catch (e) {
-      debugPrint("🚨 Layer Error: $e");
+      // ... your existing code ...
+    if (!(await _mapboxController?.style.styleLayerExists("filtered-1-bubbles") ?? false)) {
+      await _mapboxController?.style.addLayer(SymbolLayer(id: "filtered-1-bubbles", sourceId: "heroes-source", minZoom: 1.0, iconAllowOverlap: true, iconPitchAlignment: IconPitchAlignment.VIEWPORT));
     }
+    await _mapboxController?.style.setStyleLayerProperty("filtered-1-bubbles", "filter", hideCommand);
+    await _mapboxController?.style.setStyleLayerProperty("filtered-1-bubbles", "icon-image", dynamicIconImage);
+    await _mapboxController?.style.setStyleLayerProperty("filtered-1-bubbles", "icon-size", dynamicIconSize);
+
+    // 🌟 THE FIX: Force the location puck to be the absolute top layer
+    await _mapboxController?.location.updateSettings(LocationComponentSettings(
+      enabled: true,
+      pulsingEnabled: true,
+      showAccuracyRing: true,
+    ));
+
+  } catch (e) {
+    debugPrint("🚨 Layer Error: $e");
   }
+} // <-- End of _setupMapboxLayers
 
   // =========================================================================
   // 👆 4. THE INTERACTION BRIDGE (Mapbox Tap Listener)
@@ -1258,33 +1268,35 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
             onMapCreated: (MapboxMap map) {
               _mapboxController = map; 
               
-              // 🌟 THE FIX: Added the 's' to GesturesSettings
+              // 🌟 THE NEW CODE: Turn on the native Location Puck!
+              _mapboxController?.location.updateSettings(LocationComponentSettings(
+                enabled: true,
+                pulsingEnabled: true, // Gives it a cool radar pulse effect
+                showAccuracyRing: true, // Shows the transparent circle of GPS accuracy
+              ));
+              
               _mapboxController?.gestures.updateSettings(GesturesSettings(
                 pitchEnabled: false,
               ));
 
-              // 🌟 Hide the Scale Bar
               _mapboxController?.scaleBar.updateSettings(ScaleBarSettings(
                 enabled: false,
               ));
 
-              // 🌟 Move the Compass down to clear the Search Pill
               _mapboxController?.compass.updateSettings(CompassSettings(
                 position: OrnamentPosition.TOP_RIGHT,
                 marginTop: 100.0, 
               ));
 
-              // 🌟 Move the Mapbox Logo up to clear the Passport button
               _mapboxController?.logo.updateSettings(LogoSettings(
                 position: OrnamentPosition.BOTTOM_LEFT,
                 marginBottom: 90.0,
               ));
 
-              // 🌟 Move the Attribution 'i' next to the Logo
               _mapboxController?.attribution.updateSettings(AttributionSettings(
                 position: OrnamentPosition.BOTTOM_LEFT,
                 marginBottom: 90.0,
-                marginLeft: 90.0, // Adjusted slightly to sit perfectly next to the logo
+                marginLeft: 90.0, 
               ));
             },
             onTapListener: _handleMapTap,
