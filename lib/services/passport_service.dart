@@ -375,6 +375,17 @@ class PassportService {
       addStampToCache(bookId, stampData);
       debugPrint("✅ Stamp saved to Cloud DB.");
 
+      // 📡 TELEMETRY: The Ultimate Signal (High Conviction Match)
+      TelemetryService.logInteraction(
+        actionType: 'stamp_collected',
+        metadata: {
+          'restaurant_id': stampData['id'],
+          'restaurant_name': stampData['name'] ?? stampData['restaurant_name'],
+          'cuisine': stampData['cuisine'] ?? stampData['country_cuisine'],
+          'book_id': bookId,
+        }
+      );
+
       // 🆕 CHECK CAPACITY AFTER SAVING
       await checkCapacityAndRotate(bookId);
     } catch (e) {

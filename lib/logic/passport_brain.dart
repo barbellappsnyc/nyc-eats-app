@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:nyc_eats/services/telemetry_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/restaurant.dart';
 import '../services/passport_service.dart';
@@ -149,6 +150,16 @@ class PassportBrain {
 
       // PHASE 4: DEAD END (The Paywall)
       debugPrint("🧠 BRAIN: Dead End. Upgrade required.");
+
+      // 📡 TELEMETRY: Stamp Rejected (User intent blocked by game rules)
+      TelemetryService.logInteraction(
+        actionType: 'stamp_rejected',
+        metadata: {
+          'reason': 'upgrade_required_no_space',
+          'attempted_cuisine': targetCuisine,
+        }
+      );
+
       return BrainDecision.upgradeRequired(
         reason: "No available space for $targetCuisine."
       );
