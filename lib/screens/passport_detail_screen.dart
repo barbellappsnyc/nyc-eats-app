@@ -83,8 +83,13 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
 
   // 📸 PHOTOBOOTH MEMORY VARIABLES
   List<String?> _savedPhotoPaths = [null, null, null, null]; 
-  List<int> _photoRotations = [0, 0, 0, 0]; // 👈 NEW: Tracks 90-degree turns for each slot
+  List<int> _photoRotations = [0, 0, 0, 0]; 
   String _savedDateText = "";
+  
+  // 💌 POSTAGE STAMP MEMORY VARIABLES
+  List<String> _stampPhotoPaths = []; // Holds the user's custom stamp photos
+  bool _isShowingPhotoStamps = false; // (You added this in Step 1)
+  bool _showMiniGallery = false;      // 🌟 NEW: Tracks if the mini-gallery overlay is open
   
   bool _isPassportInTopSlot = true; // 👈 Replaced _isPassportOnLeft
 
@@ -156,6 +161,24 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
       _savedDateText = prefs.getString('${memoryKey}_date') ?? 
           "${_getShortMonth(DateTime.now().month)} ${DateTime.now().day}, ${DateTime.now().year}";
     });
+
+    // --- LOAD POSTAGE STAMP MEMORIES ---
+    final String stampMemoryKey = "custom_stamps_${widget.heroTag}";
+    final List<String> cachedStampNames = prefs.getStringList(stampMemoryKey) ?? [];
+    
+    List<String> validStampPaths = [];
+    for (String fileName in cachedStampNames) {
+      final String fullPath = '$basePath/$fileName';
+      if (File(fullPath).existsSync()) {
+        validStampPaths.add(fullPath);
+      }
+    }
+
+    setState(() {
+      _stampPhotoPaths = validStampPaths;
+      // Only default to showing photos if they actually have enough valid photos saved
+      _isShowingPhotoStamps = _stampPhotoPaths.length >= 3; 
+    });
   }
 
   String _getShortMonth(int month) {
@@ -194,6 +217,112 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
       debugPrint("Image Picker Error: $e");
     } finally {
       setState(() => _loadingSlotIndex = null); // ✅ Finish loading
+    }
+  }
+
+  // 💌 MULTI-IMAGE PICKER FOR CUSTOM STAMPS (APPEND-AWARE)
+  Future<void> _pickStampPhotos() async {
+    try {
+      final List<XFile> images = await _picker.pickMultiImage();
+
+      // 1. If they cancel, do nothing.
+      if (images.isEmpty) return;
+
+      // 2. Calculate available slots (Max 5 total)
+      int availableSlots = 5 - _stampPhotoPaths.length;
+      if (availableSlots <= 0) return; // Failsafe
+
+      // 3. Slice the incoming images so they don't exceed the 5 total limit
+      final List<XFile> validImages = images.length > availableSlots 
+          ? images.sublist(0, availableSlots) 
+          : images;
+
+      // 4. Check the PROJECTED total against the Minimum 3 rule
+      int projectedTotal = _stampPhotoPaths.length + validImages.length;
+      
+      if (projectedTotal < 3) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text("You need at least 3 photos total! 📸"),
+              backgroundColor: Color(0xFFD32F2F),
+              behavior: SnackBarBehavior.floating,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+        return;
+      }
+
+      final directory = await getApplicationDocumentsDirectory();
+      final prefs = await SharedPreferences.getInstance();
+      final String memoryKey = "custom_stamps_${widget.heroTag}";
+
+      // 🌟 THE FIX: Create a brand new list starting with the existing photos
+      // This forces the background to recognize the state change!
+      List<String> newFullPaths = List.from(_stampPhotoPaths);
+
+      // 5. Save the new images and append them to the list
+      for (int i = 0; i < validImages.length; i++) {
+        // Use epoch to guarantee unique filenames when appending
+        final String fileName = '${widget.heroTag}_stamp_${DateTime.now().millisecondsSinceEpoch}_$i.png';
+        final String permanentPath = '${directory.path}/$fileName';
+
+        await File(validImages[i].path).copy(permanentPath);
+        newFullPaths.add(permanentPath); 
+      }
+
+      // 6. Update State and trigger the background rebuild!
+      setState(() {
+        _stampPhotoPaths = newFullPaths;
+        _isShowingPhotoStamps = true; 
+      });
+
+      // 7. Save the updated combined list to device memory
+      List<String> updatedFileNames = _stampPhotoPaths.map((path) => path.split('/').last).toList();
+      await prefs.setStringList(memoryKey, updatedFileNames);
+
+    } catch (e) {
+      debugPrint("🚨 Stamp Multi-Picker Error: $e");
+    }
+  }
+
+  // 🗑️ DELETE CUSTOM STAMP & THE "UNDER 3" NUKE
+  Future<void> _deleteStampPhoto(int index) async {
+    setState(() {
+      // 🌟 THE FIX: We create a brand new list in memory so the background detects the change!
+      List<String> updatedList = List.from(_stampPhotoPaths);
+      updatedList.removeAt(index);
+      _stampPhotoPaths = updatedList;
+
+      // 2. THE NUKE: If they drop below 3, force the background back to emojis!
+      if (_stampPhotoPaths.length < 3 && _isShowingPhotoStamps) {
+        _isShowingPhotoStamps = false; // 🌟 Flips the main switch
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Not enough photos! Switched back to standard stamps. 📮"),
+            backgroundColor: Color(0xFFD32F2F),
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
+    });
+
+    // ... (Keep the rest of the SharedPreferences saving logic exactly as it is)
+
+    // 3. Update device memory so the deleted photo stays gone
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String memoryKey = "custom_stamps_${widget.heroTag}";
+      
+      // We only save the file names to SharedPreferences to prevent path corruption
+      List<String> updatedFileNames = _stampPhotoPaths.map((path) => path.split('/').last).toList();
+      await prefs.setStringList(memoryKey, updatedFileNames);
+      
+    } catch (e) {
+      debugPrint("🚨 Error updating stamp memory: $e");
     }
   }
 
@@ -572,6 +701,63 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
     super.dispose();
   }
 
+  // 🖼️ THE MINI-GALLERY OVERLAY
+  Widget _buildMiniGallery() {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.45),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white.withOpacity(0.15), width: 1),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 1. Draw the existing photos with the JIGGLE
+              ..._stampPhotoPaths.asMap().entries.map((entry) {
+                int idx = entry.key;
+                String path = entry.value;
+                return JigglingThumbnail(
+                  imagePath: path,
+                  onDelete: () {
+                    HapticFeedback.lightImpact();
+                    _deleteStampPhoto(idx);
+                    if (_stampPhotoPaths.isEmpty) {
+                      setState(() => _showMiniGallery = false);
+                    }
+                  },
+                );
+              }),
+
+              // 2. The "Add More" Button (Only shows if under 5 photos)
+              if (_stampPhotoPaths.length < 5)
+                GestureDetector(
+                  onTap: () {
+                    HapticFeedback.mediumImpact();
+                    _pickStampPhotos();
+                  },
+                  child: Container(
+                    width: 56, 
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white30, style: BorderStyle.solid, width: 1),
+                    ),
+                    child: const Icon(CupertinoIcons.add, color: Colors.white, size: 24),
+                  ),
+                )
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
 
@@ -598,12 +784,21 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
        // ...
       Container(color: widget.backgroundColor), 
       BaggageTagBackground(cuisine: widget.cuisine, stamps: widget.stamps), 
+      // ...
       const PizzeriaTableclothBackground(), 
       CoordinateCollageBackground(stamps: widget.stamps), 
+      
+      // 🌟 INJECTED: Passing the photos and the switch state into the background!
       RepaintBoundary(
-        child: PostageStampBackground(cuisine: widget.cuisine), 
+        child: PostageStampBackground(
+          cuisine: widget.cuisine,
+          userPhotoPaths: _stampPhotoPaths,
+          showPhotos: _isShowingPhotoStamps,
+        ), 
       ), 
+      
       MtaBackground( 
+      // ...
         stations: _mtaStations, 
         isDarkMode: _isMtaNightMode, 
         passportPosition: _cardPosition,
@@ -888,6 +1083,12 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
                     ),
                     const SizedBox(height: 20),
                   ],
+
+                  // 🌟 INJECTED: The Mini-Gallery Overlay drops in right above the pill
+                  if (_currentBgIndex == 4 && _showMiniGallery && _stampPhotoPaths.isNotEmpty) ...[
+                    _buildMiniGallery(),
+                    const SizedBox(height: 12),
+                  ],
                   
                   ClipRRect(
                     borderRadius: BorderRadius.circular(40),
@@ -921,7 +1122,41 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
                                   onTap: _shareToStory,
                                 ),
 
+                              // 🌟 INJECTED: The dual-purpose Camera / Stamp Toggle
+                              if (_currentBgIndex == 4)
+                                _buildGroovedButton(
+                                  // Looks like a camera if emojis, looks like a ticket/stamp if photos
+                                  icon: _isShowingPhotoStamps ? CupertinoIcons.ticket_fill : CupertinoIcons.camera_fill,
+                                  color: _isShowingPhotoStamps ? Colors.amber : Colors.white,
+                                  onTap: () {
+                                    HapticFeedback.selectionClick();
+                                    if (_isShowingPhotoStamps) {
+                                      setState(() => _isShowingPhotoStamps = false); // Snap to Emojis
+                                    } else {
+                                      // If they already have 3+ photos saved, just toggle the view instantly
+                                      if (_stampPhotoPaths.length >= 3) {
+                                        setState(() => _isShowingPhotoStamps = true); 
+                                      } else {
+                                        // Otherwise, open the gallery
+                                        _pickStampPhotos();
+                                      }
+                                    }
+                                  },
+                                ),
+
+                              // 🌟 INJECTED: The Gallery Viewer Button (Only appears if photos exist in memory)
+                              if (_currentBgIndex == 4 && _stampPhotoPaths.isNotEmpty)
+                                _buildGroovedButton(
+                                  icon: CupertinoIcons.photo_on_rectangle,
+                                  color: _showMiniGallery ? Colors.amber : Colors.white,
+                                  onTap: () {
+                                    HapticFeedback.lightImpact();
+                                    setState(() => _showMiniGallery = !_showMiniGallery);
+                                  },
+                                ),
+
                               if (_currentBgIndex == 5)
+                                // ... (Keep your MTA Night Mode button exactly as is)
                                 _buildGroovedButton(
                                   icon: _isMtaNightMode ? CupertinoIcons.moon_stars_fill : CupertinoIcons.sun_max_fill,
                                   color: _isMtaNightMode ? Colors.indigo[300]! : Colors.amber,
@@ -943,6 +1178,87 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// 📳 THE iOS JIGGLE ANIMATION WIDGET
+class JigglingThumbnail extends StatefulWidget {
+  final String imagePath;
+  final VoidCallback onDelete;
+
+  const JigglingThumbnail({super.key, required this.imagePath, required this.onDelete});
+
+  @override
+  State<JigglingThumbnail> createState() => _JigglingThumbnailState();
+}
+
+class _JigglingThumbnailState extends State<JigglingThumbnail> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 120), // Fast, tight shake
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        // Rotates back and forth by a tiny microscopic angle
+        final double angle = (_controller.value * 0.05) - 0.025;
+        return Transform.rotate(
+          angle: angle,
+          child: child,
+        );
+      },
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            margin: const EdgeInsets.only(right: 12),
+            width: 56, 
+            height: 56,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              image: DecorationImage(
+                image: FileImage(File(widget.imagePath)),
+                fit: BoxFit.cover, 
+              ),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 4, offset: const Offset(0, 2))
+              ]
+            ),
+          ),
+          Positioned(
+            top: -6, 
+            right: 4,
+            child: GestureDetector(
+              onTap: widget.onDelete,
+              child: Container(
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.5), // 🌟 THE FIX: Sleek translucent grey
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white.withOpacity(0.8), width: 1.5),
+                ),
+                child: const Icon(Icons.close, size: 10, color: Colors.white, weight: 900),
+              )
+            )
+          )
+        ]
       ),
     );
   }

@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../logic/passport_rules.dart';
 import '../logic/single_visa_rules.dart';
 import '../logic/standard_rules.dart';
+import '../services/telemetry_service.dart';
 
 class PassportService {
   static final SupabaseClient _client = Supabase.instance.client;

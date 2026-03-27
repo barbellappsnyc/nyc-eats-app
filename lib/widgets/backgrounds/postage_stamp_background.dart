@@ -1,11 +1,21 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'dart:math';
 import 'package:nyc_eats/config/cuisine_constants.dart';
 
 class PostageStampBackground extends StatefulWidget {
   final String cuisine;
+  // 🌟 INJECTED: The Bridge Variables
+  final List<String> userPhotoPaths; 
+  final bool showPhotos;             
 
-  const PostageStampBackground({super.key, required this.cuisine});
+  const PostageStampBackground({
+    super.key, 
+    required this.cuisine,
+    this.userPhotoPaths = const [], // Defaults to empty so we don't break existing calls
+    this.showPhotos = false,        // Defaults to emojis
+  });
 
   @override
   State<PostageStampBackground> createState() => _PostageStampBackgroundState();
@@ -17,13 +27,16 @@ class _PostageStampBackgroundState extends State<PostageStampBackground> {
   @override
   void initState() {
     super.initState();
-    _cachedStamps = _generateStamps(); // 👈 MATH HAPPENS ONLY ONCE!
+    _cachedStamps = _generateStamps(); 
   }
 
   @override
   void didUpdateWidget(covariant PostageStampBackground oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.cuisine != widget.cuisine) {
+    // 🌟 INJECTED: Now it mathematically recalculates if ANY of these three change
+    if (oldWidget.cuisine != widget.cuisine || 
+        oldWidget.showPhotos != widget.showPhotos || 
+        oldWidget.userPhotoPaths != widget.userPhotoPaths) {
       setState(() {
         _cachedStamps = _generateStamps();
       });
@@ -45,6 +58,9 @@ class _PostageStampBackgroundState extends State<PostageStampBackground> {
     final Random rnd = Random(42); 
     final List<Widget> generatedStamps = [];
 
+    // 🌟 Check if we are rendering photos or emojis
+    final bool usePhotos = widget.showPhotos && widget.userPhotoPaths.isNotEmpty;
+
     final List<Color> stampColors = [
       const Color(0xFFF9F6EE), const Color(0xFFF4ECD8), const Color(0xFFEFE5D0), 
       const Color(0xFFFDFBF7), const Color(0xFFF5EBE0),
@@ -54,63 +70,132 @@ class _PostageStampBackgroundState extends State<PostageStampBackground> {
       Colors.black87, const Color(0xFF8B1A1A), const Color(0xFF1A2A42), 
     ];
 
-    // Generate an excessive amount (150) to guarantee it fills even the largest Pro Max screens
-    for (int i = 0; i < 150; i++) {
-      final String emoji = emojis[rnd.nextInt(emojis.length)];
+    for (int i = 0; i < 70; i++) {
       final Color bgColor = stampColors[rnd.nextInt(stampColors.length)];
-      
-      // A microscopic rotation so they don't look like sterile computer boxes
       final double slightRotation = (rnd.nextDouble() * 0.1) - 0.05; 
       
       final bool hasPostmark = rnd.nextBool();
       final Color postmarkColor = postmarkColors[rnd.nextInt(postmarkColors.length)];
       final double postmarkRotation = (rnd.nextDouble() * 1.5) - 0.75;
 
+      // Decide what the central asset is for this specific stamp
+      final String emoji = emojis[rnd.nextInt(emojis.length)];
+      final String photoPath = usePhotos 
+          ? widget.userPhotoPaths[rnd.nextInt(widget.userPhotoPaths.length)] 
+          : "";
+
       generatedStamps.add(
         Transform.rotate(
           angle: slightRotation,
-          // 🪄 THE FIX: We use SizedBox to define the area, and PhysicalShape to handle the complex teeth+shadow
           child: SizedBox(
             width: 75, 
             height: 90,
             child: PhysicalShape(
-              clipper: const StampClipper(), // Cuts the teeth
-              color: bgColor, // The paper color
-              elevation: 2.0, // Creates a natural, teeth-hugging drop shadow
+              clipper: const StampClipper(), 
+              color: bgColor, 
+              elevation: 2.0, 
               shadowColor: Colors.black.withOpacity(0.6),
+              clipBehavior: Clip.antiAlias, // 🌟 THE FIX: Actually cuts the photo!
               child: Stack(
                 children: [
+                  // 📸 LAYER 1: The Photo & Scrim (Now inset by 4 pixels!)
+                  if (usePhotos)
+                    Positioned.fill(
+                      child: Container(
+                        margin: const EdgeInsets.all(4), // 🌟 THE FIX: Shrinks the photo to reveal the paper edge!
+                        clipBehavior: Clip.hardEdge, // Prevents the photo from bleeding out
+                        decoration: const BoxDecoration(),
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            Image.file(
+                              File(photoPath),
+                              fit: BoxFit.cover, 
+                              cacheWidth: 200, 
+                              cacheHeight: 240, 
+                            ),
+                            // 🕶️ The Scrim (Moved inside the inset container)
+                            Container(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    Colors.black.withOpacity(0.7), 
+                                    Colors.transparent,
+                                    Colors.transparent,
+                                    Colors.black.withOpacity(0.7), 
+                                  ],
+                                  stops: const [0.0, 0.25, 0.75, 1.0],
+                                )
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                  // 📦 LAYER 2: The Inner Border
                   Positioned.fill(
                     child: Container(
-                      margin: const EdgeInsets.all(4),
+                      margin: const EdgeInsets.all(4), // Perfectly overlaps the edge of the photo
                       decoration: BoxDecoration(
-                        border: Border.all(color: Colors.black.withOpacity(0.2), width: 0.5),
+                        border: Border.all(
+                          color: usePhotos ? Colors.white.withOpacity(0.4) : Colors.black.withOpacity(0.2), 
+                          width: 0.5
+                        ),
                       ),
                     ),
                   ),
-                  Center(child: Text(emoji, style: const TextStyle(fontSize: 34))),
+
+                  // 🍣 LAYER 3: The Emoji (If Active)
+                  if (!usePhotos)
+                    Center(child: Text(emoji, style: const TextStyle(fontSize: 34))),
+                  
+                  // ✍️ LAYER 4: The Typography (Country & Price)
                   Positioned(
-                    top: 6, left: 6,
+                    // Pushed slightly further in (from 6 to 8) so the text breathes inside the newly framed photo
+                    top: 8, left: 8, 
                     child: Text(
                       widget.cuisine.toUpperCase(),
-                      style: TextStyle(fontSize: 6, fontWeight: FontWeight.bold, letterSpacing: 1, color: Colors.black.withOpacity(0.6)),
+// ... Keep the rest of your TextStyle and Postmark code the exact same
+                      style: TextStyle(
+                        fontSize: 6, 
+                        fontWeight: FontWeight.w900, 
+                        letterSpacing: 1, 
+                        color: usePhotos ? Colors.white : Colors.black.withOpacity(0.6),
+                        shadows: usePhotos ? [const Shadow(color: Colors.black, blurRadius: 4)] : [],
+                      ),
                     ),
                   ),
                   Positioned(
                     bottom: 6, right: 6,
                     child: Text(
                       "${rnd.nextInt(80) + 10}¢",
-                      style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.black.withOpacity(0.7)),
+                      style: TextStyle(
+                        fontSize: 8, 
+                        fontWeight: FontWeight.bold, 
+                        color: usePhotos ? Colors.white : Colors.black.withOpacity(0.7),
+                        shadows: usePhotos ? [const Shadow(color: Colors.black, blurRadius: 4)] : [],
+                      ),
                     ),
                   ),
+
+                  // 📬 LAYER 6: The Postmark Cancellation Lines
                   if (hasPostmark)
                     Positioned.fill(
                       child: Transform.rotate(
                         angle: postmarkRotation,
                         child: Opacity(
-                          opacity: 0.6,
+                          // Push opacity slightly higher on photos so the lines pop
+                          opacity: usePhotos ? 0.8 : 0.6,
                           child: CustomPaint(
-                            painter: PostmarkPainter(color: postmarkColor),
+                            painter: PostmarkPainter(
+                              // White postmarks look incredible on dark photos
+                              color: usePhotos && postmarkColor == Colors.black87 
+                                  ? Colors.white.withOpacity(0.8) 
+                                  : postmarkColor
+                            ),
                           ),
                         ),
                       ),

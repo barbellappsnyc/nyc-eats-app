@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/scheduler.dart';
 import 'animated_cuisine_placeholder.dart';
 import 'package:audioplayers/audioplayers.dart';
+import '../services/telemetry_service.dart'; // Add this near your other imports
 
 class CountryWheelModal extends StatefulWidget {
   final bool isDarkMode;
@@ -311,10 +312,15 @@ class _CountryWheelModalState extends State<CountryWheelModal> with TickerProvid
   void _spinTheWheel() {
     if (_isSpinning) return;
     
+    // 📡 TELEMETRY: The user has committed to a random spin
+    TelemetryService.logInteraction(actionType: 'wheel_spin_started');
+
     setState(() {
       _isSpinning = true;
       _showWinner = false;
     });
+
+    // ... rest of your existing code ...
 
     final random = Random();
     int randomTarget = random.nextInt(_activeCountries.length - 1) + 1; 
@@ -342,7 +348,17 @@ class _CountryWheelModalState extends State<CountryWheelModal> with TickerProvid
       debugPrint("Audio error: $e");
     }
 
+    // 📡 TELEMETRY: Log what the wheel actually landed on
+    TelemetryService.logInteraction(
+      actionType: 'wheel_result_shown', 
+      metadata: {
+        'country_key': country,
+        'search_target': _getSearchName(country)
+      }
+    );
+
     setState(() {
+// ... rest of your existing code ...
       _isSpinning = false;
       _showWinner = true;
       _winnerCountry = country;

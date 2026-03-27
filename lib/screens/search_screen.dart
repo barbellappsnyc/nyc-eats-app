@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart'; // 🌟 ADDED FOR NATIVE iOS LOADER
+import 'package:flutter/cupertino.dart'; // 検 ADDED FOR NATIVE iOS LOADER
 import '../models/restaurant.dart';
 import '../config/constants.dart'; 
 import 'dart:async'; 
 import 'package:supabase_flutter/supabase_flutter.dart'; 
+import '../services/telemetry_service.dart';
 
 class SearchScreen extends StatefulWidget {
   final List<String> availableCategories;
@@ -79,6 +80,14 @@ class _SearchScreenState extends State<SearchScreen> {
         setState(() => _isSearchingDB = true); 
         
         _debounce = Timer(const Duration(milliseconds: 500), () {
+          // 📡 TELEMETRY: The user is explicitly searching for something
+          if (query.trim().isNotEmpty) {
+            TelemetryService.logInteraction(
+              actionType: 'search_executed',
+              metadata: {'query': query.trim().toLowerCase()},
+            );
+          }
+
           _searchSupabase(query);
         });
       }
@@ -100,14 +109,14 @@ class _SearchScreenState extends State<SearchScreen> {
         });
       }
     } catch (e) {
-      debugPrint("🚨 Search Query Error: $e");
+      debugPrint("圷 Search Query Error: $e");
       if (mounted) setState(() => _isSearchingDB = false);
     }
   }
   
   String? _getEmojiForCategory(String category) {
     if (category.toLowerCase() == 'hot_dog' || category.toLowerCase() == 'hot dog') {
-      return '🌭';
+      return '遣';
     }
 
     if (categoryFlags.containsKey(category)) {
@@ -254,7 +263,7 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget _buildSearchResults(Color textColor, bool isDark) {
     if (_isSearchingDB && _filteredRestaurants.isEmpty) {
       return const Center(
-        // 🌟 THE FIX: Replaced standard Material loader with the native iOS spinner
+        // 検 THE FIX: Replaced standard Material loader with the native iOS spinner
         child: CupertinoActivityIndicator(radius: 16),
       );
     }
@@ -319,7 +328,7 @@ class _SearchScreenState extends State<SearchScreen> {
               contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4), 
               title: Text(r.name, style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
               subtitle: Text(
-                "${_formatCategoryName(r.cuisine)} • ${r.price}", 
+                "${_formatCategoryName(r.cuisine)} 窶｢ ${r.price}", 
                 style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600]),
               ),
               leading: Container(
@@ -331,6 +340,16 @@ class _SearchScreenState extends State<SearchScreen> {
                 child: const Icon(Icons.location_on, color: Colors.redAccent, size: 20),
               ),
               onTap: () {
+                // 📡 TELEMETRY: The user found a search result compelling enough to click
+                TelemetryService.logInteraction(
+                  actionType: 'search_result_clicked',
+                  metadata: {
+                    'restaurant_name': r.name,
+                    'restaurant_cuisine': r.cuisine,
+                    'search_query': _query, 
+                  }
+                );
+                
                 widget.onRestaurantSelected(r);
                 Navigator.pop(context);
               },

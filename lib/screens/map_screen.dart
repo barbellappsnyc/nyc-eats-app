@@ -149,29 +149,41 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
     PassportService.prewarmCache();
     await _loadFavorites(); 
     
-    if (mounted) setState(() => _isBuildingVault = true);
+    // 🌟 THE FIX: The Strict UI Lock
+    final prefs = await SharedPreferences.getInstance();
+    final bool hasStampedVisa = prefs.getBool('has_stamped_initial_visa') ?? false;
+
+    // ONLY show the loading screen if they've never done this before
+    if (!hasStampedVisa) {
+      if (mounted) setState(() => _isBuildingVault = true);
+    }
+
     try {
-      // 🌟 THE FIX: Force it to true just for this run to download the hours!
-      // (You can change this back to false tomorrow)
       _vaultPaths = await VaultBuilder.buildVaultIfNeeded();
       
       if (_vaultPaths != null && _vaultPaths!['hours'] != null) {
         final hoursFile = File(_vaultPaths!['hours']!);
         if (await hoursFile.exists()) {
           final hoursStr = await hoursFile.readAsString();
-          
-          // 🌟 THE FIX: Pass jsonDecode to a background isolate!
+          // Using the isolate compute from earlier to prevent freezing!
           final decoded = await compute(jsonDecode, hoursStr) as Map<String, dynamic>; 
-          
           _restaurantHours = decoded.map((key, value) => MapEntry(key, value.toString()));
         }
       }
+
       if (_mapboxController != null && _vaultPaths != null) {
         _setupMapboxLayers(_vaultPaths!); 
       }
+
+      // 🌟 Lock the gate so they never see the loading screen again
+      if (!hasStampedVisa) {
+        await prefs.setBool('has_stamped_initial_visa', true);
+      }
+
     } catch (e) {
       debugPrint("🚨 Vault creation failed: $e");
     } finally {
+      // Always ensure the UI shield drops, just in case
       if (mounted) setState(() => _isBuildingVault = false);
     }
     
@@ -225,7 +237,17 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
 
   Future<void> _loadTheme() async {
     final prefs = await SharedPreferences.getInstance();
-    setState(() => isDarkMode = prefs.getBool('is_dark_mode') ?? false);
+    
+    if (mounted) {
+      setState(() => isDarkMode = prefs.getBool('is_dark_mode') ?? false);
+    }
+
+    // 🌟 THE FIX: Force the Mapbox engine to instantly sync with the saved theme
+    if (_mapboxController != null) {
+      _mapboxController!.loadStyleURI(
+        isDarkMode ? MapboxStyles.DARK : MapboxStyles.STANDARD
+      );
+    }
   }
 
   Future<void> _toggleTheme() async {
@@ -296,13 +318,136 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
   void _showLocationDialog() {
     showDialog(
       context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text("Location Disabled"),
-        content: const Text("Turn on location to see spots near you."),
-        actions: [
-          TextButton(child: const Text("Turn On"), onPressed: () { Navigator.pop(context); geo.Geolocator.openLocationSettings(); }),
-        ],
+      barrierColor: Colors.black.withOpacity(0.4), // 1. Dim the map behind the dialog
+      barrierDismissible: true,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent, // 2. CRITICAL: Kill default background
+        surfaceTintColor: Colors.transparent, // 3. CRITICAL: Kill Material 3 white tint
+        elevation: 0,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 32),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(28), // Apple's standard smooth curve
+          child: BackdropFilter(
+            filter: ui.ImageFilter.blur(sigmaX: 25.0, sigmaY: 25.0), // 4. The heavy glass blur
+            child: Container(
+              padding: const EdgeInsets.all(28),
+              decoration: BoxDecoration(
+                // 5. Very low opacity colors so the blur actually shines through
+                color: isDarkMode 
+                    ? const Color(0xFF1C1C1E).withOpacity(0.55) 
+                    : const Color(0xFFF2F2F7).withOpacity(0.65),
+                // 6. The signature Apple microscopic glass shine border
+                border: Border.all(
+                  color: isDarkMode 
+                      ? Colors.white.withOpacity(0.1) 
+                      : Colors.white.withOpacity(0.5),
+                  width: 1.5,
+                ),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 📡 Premium Radar Icon
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isDarkMode 
+                          ? Colors.white.withOpacity(0.1) 
+                          : Colors.black.withOpacity(0.05),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      CupertinoIcons.location_slash_fill,
+                      size: 36,
+                      color: isDarkMode ? Colors.white : Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  
+                  // 📜 Elegant Title
+                  Text(
+                    "Location Disabled",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontFamily: 'AppleGaramond',
+                      fontSize: 26,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  
+                  // 💬 Softer, clearer instructions
+                  Text(
+                    "NYC Eats works best when it can show you the culinary gems hiding right around your corner.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontFamily: 'SFPro',
+                      fontSize: 15,
+                      height: 1.3,
+                      color: isDarkMode ? Colors.white70 : Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  
+                  // 🔘 The Action Buttons
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // Primary Action
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          geo.Geolocator.openLocationSettings();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isDarkMode ? Colors.white : Colors.black,
+                          foregroundColor: isDarkMode ? Colors.black : Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: const Text(
+                          "Enable in Settings",
+                          style: TextStyle(
+                            fontFamily: 'SFPro',
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      
+                      // Secondary Action: Bypass
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: TextButton.styleFrom(
+                          foregroundColor: isDarkMode ? Colors.white70 : Colors.black54,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: const Text(
+                          "Explore Without Location",
+                          style: TextStyle(
+                            fontFamily: 'SFPro',
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -346,13 +491,22 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
   }
 
   Future<void> _jumpToRestaurant(Restaurant restaurant) async {
-    // Uses setCamera instead of flyTo to instantly snap to the coordinates
+    // 🌟 THE MEMORY SWEEP: Dump old images from RAM before the heavy graphic jump
+    PaintingBinding.instance.imageCache.clear();
+    PaintingBinding.instance.imageCache.clearLiveImages();
+
+    // 1. Teleport the map
     _mapboxController?.setCamera(
       CameraOptions(
         center: Point(coordinates: Position(restaurant.location.longitude, restaurant.location.latitude)),
         zoom: 16.0,
       ),
     );
+
+    // 🌟 THE BREATHER: Give the iPad's Metal GPU 500ms to finish drawing the streets
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    // 2. Now that the GPU is resting, pull up the UI sheet
     _fetchAndShowRestaurant(restaurant.id);
   }
 
@@ -363,10 +517,30 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       backgroundColor: Colors.transparent,
       builder: (context) => CountryWheelModal(
         isDarkMode: isDarkMode,
-        availableCuisines: const [], // Empty for now
+        // 🌟 FIX 1: Feed the wheel the actual cuisines from your database!
+        availableCuisines: CuisineConstants.emojiPalettes.keys.toList(), 
         onCountrySelected: (country) {
-          setState(() { selectedCategory = country; selectedRestaurantName = null; });
-          _fetchRestaurants(); // 🌟 ADD THIS
+          setState(() { 
+            // 🌟 FIX 2: Ensure the string is formatted for your Mapbox filter
+            selectedCategory = country.toLowerCase(); 
+            selectedRestaurantName = null; 
+          });
+          
+          // Trigger the instant Mapbox UI filter
+          _fetchRestaurants(); 
+          
+          // 🌟 FIX 3: The "Reveal" Zoom
+          // We must zoom out to a city-wide view so they can see where the new cuisine is located!
+          if (_mapboxController != null) {
+            _mapboxController!.flyTo(
+              CameraOptions(
+                center: Point(coordinates: Position(-73.98, 40.75)), // Center of NYC
+                zoom: 10.5, // City-wide zoom level
+                pitch: 0.0,
+              ),
+              MapAnimationOptions(duration: 1500),
+            );
+          }
         },
       ),
     );
@@ -869,9 +1043,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
     await prefs.setStringList('saved_restaurants', savedRestaurantNames.toList());
   }
 
-  // =========================================================================
-  // 🗺️ THE MASTER LAYER SETUP (Mapbox Style Engine)
-  // =========================================================================
   Future<void> _setupMapboxLayers(Map<String, String> paths) async {
     if (_mapboxController == null) return;
 
@@ -881,7 +1052,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
         await _mapboxController?.style.addSource(GeoJsonSource(id: "regular-source", data: "file://${paths['regular']}", cluster: true, clusterRadius: 50, clusterMaxZoom: 14.0, buffer: 128.0));
       }
       
-      // 🌟 THE FIX 1: The "Shadow Source" (No clustering rules applied)
       if (!(await _mapboxController?.style.styleSourceExists("regular-source-unclustered") ?? false)) {
         await _mapboxController?.style.addSource(GeoJsonSource(id: "regular-source-unclustered", data: "file://${paths['regular']}"));
       }
@@ -890,7 +1060,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
         await _mapboxController?.style.addSource(GeoJsonSource(id: "heroes-source", data: "file://${paths['heroes']}", buffer: 128.0));
       }
 
-      // --- 2. DEFAULT CLUSTERS ---
+      // --- 2. THE LAYERS (No slots used here = Above map labels) ---
+      // Adding all layers...
       if (!(await _mapboxController?.style.styleLayerExists("cluster-circles") ?? false)) {
         await _mapboxController?.style.addLayer(CircleLayer(id: "cluster-circles", sourceId: "regular-source"));
       }
@@ -911,7 +1082,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       await _mapboxController?.style.setStyleLayerProperty("cluster-text", "text-allow-overlap", true);
       await _mapboxController?.style.setStyleLayerProperty("cluster-text", "text-ignore-placement", true);
 
-      // --- 3. EMOJI LOGIC ---
+      // --- 3. PILL LAYERS ---
       final starsVal = ["to-number", ["get", "michelin_stars"], 0];
       final bibCheck = ["==", ["downcase", ["to-string", ["get", "bib_gourmand"]]], "true"];
       final ringType = ["case", [">", starsVal, 0], "gold", bibCheck, "red", "black"];
@@ -925,7 +1096,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       final dynamicIconImage = ["concat", "pill-", emojiCode, "-", ringType, "-", ["to-string", starsVal]];
       final dynamicIconSize = ["interpolate", ["linear"], ["zoom"], 8.0, 0.40, 11.0, 0.55, 14.0, 0.75, 16.0, 0.90];
 
-      // --- 4. REGULAR HIERARCHY LAYERS ---
+      // Add regular-bubbles
       if (!(await _mapboxController?.style.styleLayerExists("regular-bubbles") ?? false)) {
         await _mapboxController?.style.addLayer(SymbolLayer(id: "regular-bubbles", sourceId: "regular-source", minZoom: 14.0, iconAllowOverlap: false, iconPitchAlignment: IconPitchAlignment.VIEWPORT));
       }
@@ -933,6 +1104,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       await _mapboxController?.style.setStyleLayerProperty("regular-bubbles", "icon-image", dynamicIconImage);
       await _mapboxController?.style.setStyleLayerProperty("regular-bubbles", "icon-size", dynamicIconSize);
 
+      // Add heroes layers (bib, 1, 3-2)
       if (!(await _mapboxController?.style.styleLayerExists("heroes-bib-bubbles") ?? false)) {
         await _mapboxController?.style.addLayer(SymbolLayer(id: "heroes-bib-bubbles", sourceId: "heroes-source", minZoom: 13.0, iconAllowOverlap: true, iconPitchAlignment: IconPitchAlignment.VIEWPORT));
       }
@@ -955,10 +1127,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       await _mapboxController?.style.setStyleLayerProperty("heroes-3-2-bubbles", "icon-image", dynamicIconImage);
       await _mapboxController?.style.setStyleLayerProperty("heroes-3-2-bubbles", "icon-size", dynamicIconSize);
 
-      // --- 5. FILTER OVERRIDE LAYERS (Zoom 1.0+) ---
+      // --- 4. FILTER OVERRIDES ---
       final hideCommand = ["==", ["get", "id"], -1];
 
-      // 🌟 THE FIX 2: Point the filtered regular bubbles to the new "Shadow Source"
       if (!(await _mapboxController?.style.styleLayerExists("filtered-regular-bubbles") ?? false)) {
         await _mapboxController?.style.addLayer(SymbolLayer(id: "filtered-regular-bubbles", sourceId: "regular-source-unclustered", minZoom: 1.0, iconAllowOverlap: false, iconPitchAlignment: IconPitchAlignment.VIEWPORT));
       }
@@ -973,25 +1144,26 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       await _mapboxController?.style.setStyleLayerProperty("filtered-bib-bubbles", "icon-image", dynamicIconImage);
       await _mapboxController?.style.setStyleLayerProperty("filtered-bib-bubbles", "icon-size", dynamicIconSize);
 
-      // ... your existing code ...
-    if (!(await _mapboxController?.style.styleLayerExists("filtered-1-bubbles") ?? false)) {
-      await _mapboxController?.style.addLayer(SymbolLayer(id: "filtered-1-bubbles", sourceId: "heroes-source", minZoom: 1.0, iconAllowOverlap: true, iconPitchAlignment: IconPitchAlignment.VIEWPORT));
+      if (!(await _mapboxController?.style.styleLayerExists("filtered-1-bubbles") ?? false)) {
+        await _mapboxController?.style.addLayer(SymbolLayer(id: "filtered-1-bubbles", sourceId: "heroes-source", minZoom: 1.0, iconAllowOverlap: true, iconPitchAlignment: IconPitchAlignment.VIEWPORT));
+      }
+      await _mapboxController?.style.setStyleLayerProperty("filtered-1-bubbles", "filter", hideCommand);
+      await _mapboxController?.style.setStyleLayerProperty("filtered-1-bubbles", "icon-image", dynamicIconImage);
+      await _mapboxController?.style.setStyleLayerProperty("filtered-1-bubbles", "icon-size", dynamicIconSize);
+
+      // 🌟 THE NUCLEAR HIERARCHY FIX: Toggle the puck off and back on
+      await _mapboxController?.location.updateSettings(LocationComponentSettings(enabled: false));
+      await Future.delayed(const Duration(milliseconds: 50));
+      await _mapboxController?.location.updateSettings(LocationComponentSettings(
+        enabled: true,
+        pulsingEnabled: true,
+        showAccuracyRing: true,
+      ));
+
+    } catch (e) {
+      debugPrint("🚨 Layer Error: $e");
     }
-    await _mapboxController?.style.setStyleLayerProperty("filtered-1-bubbles", "filter", hideCommand);
-    await _mapboxController?.style.setStyleLayerProperty("filtered-1-bubbles", "icon-image", dynamicIconImage);
-    await _mapboxController?.style.setStyleLayerProperty("filtered-1-bubbles", "icon-size", dynamicIconSize);
-
-    // 🌟 THE FIX: Force the location puck to be the absolute top layer
-    await _mapboxController?.location.updateSettings(LocationComponentSettings(
-      enabled: true,
-      pulsingEnabled: true,
-      showAccuracyRing: true,
-    ));
-
-  } catch (e) {
-    debugPrint("🚨 Layer Error: $e");
   }
-} // <-- End of _setupMapboxLayers
 
   // =========================================================================
   // 👆 4. THE INTERACTION BRIDGE (Mapbox Tap Listener)
@@ -1316,11 +1488,13 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
                 );
               }
             },
-            onStyleLoadedListener: (StyleLoadedEventData data) {
-              // 1. Instantly rebuild the data layers on top of the new base map
-              if (_vaultPaths != null) _setupMapboxLayers(_vaultPaths!); 
+            onStyleLoadedListener: (StyleLoadedEventData data) async {
+              // 🌟 INCREASE DELAY: Give the map 1.5 seconds to render the streets first
+              await Future.delayed(const Duration(milliseconds: 1500));
               
-              // 2. 🌟 THE FIX: Only jump the camera on the very first app launch
+              if (_vaultPaths != null) _setupMapboxLayers(_vaultPaths!);
+              
+              // 2. Only jump the camera on the very first app launch
               if (!_hasPerformedInitialCameraFly) {
                 _hasPerformedInitialCameraFly = true;
                 _mapboxController?.flyTo(

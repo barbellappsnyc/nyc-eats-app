@@ -96,10 +96,8 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
         context,
         PageRouteBuilder(
           pageBuilder: (context, animation1, animation2) => const MapScreen(),
-          transitionDuration: const Duration(milliseconds: 1000),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return FadeTransition(opacity: animation, child: child);
-          },
+          transitionDuration: Duration.zero, // 🌟 THE FIX: Instant cut!
+          reverseTransitionDuration: Duration.zero,
         ),
       );
     }

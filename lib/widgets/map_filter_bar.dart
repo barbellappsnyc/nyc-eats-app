@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import '../services/telemetry_service.dart'; // 📡 TELEMETRY IMPORT
 
 class MapFilterBar extends StatefulWidget {
   final bool isDarkMode;
@@ -142,7 +143,20 @@ class _MapFilterBarState extends State<MapFilterBar> {
           avatar: widget.selectedPrices.isNotEmpty ? null : Icon(Icons.attach_money, size: 16, color: isDark ? Colors.white : Colors.black),
           selected: widget.selectedPrices.isNotEmpty,
           showCheckmark: false,
-          onSelected: (_) => _showMultiSelectSheet(title: "Filter by Price", options: ["\$", "\$\$", "\$\$\$", "\$\$\$\$"], currentSelection: widget.selectedPrices, onApply: (s) { widget.onPriceChanged(s); _scrollToStart(); }),
+          onSelected: (_) => _showMultiSelectSheet(
+            title: "Filter by Price", 
+            options: ["\$", "\$\$", "\$\$\$", "\$\$\$\$"], 
+            currentSelection: widget.selectedPrices, 
+            onApply: (s) { 
+              // 📡 TELEMETRY: Price Filter Applied
+              TelemetryService.logInteraction(
+                actionType: 'filter_updated',
+                metadata: {'filter': 'price', 'selected_tiers': s.toList()} 
+              );
+              widget.onPriceChanged(s); 
+              _scrollToStart(); 
+            }
+          ),
           backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
           selectedColor: isDark ? Colors.white : Colors.black,
           labelStyle: TextStyle(color: widget.selectedPrices.isNotEmpty ? (isDark ? Colors.black : Colors.white) : (isDark ? Colors.white : Colors.black), fontWeight: FontWeight.bold),
@@ -155,7 +169,15 @@ class _MapFilterBarState extends State<MapFilterBar> {
         'widget': FilterChip(
           label: const Text("Open Now"),
           selected: widget.showOpenOnly,
-          onSelected: (val) { widget.onOpenChanged(val); _scrollToStart(); },
+          onSelected: (val) { 
+            // 📡 TELEMETRY: Open Now Toggled
+            TelemetryService.logInteraction(
+              actionType: 'filter_toggled',
+              metadata: {'filter': 'open_now', 'is_active': val}
+            );
+            widget.onOpenChanged(val); 
+            _scrollToStart(); 
+          },
           backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
           selectedColor: Colors.green.withOpacity(0.2),
           checkmarkColor: Colors.green,
@@ -174,6 +196,11 @@ class _MapFilterBarState extends State<MapFilterBar> {
             options: ["Bib Gourmand", "1 Star", "2 Stars", "3 Stars"], 
             currentSelection: widget.selectedMichelin, 
             onApply: (s) { 
+              // 📡 TELEMETRY: Michelin Filter Applied
+              TelemetryService.logInteraction(
+                actionType: 'filter_updated',
+                metadata: {'filter': 'michelin', 'selected_tiers': s.toList()} 
+              );
               widget.onMichelinChanged(s); 
               _scrollToStart(); 
             }
@@ -187,7 +214,15 @@ class _MapFilterBarState extends State<MapFilterBar> {
           avatar: Icon(Icons.favorite, size: 16, color: widget.savedOnly ? Colors.red : (isDark ? Colors.white : Colors.black)),
           selected: widget.savedOnly,
           showCheckmark: false,
-          onSelected: (val) { widget.onSavedChanged(val); _scrollToStart(); },
+          onSelected: (val) { 
+            // 📡 TELEMETRY: Saved Items Toggled
+            TelemetryService.logInteraction(
+              actionType: 'filter_toggled',
+              metadata: {'filter': 'saved', 'is_active': val}
+            );
+            widget.onSavedChanged(val); 
+            _scrollToStart(); 
+          },
           backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
           selectedColor: isDark ? Colors.white : Colors.black,
           labelStyle: TextStyle(color: widget.savedOnly ? (isDark ? Colors.black : Colors.white) : (isDark ? Colors.white : Colors.black), fontWeight: FontWeight.bold),
@@ -200,7 +235,15 @@ class _MapFilterBarState extends State<MapFilterBar> {
         'widget': FilterChip(
           label: const Text("Veg Options"),
           selected: widget.showVegetarian,
-          onSelected: (val) { widget.onVegChanged(val); _scrollToStart(); },
+          onSelected: (val) { 
+            // 📡 TELEMETRY: Vegetarian Filter Toggled
+            TelemetryService.logInteraction(
+              actionType: 'filter_toggled',
+              metadata: {'filter': 'dietary', 'type': 'vegetarian', 'is_active': val} 
+            );
+            widget.onVegChanged(val); 
+            _scrollToStart(); 
+          },
           backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
           selectedColor: Colors.green[800],
           checkmarkColor: Colors.white,
@@ -214,7 +257,15 @@ class _MapFilterBarState extends State<MapFilterBar> {
         'widget': FilterChip(
           label: const Text("Vegan Options"),
           selected: widget.showVegan,
-          onSelected: (val) { widget.onVeganChanged(val); _scrollToStart(); },
+          onSelected: (val) { 
+            // 📡 TELEMETRY: Vegan Filter Toggled
+            TelemetryService.logInteraction(
+              actionType: 'filter_toggled',
+              metadata: {'filter': 'dietary', 'type': 'vegan', 'is_active': val} 
+            );
+            widget.onVeganChanged(val); 
+            _scrollToStart(); 
+          },
           backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
           selectedColor: Colors.green[800],
           checkmarkColor: Colors.white,
