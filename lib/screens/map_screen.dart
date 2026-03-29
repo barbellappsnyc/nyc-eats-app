@@ -12,6 +12,7 @@ import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 import 'package:nyc_eats/config/cuisine_constants.dart';
 import 'package:nyc_eats/models/restaurant.dart';
 import 'package:nyc_eats/services/pill_cache.dart';
+import 'package:nyc_eats/services/telemetry_service.dart';
 import 'package:nyc_eats/services/vault_builder.dart';
 import 'package:nyc_eats/widgets/restaurant_detail_sheet.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -29,6 +30,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/services.dart'; // Required for HapticFeedback
 import '../widgets/map_filter_bar.dart';
+import '../widgets/concierge_overlay.dart'; // Add this near the top
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -103,6 +105,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
   Set<String> _selectedPrices = {};
   
   Map<String, String> _restaurantHours = {};
+
+  bool _showConcierge = false;
 
   @override
   void initState() {
@@ -1421,6 +1425,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
   }
 
   @override
+  @override
   build(BuildContext context) {
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -1524,7 +1529,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
                               key: _searchKey, // 🌟 THE FIX: Put the tutorial key back!
                               margin: const EdgeInsets.fromLTRB(16, 20, 16, 6), 
                               height: 64, 
-                              // ... (Keep the rest of your beautiful styling exactly as is)
                       padding: const EdgeInsets.only(left: 24, right: 12), 
                       decoration: BoxDecoration(
                       // 🌟 1. Lighten the dark mode grey slightly (from 2C2C2E to 3A3A3C)
@@ -1661,6 +1665,23 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
+                    // 🌟 CONCIERGE BUTTON (Added right above the Game Wheel)
+                    FloatingActionButton(
+                      heroTag: 'concierge_btn',
+                      mini: true, 
+                      backgroundColor: isDarkMode ? Colors.grey[800] : Colors.white,
+                      foregroundColor: Colors.amber[700], 
+                      elevation: 6,
+                      onPressed: () {
+                        setState(() {
+                          _showConcierge = true;
+                        });
+                        // 📡 TELEMETRY: Log that they summoned the concierge
+                        TelemetryService.logInteraction(actionType: 'concierge_summoned');
+                      },
+                      child: const Icon(Icons.room_service),
+                    ),
+                    const SizedBox(height: 12),
                     FloatingActionButton(key: _wheelKey, mini: true, heroTag: "wheel_btn", backgroundColor: isDarkMode ? Colors.indigoAccent : Colors.deepPurpleAccent, foregroundColor: Colors.white, elevation: 6, onPressed: _openCountryWheel, child: const Icon(Icons.casino)),
                     const SizedBox(height: 12),
                     FloatingActionButton(mini: true, heroTag: "theme_btn", backgroundColor: isDarkMode ? Colors.grey[800] : Colors.white, foregroundColor: isDarkMode ? Colors.white : Colors.black, elevation: 4, onPressed: _toggleTheme, child: Icon(isDarkMode ? Icons.dark_mode : Icons.light_mode)),
@@ -1677,8 +1698,38 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
           ),
 
           // ===================================================================
-          // 4. OVERLAYS
+          // 4. OVERLAYS & CONCIERGE
           // ===================================================================
+          
+          // 🌟 THE NEW CONCIERGE OVERLAY
+          if (_showConcierge && myLocation != null)
+            ConciergeOverlay(
+              isDarkMode: isDarkMode,
+              userLocation: LatLng(myLocation!.latitude, myLocation!.longitude), 
+              // 👇 REMOVED: allRestaurants: const [], 
+              onClose: () {
+                setState(() {
+                  _showConcierge = false;
+                });
+              },
+              onRestaurantTapped: (Restaurant r) {
+                 // ... your bottom sheet code remains exactly the same
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (context) => RestaurantDetailSheet(
+                    restaurant: r,
+                    isDarkMode: isDarkMode,
+                    // 🌟 FIX: Connects to your actual map_screen state variables!
+                    isSaved: savedRestaurantNames.contains(r.name), 
+                    myLocation: myLocation,
+                    onFavoriteToggle: () => _toggleFavorite(r.name), 
+                  ),
+                );
+              },
+            ),
+
           if (_isJumpingToLocation)
             Positioned.fill(
               child: Container(
