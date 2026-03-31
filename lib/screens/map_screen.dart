@@ -31,6 +31,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/services.dart'; // Required for HapticFeedback
 import '../widgets/map_filter_bar.dart';
 import '../widgets/concierge_overlay.dart'; // Add this near the top
+import 'dart:math' as math;
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -44,6 +45,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
 
   bool _isJumpingToLocation = false;
   bool _isBuildingVault = false;
+  bool _isExecutingBoot = false; // 🌟 THE BOOT LOCKOUT
   bool _hasPerformedInitialCameraFly = false;
   Map<String, String>? _vaultPaths; // 👈 Changed from String? _localVaultPath
 
@@ -69,6 +71,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
   );
 
   bool _isCheckingLocation = false;
+  bool _isFetchingSheet = false; // 🌟 THE BOUNCER
 
   // 🌟 FIX 1: Applied 'geo.' prefix
   StreamSubscription<geo.Position>? _positionStreamSubscription;
@@ -146,6 +149,10 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
   }
 
   Future<void> _fastBootSequence() async {
+    // 🌟 1. THE LOCKOUT: Prevent multiple boot sequences from overlapping
+    if (_isExecutingBoot) return;
+    _isExecutingBoot = true;
+
     _loadTheme();
     await _loadCachedLocation(); 
 
@@ -153,11 +160,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
     PassportService.prewarmCache();
     await _loadFavorites(); 
     
-    // 🌟 THE FIX: The Strict UI Lock
     final prefs = await SharedPreferences.getInstance();
     final bool hasStampedVisa = prefs.getBool('has_stamped_initial_visa') ?? false;
 
-    // ONLY show the loading screen if they've never done this before
     if (!hasStampedVisa) {
       if (mounted) setState(() => _isBuildingVault = true);
     }
@@ -169,7 +174,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
         final hoursFile = File(_vaultPaths!['hours']!);
         if (await hoursFile.exists()) {
           final hoursStr = await hoursFile.readAsString();
-          // Using the isolate compute from earlier to prevent freezing!
           final decoded = await compute(jsonDecode, hoursStr) as Map<String, dynamic>; 
           _restaurantHours = decoded.map((key, value) => MapEntry(key, value.toString()));
         }
@@ -179,7 +183,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
         _setupMapboxLayers(_vaultPaths!); 
       }
 
-      // 🌟 Lock the gate so they never see the loading screen again
       if (!hasStampedVisa) {
         await prefs.setBool('has_stamped_initial_visa', true);
       }
@@ -187,12 +190,18 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
     } catch (e) {
       debugPrint("🚨 Vault creation failed: $e");
     } finally {
-      // Always ensure the UI shield drops, just in case
-      if (mounted) setState(() => _isBuildingVault = false);
+      // 🌟 2. THE QUEUE: Only drop the shield and show the tutorial IF we succeeded.
+      final bool isComplete = prefs.getBool('has_stamped_initial_visa') ?? false;
+      
+      if (isComplete && mounted) {
+         setState(() => _isBuildingVault = false);
+         _initLocationService();
+         _checkAndShowTutorial(); // 🌟 MOVED HERE! The tutorial waits in line.
+      }
+      
+      // Unlock the boot sequence
+      _isExecutingBoot = false; 
     }
-    
-    _initLocationService();
-    _checkAndShowTutorial(); 
   }
   
   Future<void> _loadCachedLocation() async {
@@ -232,10 +241,15 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
     });
   }
 
-  void _updateConnectionStatus(List<ConnectivityResult> results) {
+  void _updateConnectionStatus(List<ConnectivityResult> results) async {
     bool hasConnection = results.any((r) => r != ConnectivityResult.none);
     if (mounted) {
       setState(() => _isOffline = !hasConnection);
+    }
+
+    // 🌟 THE FIX: If WiFi returns, the shield is up, AND a boot isn't already running, restart the engine!
+    if (hasConnection && _isBuildingVault && !_isExecutingBoot) {
+       _fastBootSequence(); 
     }
   }
 
@@ -1051,33 +1065,35 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
     if (_mapboxController == null) return;
 
     try {
+      // 🌟 THE FIX: The Master Escape Hatch. 
+      final sourceExists = await _mapboxController?.style.styleSourceExists("regular-source") ?? false;
+      if (sourceExists) {
+        debugPrint("Mapbox sources already exist. Skipping rebuild.");
+        return; 
+      }
+
       // --- 1. THE SOURCES ---
-      if (!(await _mapboxController?.style.styleSourceExists("regular-source") ?? false)) {
-        await _mapboxController?.style.addSource(GeoJsonSource(id: "regular-source", data: "file://${paths['regular']}", cluster: true, clusterRadius: 50, clusterMaxZoom: 14.0, buffer: 128.0));
-      }
+      await _mapboxController?.style.addSource(
+        GeoJsonSource(id: "regular-source",
+        data: "file://${paths['regular']}", 
+        cluster: true, clusterRadius: 50, 
+        clusterMaxZoom: 14.0, 
+        buffer: 128.0
+        )
+      );
       
-      if (!(await _mapboxController?.style.styleSourceExists("regular-source-unclustered") ?? false)) {
-        await _mapboxController?.style.addSource(GeoJsonSource(id: "regular-source-unclustered", data: "file://${paths['regular']}"));
-      }
+      // 🌟 VIBE FIX: Deleted 'regular-source-unclustered'. The map now only holds ONE heavy file in RAM!
+      await _mapboxController?.style.addSource(GeoJsonSource(id: "heroes-source", data: "file://${paths['heroes']}", buffer: 128.0));
 
-      if (!(await _mapboxController?.style.styleSourceExists("heroes-source") ?? false)) {
-        await _mapboxController?.style.addSource(GeoJsonSource(id: "heroes-source", data: "file://${paths['heroes']}", buffer: 128.0));
-      }
-
-      // --- 2. THE LAYERS (No slots used here = Above map labels) ---
-      // Adding all layers...
-      if (!(await _mapboxController?.style.styleLayerExists("cluster-circles") ?? false)) {
-        await _mapboxController?.style.addLayer(CircleLayer(id: "cluster-circles", sourceId: "regular-source"));
-      }
+      // --- 2. THE LAYERS ---
+      await _mapboxController?.style.addLayer(CircleLayer(id: "cluster-circles", sourceId: "regular-source"));
       await _mapboxController?.style.setStyleLayerProperty("cluster-circles", "filter", ["has", "point_count"]);
       await _mapboxController?.style.setStyleLayerProperty("cluster-circles", "circle-color", isDarkMode ? "#1E1E1E" : "#FFFFFF");
       await _mapboxController?.style.setStyleLayerProperty("cluster-circles", "circle-stroke-color", isDarkMode ? "#FFFFFF" : "#000000"); 
       await _mapboxController?.style.setStyleLayerProperty("cluster-circles", "circle-stroke-width", 3.5); 
       await _mapboxController?.style.setStyleLayerProperty("cluster-circles", "circle-radius", ["step", ["get", "point_count"], 18, 100, 22, 1000, 26]);
 
-      if (!(await _mapboxController?.style.styleLayerExists("cluster-text") ?? false)) {
-        await _mapboxController?.style.addLayer(SymbolLayer(id: "cluster-text", sourceId: "regular-source"));
-      }
+      await _mapboxController?.style.addLayer(SymbolLayer(id: "cluster-text", sourceId: "regular-source"));
       await _mapboxController?.style.setStyleLayerProperty("cluster-text", "filter", ["has", "point_count"]);
       await _mapboxController?.style.setStyleLayerProperty("cluster-text", "text-field", ["case", ["<", ["get", "point_count"], 1000], ["to-string", ["get", "point_count"]], ["concat", ["to-string", ["floor", ["/", ["get", "point_count"], 1000]]], "k+"]]);
       await _mapboxController?.style.setStyleLayerProperty("cluster-text", "text-font", ["Source Code Pro Bold", "Open Sans Bold", "Arial Unicode MS Bold"]);
@@ -1101,31 +1117,23 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       final dynamicIconSize = ["interpolate", ["linear"], ["zoom"], 8.0, 0.40, 11.0, 0.55, 14.0, 0.75, 16.0, 0.90];
 
       // Add regular-bubbles
-      if (!(await _mapboxController?.style.styleLayerExists("regular-bubbles") ?? false)) {
-        await _mapboxController?.style.addLayer(SymbolLayer(id: "regular-bubbles", sourceId: "regular-source", minZoom: 14.0, iconAllowOverlap: false, iconPitchAlignment: IconPitchAlignment.VIEWPORT));
-      }
+      await _mapboxController?.style.addLayer(SymbolLayer(id: "regular-bubbles", sourceId: "regular-source", minZoom: 14.0, iconAllowOverlap: false, iconPitchAlignment: IconPitchAlignment.VIEWPORT));
       await _mapboxController?.style.setStyleLayerProperty("regular-bubbles", "filter", ["!", ["has", "point_count"]]);
       await _mapboxController?.style.setStyleLayerProperty("regular-bubbles", "icon-image", dynamicIconImage);
       await _mapboxController?.style.setStyleLayerProperty("regular-bubbles", "icon-size", dynamicIconSize);
 
       // Add heroes layers (bib, 1, 3-2)
-      if (!(await _mapboxController?.style.styleLayerExists("heroes-bib-bubbles") ?? false)) {
-        await _mapboxController?.style.addLayer(SymbolLayer(id: "heroes-bib-bubbles", sourceId: "heroes-source", minZoom: 13.0, iconAllowOverlap: true, iconPitchAlignment: IconPitchAlignment.VIEWPORT));
-      }
+      await _mapboxController?.style.addLayer(SymbolLayer(id: "heroes-bib-bubbles", sourceId: "heroes-source", minZoom: 13.0, iconAllowOverlap: true, iconPitchAlignment: IconPitchAlignment.VIEWPORT));
       await _mapboxController?.style.setStyleLayerProperty("heroes-bib-bubbles", "filter", ["all", bibCheck, ["==", starsVal, 0]]);
       await _mapboxController?.style.setStyleLayerProperty("heroes-bib-bubbles", "icon-image", dynamicIconImage);
       await _mapboxController?.style.setStyleLayerProperty("heroes-bib-bubbles", "icon-size", dynamicIconSize);
 
-      if (!(await _mapboxController?.style.styleLayerExists("heroes-1-bubbles") ?? false)) {
-        await _mapboxController?.style.addLayer(SymbolLayer(id: "heroes-1-bubbles", sourceId: "heroes-source", minZoom: 12.0, iconAllowOverlap: true, iconPitchAlignment: IconPitchAlignment.VIEWPORT));
-      }
+      await _mapboxController?.style.addLayer(SymbolLayer(id: "heroes-1-bubbles", sourceId: "heroes-source", minZoom: 12.0, iconAllowOverlap: true, iconPitchAlignment: IconPitchAlignment.VIEWPORT));
       await _mapboxController?.style.setStyleLayerProperty("heroes-1-bubbles", "filter", ["==", starsVal, 1]);
       await _mapboxController?.style.setStyleLayerProperty("heroes-1-bubbles", "icon-image", dynamicIconImage);
       await _mapboxController?.style.setStyleLayerProperty("heroes-1-bubbles", "icon-size", dynamicIconSize);
 
-      if (!(await _mapboxController?.style.styleLayerExists("heroes-3-2-bubbles") ?? false)) {
-        await _mapboxController?.style.addLayer(SymbolLayer(id: "heroes-3-2-bubbles", sourceId: "heroes-source", minZoom: 8.0, iconAllowOverlap: true, iconPitchAlignment: IconPitchAlignment.VIEWPORT));
-      }
+      await _mapboxController?.style.addLayer(SymbolLayer(id: "heroes-3-2-bubbles", sourceId: "heroes-source", minZoom: 8.0, iconAllowOverlap: true, iconPitchAlignment: IconPitchAlignment.VIEWPORT));
       await _mapboxController?.style.setStyleLayerProperty("heroes-3-2-bubbles", "filter", [">=", starsVal, 2]);
       await _mapboxController?.style.setStyleLayerProperty("heroes-3-2-bubbles", "symbol-sort-key", ["case", ["==", starsVal, 3], 2, ["==", starsVal, 2], 1, 0]); 
       await _mapboxController?.style.setStyleLayerProperty("heroes-3-2-bubbles", "icon-image", dynamicIconImage);
@@ -1134,28 +1142,22 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       // --- 4. FILTER OVERRIDES ---
       final hideCommand = ["==", ["get", "id"], -1];
 
-      if (!(await _mapboxController?.style.styleLayerExists("filtered-regular-bubbles") ?? false)) {
-        await _mapboxController?.style.addLayer(SymbolLayer(id: "filtered-regular-bubbles", sourceId: "regular-source-unclustered", minZoom: 1.0, iconAllowOverlap: false, iconPitchAlignment: IconPitchAlignment.VIEWPORT));
-      }
+      // 🌟 VIBE FIX: Redirected this layer to point to 'regular-source' instead of the duplicate!
+      await _mapboxController?.style.addLayer(SymbolLayer(id: "filtered-regular-bubbles", sourceId: "regular-source", minZoom: 1.0, iconAllowOverlap: false, iconPitchAlignment: IconPitchAlignment.VIEWPORT));
       await _mapboxController?.style.setStyleLayerProperty("filtered-regular-bubbles", "filter", hideCommand); 
       await _mapboxController?.style.setStyleLayerProperty("filtered-regular-bubbles", "icon-image", dynamicIconImage);
       await _mapboxController?.style.setStyleLayerProperty("filtered-regular-bubbles", "icon-size", dynamicIconSize);
 
-      if (!(await _mapboxController?.style.styleLayerExists("filtered-bib-bubbles") ?? false)) {
-        await _mapboxController?.style.addLayer(SymbolLayer(id: "filtered-bib-bubbles", sourceId: "heroes-source", minZoom: 1.0, iconAllowOverlap: true, iconPitchAlignment: IconPitchAlignment.VIEWPORT));
-      }
+      await _mapboxController?.style.addLayer(SymbolLayer(id: "filtered-bib-bubbles", sourceId: "heroes-source", minZoom: 1.0, iconAllowOverlap: true, iconPitchAlignment: IconPitchAlignment.VIEWPORT));
       await _mapboxController?.style.setStyleLayerProperty("filtered-bib-bubbles", "filter", hideCommand);
       await _mapboxController?.style.setStyleLayerProperty("filtered-bib-bubbles", "icon-image", dynamicIconImage);
       await _mapboxController?.style.setStyleLayerProperty("filtered-bib-bubbles", "icon-size", dynamicIconSize);
 
-      if (!(await _mapboxController?.style.styleLayerExists("filtered-1-bubbles") ?? false)) {
-        await _mapboxController?.style.addLayer(SymbolLayer(id: "filtered-1-bubbles", sourceId: "heroes-source", minZoom: 1.0, iconAllowOverlap: true, iconPitchAlignment: IconPitchAlignment.VIEWPORT));
-      }
+      await _mapboxController?.style.addLayer(SymbolLayer(id: "filtered-1-bubbles", sourceId: "heroes-source", minZoom: 1.0, iconAllowOverlap: true, iconPitchAlignment: IconPitchAlignment.VIEWPORT));
       await _mapboxController?.style.setStyleLayerProperty("filtered-1-bubbles", "filter", hideCommand);
       await _mapboxController?.style.setStyleLayerProperty("filtered-1-bubbles", "icon-image", dynamicIconImage);
       await _mapboxController?.style.setStyleLayerProperty("filtered-1-bubbles", "icon-size", dynamicIconSize);
 
-      // 🌟 THE NUCLEAR HIERARCHY FIX: Toggle the puck off and back on
       await _mapboxController?.location.updateSettings(LocationComponentSettings(enabled: false));
       await Future.delayed(const Duration(milliseconds: 50));
       await _mapboxController?.location.updateSettings(LocationComponentSettings(
@@ -1283,8 +1285,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
   // 📡 5. SUPABASE SINGLE QUERY & UI TRIGGER
   // =========================================================================
   Future<void> _fetchAndShowRestaurant(int restaurantId) async {
-    // 🌟 THE FIX: Removed the _isJumpingToLocation = true loader!
+    // 🌟 1. THE BOUNCER: If we are already fetching, ignore any new taps!
+    if (_isFetchingSheet) return; 
     
+    // 🌟 2. Lock the door
+    _isFetchingSheet = true; 
+
     try {
       final data = await Supabase.instance.client
           .from('restaurants')
@@ -1295,7 +1301,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       final restaurant = Restaurant.fromMap(data);
 
       if (mounted) {
-        // Slide up your beautiful Detail Sheet instantly
         showModalBottomSheet(
           context: context, 
           isScrollControlled: true, 
@@ -1314,6 +1319,13 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       }
     } catch (e) {
       debugPrint("🚨 Supabase single fetch error: $e");
+    } finally {
+      // 🌟 3. Unlock the door once the data is fetched (or if it crashes)
+      // We use a tiny 300ms delay to ensure the bottom sheet has enough time 
+      // to physically animate up and block the screen before unlocking.
+      Future.delayed(const Duration(milliseconds: 300), () {
+        _isFetchingSheet = false;
+      });
     }
   }
 
@@ -1364,7 +1376,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       userFilters.add(michelinOr);
     }
 
-    // 🌟 THE FIX: "Open Now" Engine
+    // 🌟 VIBE FIX: The "Open Now" Engine throttle
     if (showOpenOnly) {
        List<int> openIds = [];
        final nycTime = DateTime.now().toUtc().subtract(const Duration(hours: 4)); 
@@ -1375,6 +1387,11 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
           }
        });
 
+       // 👇 We cap the list at 400 to prevent the massive memory spike during translation
+       if (openIds.length > 400) {
+         openIds = openIds.sublist(0, 400);
+       }
+
        if (openIds.isEmpty) {
           userFilters.add(["==", ["get", "id"], -1]); 
        } else {
@@ -1382,7 +1399,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
        }
     }
 
-    // 🌟 THE FIX: Flatten the array so Mapbox doesn't crash on nested "all" statements
     List<dynamic> combine(List<dynamic> base) {
       if (userFilters.length == 1) return base;
       return ["all", base, ...userFilters.sublist(1)];
@@ -1445,7 +1461,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
             onMapCreated: (MapboxMap map) {
               _mapboxController = map; 
               
-              // 🌟 THE NEW CODE: Turn on the native Location Puck!
+              // 🌟 THE FIX: The microsecond the engine turns over, force it to sync with the app's saved memory.
+              _mapboxController?.loadStyleURI(
+                isDarkMode ? MapboxStyles.DARK : MapboxStyles.STANDARD
+              );
+              
+              // 🌟 Turn on the native Location Puck!
               _mapboxController?.location.updateSettings(LocationComponentSettings(
                 enabled: true,
                 pulsingEnabled: true, // Gives it a cool radar pulse effect
@@ -1740,46 +1761,22 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
               ),
             ),
 
+          // 🌟 THE FIX: The new gorgeous loading overlay
           if (_isBuildingVault)
             Positioned.fill(
-              child: Container(
-                color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const CupertinoActivityIndicator(radius: 20),
-                    const SizedBox(height: 24),
-                    Text(
-                      "Stamping your initial visa...",
-                      style: TextStyle(
-                        fontFamily: 'AppleGaramond',
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        fontStyle: FontStyle.italic,
-                        color: isDarkMode ? Colors.white : Colors.black,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      "Securing local coordinates. This only happens once.",
-                      style: TextStyle(
-                        color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
+              child: VaultLoadingOverlay(
+                isDarkMode: isDarkMode,
+                isOffline: _isOffline,
               ),
             ),
         ],
       ),
-      
       // =======================================================================
       // 5. FAB (PASSPORT)
       // =======================================================================
-      floatingActionButton: FloatingActionButton(
-        key: _passportKey, 
+      // 🌟 THE FIX: Completely hide the FAB if the loading screen is active
+      floatingActionButton: _isBuildingVault ? null : FloatingActionButton(
+        key: _passportKey,
         backgroundColor: Colors.amber,
         child: const Icon(Icons.filter_none, color: Colors.black),
         onPressed: () {
@@ -1797,7 +1794,276 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
   }
 }
 
-// Put this at the very bottom of map_screen.dart
+// =========================================================================
+// 🌟 THE SMOKE & MIRRORS LOADING SCREEN (V3 - THE SIRI ORB)
+// =========================================================================
+class VaultLoadingOverlay extends StatefulWidget {
+  final bool isDarkMode;
+  final bool isOffline;
+
+  const VaultLoadingOverlay({super.key, required this.isDarkMode, required this.isOffline});
+
+  @override
+  State<VaultLoadingOverlay> createState() => _VaultLoadingOverlayState();
+}
+
+// 🌟 Changed to TickerProviderStateMixin to handle multiple animation controllers!
+class _VaultLoadingOverlayState extends State<VaultLoadingOverlay> with TickerProviderStateMixin {
+  int _fakeCount = 0;
+  Timer? _timer;
+  late DateTime _startTime;
+  
+  late AnimationController _pulseController;
+  late AnimationController _rotationController;
+
+  @override
+  void initState() {
+    super.initState();
+    _startTime = DateTime.now();
+    
+    // The Throbbing Core
+    _pulseController = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat(reverse: true);
+    // The Rotating Siri Aura
+    _rotationController = AnimationController(vsync: this, duration: const Duration(seconds: 4))..repeat();
+    
+    _startFakeCounter();
+  }
+
+  void _startFakeCounter() {
+    _timer = Timer.periodic(const Duration(milliseconds: 40), (timer) {
+      if (widget.isOffline) {
+        _startTime = _startTime.add(const Duration(milliseconds: 40));
+        return;
+      }
+
+      if (mounted) {
+        final elapsedMs = DateTime.now().difference(_startTime).inMilliseconds;
+        
+        setState(() {
+          int targetCount = (elapsedMs * 4.78).round(); 
+          
+          if (targetCount > 35850) {
+            targetCount = 35850 + ((elapsedMs - 7500) / 300).round();
+            if (targetCount > 35999) targetCount = 35999;
+          }
+          
+          if (targetCount > _fakeCount) _fakeCount = targetCount;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _pulseController.dispose();
+    _rotationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final progressPercentage = (_fakeCount / 36000).clamp(0.0, 1.0);
+    final accentColor = widget.isOffline ? Colors.redAccent : (widget.isDarkMode ? Colors.white : Colors.black);
+
+    // 🌟 Forces the battery and time to be black on the white screen
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.dark, 
+      child: ClipRRect(
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 40.0, sigmaY: 40.0), 
+          child: Container(
+            color: widget.isDarkMode ? const Color(0xFF121212).withOpacity(0.85) : const Color(0xFFF5F5F7).withOpacity(0.95),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                
+                // 🌟 1. THE SIRI ORB (V3.1 - Internal Mesh)
+                SizedBox(
+                  width: 140, 
+                  height: 140,
+                  child: Center(
+                    child: AnimatedBuilder(
+                      animation: _pulseController,
+                      builder: (context, child) {
+                        return Transform.scale(
+                          scale: widget.isOffline ? 1.0 : 1.0 + (_pulseController.value * 0.08),
+                          child: Container(
+                            width: 90, // Slightly larger to show off the internal colors
+                            height: 90,
+                            decoration: BoxDecoration(
+                              color: Colors.black, // The deep black core
+                              shape: BoxShape.circle,
+                              boxShadow: widget.isOffline ? [
+                                BoxShadow(color: Colors.redAccent.withOpacity(0.4), blurRadius: 30, spreadRadius: 10)
+                              ] : [
+                                BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 15, offset: const Offset(0, 6))
+                              ],
+                            ),
+                            // 🌟 THE FIX: ClipOval traps the blurred colors strictly inside the black orb
+                            child: ClipOval(
+                              child: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  // Layer A: The Internal Swirling Smoke
+                                  if (!widget.isOffline)
+                                    AnimatedBuilder(
+                                      animation: _rotationController,
+                                      builder: (context, child) {
+                                        return Transform.scale(
+                                          scale: 1.4, // Scale up so the heavy blur doesn't leave edge gaps
+                                          child: Transform.rotate(
+                                            angle: _rotationController.value * 2 * math.pi,
+                                            child: ImageFiltered(
+                                              imageFilter: ui.ImageFilter.blur(sigmaX: 14.0, sigmaY: 14.0),
+                                              child: Container(
+                                                decoration: BoxDecoration(
+                                                  shape: BoxShape.circle,
+                                                  gradient: SweepGradient(
+                                                    colors: [
+                                                      const Color(0xFF007AFF).withOpacity(0.75), // Blue
+                                                      const Color(0xFFFF2D55).withOpacity(0.75), // Red
+                                                      const Color(0xFFFFCC00).withOpacity(0.75), // Yellow
+                                                      const Color(0xFF007AFF).withOpacity(0.75), // Loop
+                                                    ],
+                                                    stops: const [0.0, 0.33, 0.66, 1.0],
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                    ),
+
+                                  // Layer B: The Icon on top
+                                  Icon(
+                                    widget.isOffline ? CupertinoIcons.wifi_exclamationmark : Icons.restaurant, 
+                                    size: 38, 
+                                    color: widget.isOffline ? Colors.redAccent : Colors.white
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      }
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 48),
+                
+                // 🌟 2. THE TEXT UPDATES
+                Text(
+                  widget.isOffline ? "SIGNAL LOST" : "INITIALIZING VAULT",
+                  style: TextStyle(
+                    fontFamily: 'Courier',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 3.0,
+                    color: widget.isOffline ? Colors.redAccent : (widget.isDarkMode ? Colors.white54 : Colors.black54),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                
+                Text(
+                  widget.isOffline ? "Awaiting Network Connection" : "Fetching Restaurants...",
+                  style: TextStyle(
+                    fontFamily: 'AppleGaramond',
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: widget.isDarkMode ? Colors.white : Colors.black,
+                  ),
+                ),
+                
+                // The Reassurance Text
+                if (!widget.isOffline)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12.0),
+                    child: Text(
+                      "This secure download only happens once.\nPlease keep the app open.",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: 'SFPro',
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: widget.isDarkMode ? Colors.white54 : Colors.black54,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                
+                const SizedBox(height: 40),
+
+                // 🌟 3. THE PROGRESS BAR
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 60),
+                  child: Column(
+                    children: [
+                      Stack(
+                        children: [
+                          Container(
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: widget.isDarkMode ? Colors.white10 : Colors.black12,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 100),
+                            height: 4,
+                            width: MediaQuery.of(context).size.width * progressPercentage, 
+                            decoration: BoxDecoration(
+                              color: widget.isOffline ? Colors.redAccent : (widget.isDarkMode ? Colors.white : Colors.black),
+                              borderRadius: BorderRadius.circular(2),
+                              boxShadow: [
+                                BoxShadow(color: accentColor.withOpacity(0.5), blurRadius: 8)
+                              ]
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      
+                      // 🌟 4. THE DATA READOUT
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            widget.isOffline ? "OFFLINE" : "RESTAURANTS",
+                            style: TextStyle(
+                              fontFamily: 'Courier',
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: widget.isDarkMode ? Colors.white30 : Colors.black38,
+                            ),
+                          ),
+                          Text(
+                            "${_fakeCount.toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')} / 36,000+",
+                            style: TextStyle(
+                              fontFamily: 'Courier', 
+                              color: widget.isDarkMode ? Colors.white70 : Colors.black87,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// =========================================================================
+// 🕒 THE OPEN HOURS PARSER
+// =========================================================================
 class OSMTimeParser {
   static bool isOpen(String hoursStr, DateTime now) {
     if (hoursStr.contains('24/7')) return true;

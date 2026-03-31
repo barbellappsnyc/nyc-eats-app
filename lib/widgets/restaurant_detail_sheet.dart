@@ -51,6 +51,10 @@ class _RestaurantDetailSheetState extends State<RestaurantDetailSheet> {
   
   @override
   void dispose() {
+
+    // 🧹 THE MEMORY FLUSH: Nuke the images from RAM the second this sheet closes!
+    PaintingBinding.instance.imageCache.clear();
+    PaintingBinding.instance.imageCache.clearLiveImages();
     _scrollController.dispose();
     super.dispose();
   }

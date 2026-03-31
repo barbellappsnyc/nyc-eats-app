@@ -29,7 +29,8 @@ class VaultBuilder {
             .from('restaurants')
             // 🌟 THE FIX: Select ALL columns needed for Mapbox filtering!
             .select('id, name, lat, lng, cuisine, michelin_stars, bib_gourmand, price, is_vegetarian, is_vegan, opening_hours')
-            .range(offset, offset + pageSize - 1);
+            .range(offset, offset + pageSize - 1)
+            .timeout(const Duration(seconds: 5)); // 🌟 THE ZOMBIE KILL SWITCH
 
         allRows.addAll(response);
         if (response.length < pageSize) hasMore = false;
