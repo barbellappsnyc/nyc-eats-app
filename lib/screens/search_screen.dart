@@ -99,7 +99,8 @@ class _SearchScreenState extends State<SearchScreen> {
       final data = await Supabase.instance.client
           .from('restaurants')
           .select()
-          .ilike('name', '%$searchQuery%') 
+          // 🌟 THE FIX: Use Supabase's .or() to search both Name AND Cuisine
+          .or('name.ilike.%$searchQuery%,cuisine.ilike.%$searchQuery%') 
           .limit(20);
 
       if (mounted) {
@@ -109,14 +110,14 @@ class _SearchScreenState extends State<SearchScreen> {
         });
       }
     } catch (e) {
-      debugPrint("圷 Search Query Error: $e");
+      debugPrint("🚨 Search Query Error: $e");
       if (mounted) setState(() => _isSearchingDB = false);
     }
   }
   
   String? _getEmojiForCategory(String category) {
     if (category.toLowerCase() == 'hot_dog' || category.toLowerCase() == 'hot dog') {
-      return '遣';
+      return '🌭'; // 🌟 Fixed the corrupted emoji
     }
 
     if (categoryFlags.containsKey(category)) {
@@ -249,7 +250,9 @@ class _SearchScreenState extends State<SearchScreen> {
                   )
                 ),
                 onTap: () {
-                  widget.onCategorySelected(cat); 
+                  // 🌟 THE INTERCEPTOR: Strips emojis so the Mapbox database can actually read it
+                  final cleanCategory = cat.replaceAll(RegExp(r'[^\w\s-]', unicode: true), '').trim().toLowerCase();
+                  widget.onCategorySelected(cleanCategory); 
                   Navigator.pop(context);
                 },
               );
@@ -305,7 +308,9 @@ class _SearchScreenState extends State<SearchScreen> {
                 style: TextStyle(color: textColor, fontSize: 16, fontWeight: FontWeight.w500)
               ),
               onTap: () {
-                widget.onCategorySelected(cat); 
+                // 🌟 THE INTERCEPTOR: Strips emojis here too
+                final cleanCategory = cat.replaceAll(RegExp(r'[^\w\s-]', unicode: true), '').trim().toLowerCase();
+                widget.onCategorySelected(cleanCategory); 
                 Navigator.pop(context);
               },
             );
@@ -328,7 +333,7 @@ class _SearchScreenState extends State<SearchScreen> {
               contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4), 
               title: Text(r.name, style: TextStyle(color: textColor, fontWeight: FontWeight.bold)),
               subtitle: Text(
-                "${_formatCategoryName(r.cuisine)} 窶｢ ${r.price}", 
+                "${_formatCategoryName(r.cuisine)} • ${r.price}", // 🌟 Replaced the corrupted text with a clean bullet point
                 style: TextStyle(color: isDark ? Colors.grey[400] : Colors.grey[600]),
               ),
               leading: Container(

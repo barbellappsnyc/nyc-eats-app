@@ -1117,27 +1117,31 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
     if (_mapboxController == null) return;
 
     try {
-      // 🌟 THE FIX: The Master Escape Hatch. 
       final sourceExists = await _mapboxController?.style.styleSourceExists("regular-source") ?? false;
       if (sourceExists) {
         debugPrint("Mapbox sources already exist. Skipping rebuild.");
         return; 
       }
 
-      // --- 1. THE SOURCES ---
+      // --- 1. THE LOCAL SOURCES ---
       await _mapboxController?.style.addSource(
-        GeoJsonSource(id: "regular-source",
-        data: "file://${paths['regular']}", 
-        cluster: true, clusterRadius: 50, 
+        GeoJsonSource(id: "regular-source", data: "file://${paths['regular']}", cluster: true, clusterRadius: 50, clusterMaxZoom: 14.0, buffer: 128.0)
+      );
+      await _mapboxController?.style.addSource(
+        GeoJsonSource(id: "heroes-source", data: "file://${paths['heroes']}", buffer: 128.0)
+      );
+
+      // 🌟 THE INJECTOR VESSEL: Now with Clustering turned ON!
+      await _mapboxController?.style.addSource(GeoJsonSource(
+        id: "search-source", 
+        data: '{"type":"FeatureCollection","features":[]}', 
+        cluster: true,        // 🌟 FIX: Cluster the Supabase data!
+        clusterRadius: 50, 
         clusterMaxZoom: 14.0, 
         buffer: 128.0
-        )
-      );
-      
-      // 🌟 VIBE FIX: Deleted 'regular-source-unclustered'. The map now only holds ONE heavy file in RAM!
-      await _mapboxController?.style.addSource(GeoJsonSource(id: "heroes-source", data: "file://${paths['heroes']}", buffer: 128.0));
+      ));
 
-      // --- 2. THE LAYERS ---
+      // --- 2. DEFAULT CLUSTER LAYERS ---
       await _mapboxController?.style.addLayer(CircleLayer(id: "cluster-circles", sourceId: "regular-source"));
       await _mapboxController?.style.setStyleLayerProperty("cluster-circles", "filter", ["has", "point_count"]);
       await _mapboxController?.style.setStyleLayerProperty("cluster-circles", "circle-color", isDarkMode ? "#1E1E1E" : "#FFFFFF");
@@ -1151,13 +1155,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       await _mapboxController?.style.setStyleLayerProperty("cluster-text", "text-font", ["Source Code Pro Bold", "Open Sans Bold", "Arial Unicode MS Bold"]);
       await _mapboxController?.style.setStyleLayerProperty("cluster-text", "text-size", 14.0);
       await _mapboxController?.style.setStyleLayerProperty("cluster-text", "text-color", isDarkMode ? "#FFFFFF" : "#000000");
-      await _mapboxController?.style.setStyleLayerProperty("cluster-text", "text-allow-overlap", true);
-      await _mapboxController?.style.setStyleLayerProperty("cluster-text", "text-ignore-placement", true);
 
-      // --- 3. PILL LAYERS ---
+      // --- 3. PILL CONFIGURATION ---
       final starsVal = ["to-number", ["get", "michelin_stars"], 0];
       final bibCheck = ["==", ["downcase", ["to-string", ["get", "bib_gourmand"]]], "true"];
       final ringType = ["case", [">", starsVal, 0], "gold", bibCheck, "red", "black"];
+      final notCluster = ["!", ["has", "point_count"]]; // 🌟 Helper to prevent drawing pins under clusters
       
       List<dynamic> emojiCode = ["case"];
       for (var cuisineKeyword in CuisineConstants.emojiPalettes.keys) {
@@ -1168,13 +1171,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       final dynamicIconImage = ["concat", "pill-", emojiCode, "-", ringType, "-", ["to-string", starsVal]];
       final dynamicIconSize = ["interpolate", ["linear"], ["zoom"], 8.0, 0.40, 11.0, 0.55, 14.0, 0.75, 16.0, 0.90];
 
-      // Add regular-bubbles
+      // --- 4. DEFAULT REGULAR & HERO LAYERS ---
       await _mapboxController?.style.addLayer(SymbolLayer(id: "regular-bubbles", sourceId: "regular-source", minZoom: 14.0, iconAllowOverlap: false, iconPitchAlignment: IconPitchAlignment.VIEWPORT));
-      await _mapboxController?.style.setStyleLayerProperty("regular-bubbles", "filter", ["!", ["has", "point_count"]]);
+      await _mapboxController?.style.setStyleLayerProperty("regular-bubbles", "filter", notCluster);
       await _mapboxController?.style.setStyleLayerProperty("regular-bubbles", "icon-image", dynamicIconImage);
       await _mapboxController?.style.setStyleLayerProperty("regular-bubbles", "icon-size", dynamicIconSize);
 
-      // Add heroes layers (bib, 1, 3-2)
       await _mapboxController?.style.addLayer(SymbolLayer(id: "heroes-bib-bubbles", sourceId: "heroes-source", minZoom: 13.0, iconAllowOverlap: true, iconPitchAlignment: IconPitchAlignment.VIEWPORT));
       await _mapboxController?.style.setStyleLayerProperty("heroes-bib-bubbles", "filter", ["all", bibCheck, ["==", starsVal, 0]]);
       await _mapboxController?.style.setStyleLayerProperty("heroes-bib-bubbles", "icon-image", dynamicIconImage);
@@ -1191,25 +1193,57 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       await _mapboxController?.style.setStyleLayerProperty("heroes-3-2-bubbles", "icon-image", dynamicIconImage);
       await _mapboxController?.style.setStyleLayerProperty("heroes-3-2-bubbles", "icon-size", dynamicIconSize);
 
-      // --- 4. FILTER OVERRIDES ---
-      final hideCommand = ["==", ["get", "id"], -1];
+      // --- 5. 🌟 THE SEARCH LAYERS (The proper hierarchy) ---
+      
+      // A. Search Clusters
+      await _mapboxController?.style.addLayer(CircleLayer(id: "search-cluster-circles", sourceId: "search-source"));
+      await _mapboxController?.style.setStyleLayerProperty("search-cluster-circles", "filter", ["has", "point_count"]);
+      await _mapboxController?.style.setStyleLayerProperty("search-cluster-circles", "circle-color", isDarkMode ? "#1E1E1E" : "#FFFFFF");
+      await _mapboxController?.style.setStyleLayerProperty("search-cluster-circles", "circle-stroke-color", "#FFB300"); // Amber border so you know it's a search result!
+      await _mapboxController?.style.setStyleLayerProperty("search-cluster-circles", "circle-stroke-width", 3.5); 
+      await _mapboxController?.style.setStyleLayerProperty("search-cluster-circles", "circle-radius", ["step", ["get", "point_count"], 18, 100, 22, 1000, 26]);
 
-      // 🌟 VIBE FIX: Redirected this layer to point to 'regular-source' instead of the duplicate!
-      await _mapboxController?.style.addLayer(SymbolLayer(id: "filtered-regular-bubbles", sourceId: "regular-source", minZoom: 1.0, iconAllowOverlap: false, iconPitchAlignment: IconPitchAlignment.VIEWPORT));
-      await _mapboxController?.style.setStyleLayerProperty("filtered-regular-bubbles", "filter", hideCommand); 
-      await _mapboxController?.style.setStyleLayerProperty("filtered-regular-bubbles", "icon-image", dynamicIconImage);
-      await _mapboxController?.style.setStyleLayerProperty("filtered-regular-bubbles", "icon-size", dynamicIconSize);
+      await _mapboxController?.style.addLayer(SymbolLayer(id: "search-cluster-text", sourceId: "search-source"));
+      await _mapboxController?.style.setStyleLayerProperty("search-cluster-text", "filter", ["has", "point_count"]);
+      await _mapboxController?.style.setStyleLayerProperty("search-cluster-text", "text-field", ["case", ["<", ["get", "point_count"], 1000], ["to-string", ["get", "point_count"]], ["concat", ["to-string", ["floor", ["/", ["get", "point_count"], 1000]]], "k+"]]);
+      await _mapboxController?.style.setStyleLayerProperty("search-cluster-text", "text-font", ["Source Code Pro Bold", "Open Sans Bold", "Arial Unicode MS Bold"]);
+      await _mapboxController?.style.setStyleLayerProperty("search-cluster-text", "text-size", 14.0);
+      await _mapboxController?.style.setStyleLayerProperty("search-cluster-text", "text-color", isDarkMode ? "#FFFFFF" : "#000000");
 
-      await _mapboxController?.style.addLayer(SymbolLayer(id: "filtered-bib-bubbles", sourceId: "heroes-source", minZoom: 1.0, iconAllowOverlap: true, iconPitchAlignment: IconPitchAlignment.VIEWPORT));
-      await _mapboxController?.style.setStyleLayerProperty("filtered-bib-bubbles", "filter", hideCommand);
-      await _mapboxController?.style.setStyleLayerProperty("filtered-bib-bubbles", "icon-image", dynamicIconImage);
-      await _mapboxController?.style.setStyleLayerProperty("filtered-bib-bubbles", "icon-size", dynamicIconSize);
+      // B. Search Regular
+      await _mapboxController?.style.addLayer(SymbolLayer(id: "search-regular-bubbles", sourceId: "search-source", iconAllowOverlap: true, iconIgnorePlacement: true, iconPitchAlignment: IconPitchAlignment.VIEWPORT));
+      await _mapboxController?.style.setStyleLayerProperty("search-regular-bubbles", "filter", notCluster);
+      await _mapboxController?.style.setStyleLayerProperty("search-regular-bubbles", "icon-image", dynamicIconImage);
+      await _mapboxController?.style.setStyleLayerProperty("search-regular-bubbles", "icon-size", dynamicIconSize);
 
-      await _mapboxController?.style.addLayer(SymbolLayer(id: "filtered-1-bubbles", sourceId: "heroes-source", minZoom: 1.0, iconAllowOverlap: true, iconPitchAlignment: IconPitchAlignment.VIEWPORT));
-      await _mapboxController?.style.setStyleLayerProperty("filtered-1-bubbles", "filter", hideCommand);
-      await _mapboxController?.style.setStyleLayerProperty("filtered-1-bubbles", "icon-image", dynamicIconImage);
-      await _mapboxController?.style.setStyleLayerProperty("filtered-1-bubbles", "icon-size", dynamicIconSize);
+      // C. Search Bib
+      await _mapboxController?.style.addLayer(SymbolLayer(id: "search-bib-bubbles", sourceId: "search-source", iconAllowOverlap: true, iconIgnorePlacement: true, iconPitchAlignment: IconPitchAlignment.VIEWPORT));
+      await _mapboxController?.style.setStyleLayerProperty("search-bib-bubbles", "filter", ["all", notCluster, bibCheck, ["==", starsVal, 0]]);
+      await _mapboxController?.style.setStyleLayerProperty("search-bib-bubbles", "icon-image", dynamicIconImage);
+      await _mapboxController?.style.setStyleLayerProperty("search-bib-bubbles", "icon-size", dynamicIconSize);
 
+      // D. Search 1-Star
+      await _mapboxController?.style.addLayer(SymbolLayer(id: "search-1-bubbles", sourceId: "search-source", iconAllowOverlap: true, iconIgnorePlacement: true, iconPitchAlignment: IconPitchAlignment.VIEWPORT));
+      await _mapboxController?.style.setStyleLayerProperty("search-1-bubbles", "filter", ["all", notCluster, ["==", starsVal, 1]]);
+      await _mapboxController?.style.setStyleLayerProperty("search-1-bubbles", "icon-image", dynamicIconImage);
+      await _mapboxController?.style.setStyleLayerProperty("search-1-bubbles", "icon-size", dynamicIconSize);
+
+      // E. Search 3 & 2-Star (Rendered last, stays on top!)
+      await _mapboxController?.style.addLayer(SymbolLayer(id: "search-3-2-bubbles", sourceId: "search-source", iconAllowOverlap: true, iconIgnorePlacement: true, iconPitchAlignment: IconPitchAlignment.VIEWPORT));
+      await _mapboxController?.style.setStyleLayerProperty("search-3-2-bubbles", "filter", ["all", notCluster, [">=", starsVal, 2]]);
+      await _mapboxController?.style.setStyleLayerProperty("search-3-2-bubbles", "symbol-sort-key", ["case", ["==", starsVal, 3], 2, ["==", starsVal, 2], 1, 0]); 
+      await _mapboxController?.style.setStyleLayerProperty("search-3-2-bubbles", "icon-image", dynamicIconImage);
+      await _mapboxController?.style.setStyleLayerProperty("search-3-2-bubbles", "icon-size", dynamicIconSize);
+
+      // Start all search layers hidden
+      await _mapboxController?.style.setStyleLayerProperty("search-cluster-circles", "visibility", "none"); 
+      await _mapboxController?.style.setStyleLayerProperty("search-cluster-text", "visibility", "none"); 
+      await _mapboxController?.style.setStyleLayerProperty("search-regular-bubbles", "visibility", "none"); 
+      await _mapboxController?.style.setStyleLayerProperty("search-bib-bubbles", "visibility", "none"); 
+      await _mapboxController?.style.setStyleLayerProperty("search-1-bubbles", "visibility", "none"); 
+      await _mapboxController?.style.setStyleLayerProperty("search-3-2-bubbles", "visibility", "none"); 
+
+      // NATIVE LOCATION PUCK
       await _mapboxController?.location.updateSettings(LocationComponentSettings(enabled: false));
       await Future.delayed(const Duration(milliseconds: 50));
       await _mapboxController?.location.updateSettings(LocationComponentSettings(
@@ -1246,13 +1280,15 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       );
 
       final options = RenderedQueryOptions(layerIds: [
+        "search-heroes-3-2-bubbles",
         "heroes-3-2-bubbles", 
-        "filtered-1-bubbles",       // 🌟 ADDED
+        "search-heroes-1-bubbles",
         "heroes-1-bubbles",   
-        "filtered-bib-bubbles",     // 🌟 ADDED
+        "search-bib-bubbles",
         "heroes-bib-bubbles", 
-        "filtered-regular-bubbles", // 🌟 ADDED
+        "search-regular-bubbles",
         "regular-bubbles",    
+        "search-cluster-circles",
         "cluster-circles"     
       ]);
       
@@ -1260,15 +1296,17 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
 
       if (features.isNotEmpty) {
         
-        // 🌟 THE FIX: The Priority Funnel updated with overrides
+        // 🌟 Prioritize clicks: 3-stars first, clusters last
         final List<String> layerPriority = [
+          "search-heroes-3-2-bubbles",
           "heroes-3-2-bubbles",
-          "filtered-1-bubbles",       // 🌟 ADDED
+          "search-heroes-1-bubbles",
           "heroes-1-bubbles",
-          "filtered-bib-bubbles",     // 🌟 ADDED
+          "search-bib-bubbles",
           "heroes-bib-bubbles",
-          "filtered-regular-bubbles", // 🌟 ADDED
+          "search-regular-bubbles",
           "regular-bubbles",
+          "search-cluster-circles",
           "cluster-circles"
         ];
 
@@ -1413,108 +1451,158 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
   void _fetchRestaurants() async {
     if (_mapboxController == null) return;
 
-    final clusterBase = ["has", "point_count"];
-    final starsVal = ["to-number", ["get", "michelin_stars"], 0];
-    final bibCheck = ["==", ["downcase", ["to-string", ["get", "bib_gourmand"]]], "true"];
+    bool hasActiveFilters = selectedCategory != null || 
+                            selectedRestaurantName != null || 
+                            _showVegetarian || 
+                            _showVegan || 
+                            savedOnly || 
+                            _selectedPrices.isNotEmpty || 
+                            _selectedMichelin.isNotEmpty || 
+                            showOpenOnly;
 
-    final regularBase = ["!", ["has", "point_count"]];
-    final bibBase = ["all", bibCheck, ["==", starsVal, 0]];
-    final star1Base = ["==", starsVal, 1];
-    final star32Base = [">=", starsVal, 2];
-
-    List<dynamic> userFilters = ["all"]; 
-
-    if (selectedRestaurantName != null) {
-      userFilters.add(["==", ["get", "name"], selectedRestaurantName]);
-    } else if (selectedCategory != null) {
-      userFilters.add(["==", ["downcase", ["to-string", ["get", "cuisine"]]], selectedCategory!.toLowerCase()]);
-    }
-
-    if (_showVegetarian) userFilters.add(["==", ["downcase", ["to-string", ["get", "is_vegetarian"]]], "true"]);
-    if (_showVegan) userFilters.add(["==", ["downcase", ["to-string", ["get", "is_vegan"]]], "true"]);
-
-    if (savedOnly) {
-      if (savedRestaurantNames.isEmpty) {
-        userFilters.add(["==", ["get", "id"], -1]); 
-      } else {
-        userFilters.add(["in", ["get", "name"], ["literal", savedRestaurantNames.toList()]]);
-      }
-    }
-
-    if (_selectedPrices.isNotEmpty) {
-      userFilters.add(["in", ["get", "price"], ["literal", _selectedPrices.toList()]]);
-    }
-
-    if (_selectedMichelin.isNotEmpty) {
-      List<dynamic> michelinOr = ["any"]; 
-      if (_selectedMichelin.contains("Bib Gourmand")) michelinOr.add(bibCheck);
-      if (_selectedMichelin.contains("1 Star")) michelinOr.add(["==", starsVal, 1]);
-      if (_selectedMichelin.contains("2 Stars")) michelinOr.add(["==", starsVal, 2]);
-      if (_selectedMichelin.contains("3 Stars")) michelinOr.add(["==", starsVal, 3]);
-      userFilters.add(michelinOr);
-    }
-
-    // 🌟 VIBE FIX: The "Open Now" Engine throttle
-    if (showOpenOnly) {
-       List<int> openIds = [];
-       final nycTime = DateTime.now().toUtc().subtract(const Duration(hours: 4)); 
-       
-       _restaurantHours.forEach((id, hoursString) {
-          if (OSMTimeParser.isOpen(hoursString, nycTime)) {
-             openIds.add(int.parse(id));
-          }
-       });
-
-       // 👇 We cap the list at 400 to prevent the massive memory spike during translation
-       if (openIds.length > 400) {
-         openIds = openIds.sublist(0, 400);
-       }
-
-       if (openIds.isEmpty) {
-          userFilters.add(["==", ["get", "id"], -1]); 
-       } else {
-          userFilters.add(["in", ["get", "id"], ["literal", openIds]]);
-       }
-    }
-
-    List<dynamic> combine(List<dynamic> base) {
-      if (userFilters.length == 1) return base;
-      return ["all", base, ...userFilters.sublist(1)];
+    // Helper to clear map if a filter combination returns zero results
+    Future<void> injectEmptySearch() async {
+      await _mapboxController?.style.setStyleSourceProperty("search-source", "data", '{"type": "FeatureCollection", "features": []}');
+      
+      // Hide default
+      await _mapboxController?.style.setStyleLayerProperty("cluster-circles", "visibility", "none");
+      await _mapboxController?.style.setStyleLayerProperty("cluster-text", "visibility", "none");
+      await _mapboxController?.style.setStyleLayerProperty("regular-bubbles", "visibility", "none");
+      await _mapboxController?.style.setStyleLayerProperty("heroes-bib-bubbles", "visibility", "none");
+      await _mapboxController?.style.setStyleLayerProperty("heroes-1-bubbles", "visibility", "none");
+      await _mapboxController?.style.setStyleLayerProperty("heroes-3-2-bubbles", "visibility", "none");
+      
+      // Show Search Layers
+      await _mapboxController?.style.setStyleLayerProperty("search-cluster-circles", "visibility", "visible");
+      await _mapboxController?.style.setStyleLayerProperty("search-cluster-text", "visibility", "visible");
+      await _mapboxController?.style.setStyleLayerProperty("search-regular-bubbles", "visibility", "visible");
+      await _mapboxController?.style.setStyleLayerProperty("search-bib-bubbles", "visibility", "visible");
+      await _mapboxController?.style.setStyleLayerProperty("search-1-bubbles", "visibility", "visible");
+      await _mapboxController?.style.setStyleLayerProperty("search-3-2-bubbles", "visibility", "visible");
     }
 
     try {
-      bool hasActiveFilters = userFilters.length > 1;
-      final hideCommand = ["==", ["get", "id"], -1];
-
-      if (hasActiveFilters) {
-        // 1. HIDE DEFAULT HIERARCHY
-        await _mapboxController?.style.setStyleLayerProperty("cluster-circles", "filter", hideCommand);
-        await _mapboxController?.style.setStyleLayerProperty("cluster-text", "filter", hideCommand);
-        await _mapboxController?.style.setStyleLayerProperty("regular-bubbles", "filter", hideCommand);
-        await _mapboxController?.style.setStyleLayerProperty("heroes-bib-bubbles", "filter", hideCommand);
-        await _mapboxController?.style.setStyleLayerProperty("heroes-1-bubbles", "filter", hideCommand);
-
-        // 2. SHOW OVERRIDE LAYERS GLOBALLY
-        await _mapboxController?.style.setStyleLayerProperty("filtered-regular-bubbles", "filter", combine(regularBase));
-        await _mapboxController?.style.setStyleLayerProperty("filtered-bib-bubbles", "filter", combine(bibBase));
-        await _mapboxController?.style.setStyleLayerProperty("filtered-1-bubbles", "filter", combine(star1Base));
-        await _mapboxController?.style.setStyleLayerProperty("heroes-3-2-bubbles", "filter", combine(star32Base)); 
-      } else {
-        // 1. RESTORE DEFAULT HIERARCHY
-        await _mapboxController?.style.setStyleLayerProperty("cluster-circles", "filter", clusterBase);
-        await _mapboxController?.style.setStyleLayerProperty("cluster-text", "filter", clusterBase);
-        await _mapboxController?.style.setStyleLayerProperty("regular-bubbles", "filter", regularBase);
-        await _mapboxController?.style.setStyleLayerProperty("heroes-bib-bubbles", "filter", bibBase);
-        await _mapboxController?.style.setStyleLayerProperty("heroes-1-bubbles", "filter", star1Base);
-        await _mapboxController?.style.setStyleLayerProperty("heroes-3-2-bubbles", "filter", star32Base);
-
-        // 2. HIDE OVERRIDE LAYERS
-        await _mapboxController?.style.setStyleLayerProperty("filtered-regular-bubbles", "filter", hideCommand);
-        await _mapboxController?.style.setStyleLayerProperty("filtered-bib-bubbles", "filter", hideCommand);
-        await _mapboxController?.style.setStyleLayerProperty("filtered-1-bubbles", "filter", hideCommand);
+      if (!hasActiveFilters) {
+        // 🌟 RESET: Restore default hierarchy, hide the search layers
+        await _mapboxController?.style.setStyleLayerProperty("search-cluster-circles", "visibility", "none");
+        await _mapboxController?.style.setStyleLayerProperty("search-cluster-text", "visibility", "none");
+        await _mapboxController?.style.setStyleLayerProperty("search-regular-bubbles", "visibility", "none");
+        await _mapboxController?.style.setStyleLayerProperty("search-bib-bubbles", "visibility", "none");
+        await _mapboxController?.style.setStyleLayerProperty("search-1-bubbles", "visibility", "none");
+        await _mapboxController?.style.setStyleLayerProperty("search-3-2-bubbles", "visibility", "none");
+        
+        await _mapboxController?.style.setStyleLayerProperty("cluster-circles", "visibility", "visible");
+        await _mapboxController?.style.setStyleLayerProperty("cluster-text", "visibility", "visible");
+        await _mapboxController?.style.setStyleLayerProperty("regular-bubbles", "visibility", "visible");
+        await _mapboxController?.style.setStyleLayerProperty("heroes-bib-bubbles", "visibility", "visible");
+        await _mapboxController?.style.setStyleLayerProperty("heroes-1-bubbles", "visibility", "visible");
+        await _mapboxController?.style.setStyleLayerProperty("heroes-3-2-bubbles", "visibility", "visible");
+        return;
       }
+
+      // 🌟 OFFLINE CHECK
+      if (_isOffline) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text("Search mapping requires an internet connection.", style: TextStyle(fontFamily: 'SFPro')),
+            backgroundColor: Colors.amber[800],
+          ),
+        );
+        return;
+      }
+
+      // 🌟 BUILD SUPABASE QUERY
+      var query = Supabase.instance.client.from('restaurants').select();
+
+      if (selectedRestaurantName != null) {
+        query = query.eq('name', selectedRestaurantName!);
+      } else if (selectedCategory != null) {
+        query = query.ilike('cuisine', '%${selectedCategory!}%');
+      }
+
+      if (_showVegetarian) query = query.eq('is_vegetarian', true);
+      if (_showVegan) query = query.eq('is_vegan', true);
+
+      if (savedOnly) {
+        if (savedRestaurantNames.isEmpty) {
+          await injectEmptySearch();
+          return;
+        } else {
+          query = query.inFilter('name', savedRestaurantNames.toList());
+        }
+      }
+
+      if (_selectedPrices.isNotEmpty) {
+        query = query.inFilter('price', _selectedPrices.toList());
+      }
+
+      if (_selectedMichelin.isNotEmpty) {
+        List<String> orConditions = [];
+        if (_selectedMichelin.contains("Bib Gourmand")) orConditions.add('bib_gourmand.eq.true');
+        if (_selectedMichelin.contains("1 Star")) orConditions.add('michelin_stars.eq.1');
+        if (_selectedMichelin.contains("2 Stars")) orConditions.add('michelin_stars.eq.2');
+        if (_selectedMichelin.contains("3 Stars")) orConditions.add('michelin_stars.eq.3');
+        
+        if (orConditions.isNotEmpty) {
+          query = query.or(orConditions.join(','));
+        }
+      }
+
+      if (showOpenOnly) {
+         List<int> openIds = [];
+         final nycTime = DateTime.now().toUtc().subtract(const Duration(hours: 4)); 
+         _restaurantHours.forEach((id, hoursString) {
+            if (OSMTimeParser.isOpen(hoursString, nycTime)) openIds.add(int.parse(id));
+         });
+
+         if (openIds.length > 400) openIds = openIds.sublist(0, 400);
+
+         if (openIds.isEmpty) {
+            await injectEmptySearch();
+            return; 
+         } else {
+            query = query.inFilter('id', openIds);
+         }
+      }
+
+      // 🌟 FETCH & CONVERT (Limit applied!)
+      final data = await query.limit(2000);
+      
+      List<Map<String, dynamic>> features = data.map((r) {
+        return {
+          "type": "Feature",
+          "geometry": {
+            "type": "Point",
+            "coordinates": [r['lng'], r['lat']] 
+          },
+          "properties": r 
+        };
+      }).toList();
+
+      final String geoJsonPayload = jsonEncode({
+        "type": "FeatureCollection",
+        "features": features
+      });
+
+      // 🌟 INJECT & SWAP LAYERS
+      await _mapboxController?.style.setStyleSourceProperty("search-source", "data", geoJsonPayload);
+
+      await _mapboxController?.style.setStyleLayerProperty("cluster-circles", "visibility", "none");
+      await _mapboxController?.style.setStyleLayerProperty("cluster-text", "visibility", "none");
+      await _mapboxController?.style.setStyleLayerProperty("regular-bubbles", "visibility", "none");
+      await _mapboxController?.style.setStyleLayerProperty("heroes-bib-bubbles", "visibility", "none");
+      await _mapboxController?.style.setStyleLayerProperty("heroes-1-bubbles", "visibility", "none");
+      await _mapboxController?.style.setStyleLayerProperty("heroes-3-2-bubbles", "visibility", "none");
+      
+      await _mapboxController?.style.setStyleLayerProperty("search-cluster-circles", "visibility", "visible");
+      await _mapboxController?.style.setStyleLayerProperty("search-cluster-text", "visibility", "visible");
+      await _mapboxController?.style.setStyleLayerProperty("search-regular-bubbles", "visibility", "visible");
+      await _mapboxController?.style.setStyleLayerProperty("search-bib-bubbles", "visibility", "visible");
+      await _mapboxController?.style.setStyleLayerProperty("search-1-bubbles", "visibility", "visible");
+      await _mapboxController?.style.setStyleLayerProperty("search-3-2-bubbles", "visibility", "visible");
+
     } catch (e) {
-      debugPrint("🚨 Filter Update Error: $e");
+      debugPrint("🚨 Injector Error: $e");
     }
   }
 
