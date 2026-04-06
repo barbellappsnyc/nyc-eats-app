@@ -1,7 +1,8 @@
 import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
-import 'package:flutter/foundation.dart'; // 👈 1. Added this for kDebugMode and debugPrint
+import 'package:flutter/foundation.dart'; 
+import 'package:flutter_dotenv/flutter_dotenv.dart'; // 🌟 ADDED DOTENV
 
 class PurchaseService {
   // Singleton pattern
@@ -11,33 +12,27 @@ class PurchaseService {
 
   bool _isInitialized = false;
 
-  // 🔑 YOUR KEYS GO HERE
-  final String _iosApiKey = 'appl_qbylCvYsyXEXBKFceOKcbGyAnVD'; 
-  final String _androidApiKey = 'goog_YOUR_ANDROID_KEY_HERE';
-
   /// 1. Initialize (Real RevenueCat)
   Future<void> init() async {
-    // Prevent double initialization
     if (_isInitialized) return;
 
-    // 👈 2. Protected RevenueCat's internal logger!
     if (kDebugMode) {
       await Purchases.setLogLevel(LogLevel.debug);
     }
 
     PurchasesConfiguration? configuration;
 
+    // 🌟 THE FIX: Pulling your keys securely from the .env file
     if (Platform.isAndroid) {
-      configuration = PurchasesConfiguration(_androidApiKey);
+      configuration = PurchasesConfiguration(dotenv.env['RC_ANDROID_KEY'] ?? '');
     } else if (Platform.isIOS) {
-      configuration = PurchasesConfiguration(_iosApiKey);
-      // Note: On Simulator, this will only work if you have a .storekit file loaded in Xcode scheme
+      configuration = PurchasesConfiguration(dotenv.env['RC_IOS_KEY'] ?? '');
     }
 
     if (configuration != null) {
       await Purchases.configure(configuration);
       _isInitialized = true;
-      if (kDebugMode) debugPrint("✅ REAL PURCHASE SERVICE: Initialized"); // 👈 3. Protected
+      if (kDebugMode) debugPrint("✅ REAL PURCHASE SERVICE: Initialized"); 
     }
   }
 
@@ -45,16 +40,14 @@ class PurchaseService {
   Future<List<Package>> fetchOffers() async {
     try {
       final offerings = await Purchases.getOfferings();
-      
-      // We look for the 'current' offering you configured in the RevenueCat dashboard.
       if (offerings.current != null && offerings.current!.availablePackages.isNotEmpty) {
         return offerings.current!.availablePackages;
       } else {
-        if (kDebugMode) debugPrint("⚠️ No offerings found. Check RevenueCat Dashboard setup."); // 👈 Protected
+        if (kDebugMode) debugPrint("⚠️ No offerings found. Check RevenueCat Dashboard setup."); 
         return [];
       }
     } on PlatformException catch (e) {
-      if (kDebugMode) debugPrint("❌ Error fetching offers: $e"); // 👈 Protected
+      if (kDebugMode) debugPrint("❌ Error fetching offers: $e"); 
       return [];
     }
   }
@@ -62,19 +55,28 @@ class PurchaseService {
   /// 3. Buy an Item (Real Transaction)
   Future<bool> purchasePackage(Package package) async {
     try {
-      final CustomerInfo customerInfo = await Purchases.purchasePackage(package);
-      
-      // If code reaches here, the transaction was successful!
-      if (kDebugMode) debugPrint("✅ PURCHASE SUCCESS: ${package.storeProduct.identifier}"); // 👈 Protected
+      await Purchases.purchasePackage(package);
+      if (kDebugMode) debugPrint("✅ PURCHASE SUCCESS: ${package.storeProduct.identifier}"); 
       return true;
-      
     } on PlatformException catch (e) {
       final errorCode = PurchasesErrorHelper.getErrorCode(e);
       if (errorCode == PurchasesErrorCode.purchaseCancelledError) {
-        if (kDebugMode) debugPrint("User cancelled purchase"); // 👈 Protected
+        if (kDebugMode) debugPrint("User cancelled purchase"); 
       } else {
-        if (kDebugMode) debugPrint("❌ Purchase Error: $e"); // 👈 Protected
+        if (kDebugMode) debugPrint("❌ Purchase Error: $e"); 
       }
+      return false;
+    }
+  }
+
+  /// 🌟 4. THE APPLE REQUIREMENT: Restore Purchases
+  Future<bool> restorePurchases() async {
+    try {
+      await Purchases.restorePurchases();
+      if (kDebugMode) debugPrint("✅ RESTORE SUCCESS");
+      return true;
+    } catch (e) {
+      if (kDebugMode) debugPrint("❌ Restore Error: $e");
       return false;
     }
   }

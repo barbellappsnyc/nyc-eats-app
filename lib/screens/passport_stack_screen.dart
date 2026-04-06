@@ -1,5 +1,6 @@
 // ... imports ... (Same as before)
 import 'dart:async';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -445,8 +446,15 @@ class _PassportStackScreenState extends State<PassportStackScreen>
   Future<void> _initiateImmigrationProtocol() async {
     if (_protocolRunning || _showStampButton || _isStampingSequence) return;
     
+    // 🛑 THE BOUNCER: Block auto-handoffs
+    if (await _runImmigrationBouncer()) {
+       if (mounted) setState(() { _isLoading = false; }); 
+       return; 
+    }
+
     // 🌉 Keep the loading bridge active!
     setState(() { _protocolRunning = true; _isLoading = true; });
+// ... rest remains exactly the same
 
     final userId = Supabase.instance.client.auth.currentUser?.id;
 
@@ -1243,12 +1251,13 @@ class _PassportStackScreenState extends State<PassportStackScreen>
     return Color(int.parse(buffer.toString(), radix: 16));
   }
 
-  // 1. 🚀 MANUAL STAMPING (The "+" Button)
   Future<void> _showStampSearchSheet() async {
+    // 🛑 THE BOUNCER: Block manual entry
+    if (await _runImmigrationBouncer()) return;
+
     // 🛑 ARCHIVE INTERCEPTOR
-    // Rule: If it's Read-Only AND NOT the Wildcard, we block it.
-    // Exception: If it IS the Wildcard, we let them pass (The Mercenary Protocol).
     if (widget.isReadOnly && _passportSku != 'free_tier') {
+// ... rest remains exactly the same
       final bool? shouldActivate = await showDialog<bool>(
         context: context,
         builder: (context) => Dialog(
@@ -1300,6 +1309,52 @@ class _PassportStackScreenState extends State<PassportStackScreen>
     if (selected != null) {
       _executeStampSequence(manualRestaurant: selected);
     }
+  }
+
+  // 🛑 OFFLINE BOUNCER
+  Future<bool> _runImmigrationBouncer() async {
+    final results = await Connectivity().checkConnectivity();
+    final isOffline = !results.any((r) => r != ConnectivityResult.none);
+
+    if (isOffline) {
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => Dialog(
+            backgroundColor: const Color(0xFFFFFDF7),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(color: Colors.redAccent.withOpacity(0.1), shape: BoxShape.circle),
+                    child: const Icon(Icons.wifi_off, size: 40, color: Colors.redAccent),
+                  ),
+                  const SizedBox(height: 20),
+                  const Text("SERVICES OFFLINE", style: TextStyle(fontFamily: 'Courier', fontWeight: FontWeight.bold, fontSize: 20, letterSpacing: 1.0)),
+                  const SizedBox(height: 12),
+                  const Text("Immigration Services is currently offline.\n\nPlease connect to the internet to verify and issue new stamps.", textAlign: TextAlign.center, style: TextStyle(color: Colors.black54, height: 1.5, fontSize: 14)),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.black, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                      child: const Text("GOT IT", style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.0)),
+                    ),
+                  )
+                ],
+              ),
+            ),
+          )
+        );
+      }
+      return true; // User is bounced
+    }
+    return false; // User is allowed
   }
 
   @override

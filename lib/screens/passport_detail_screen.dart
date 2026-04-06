@@ -73,6 +73,7 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
   bool _isMtaNightMode = true; 
   bool _isDragging = false;
   bool _isPassportOnTop = true; 
+  bool _isSavingToCameraRoll = false; // 👈 NEW: Tracks the download state
 
   late List<bool> _bgIsLight;   
   final ScreenshotController _cardOnlyController = ScreenshotController();
@@ -495,15 +496,46 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
       
       // 1. ENTERING MTA (Index 5)
       if (_currentBgIndex == 5) { 
-        double targetY = size.height / 2; 
-        if (_mtaStations.length == 1 || _mtaStations.length == 3) {
-          targetY = size.height * 0.65; 
+        bool hasBottomBlobs = _mtaStations.length == 2 || _mtaStations.length >= 4;
+
+        double screenW = size.width;
+        double screenH = size.height;
+        
+        double baseCardW = (screenW * 0.85).clamp(300.0, 400.0);
+        double baseCardH = baseCardW * (540 / 340);
+        
+        // Exact architectural margins from the background
+        double notchMargin = 80.0;
+        double pillMargin = 110.0;
+        double targetBH = screenH * 0.13;
+        double safePadding = 40.0; // 🌟 20px guaranteed gap on top and bottom
+        
+        if (hasBottomBlobs) {
+           double topBlobBottom = notchMargin + targetBH;
+           double bottomBlobTop = (screenH - pillMargin) - targetBH;
+           double availableH = bottomBlobTop - topBlobBottom;
+           
+           double maxCardH = availableH - safePadding;
+           double idealScale = maxCardH / baseCardH;
+           
+           // 🌟 Let it grow massively on iPads, but protect it from over-shrinking on SEs
+           _cardScale = idealScale.clamp(0.65, 0.95); 
+           _cardPosition = Offset(screenW / 2, topBlobBottom + (availableH / 2));
+        } else {
+           double topBlobBottom = notchMargin + targetBH;
+           double availableH = (screenH - pillMargin) - topBlobBottom;
+           
+           double maxCardH = availableH - safePadding;
+           double idealScale = maxCardH / baseCardH;
+           
+           // 🌟 Let it hit full 1.0 scale on larger screens
+           _cardScale = idealScale.clamp(0.75, 1.0); 
+           // Nudge slightly below center for visual balance
+           _cardPosition = Offset(screenW / 2, topBlobBottom + (availableH * 0.52));
         }
-        _cardPosition = Offset(size.width / 2, targetY);
-        _cardScale = 1.0; 
         _cardRotation = 0.0; 
-      } 
-      
+      }
+      // ... (keep your existing Photobooth and Exit logic below)
       // 2. ENTERING PHOTOBOOTH TABLETHROW (Index 8)
       else if (_currentBgIndex == 8) {
         _cardRotation = 1.570796; // 👈 90 degrees
@@ -552,6 +584,11 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
   }
 
   Future<void> _saveToCameraRoll() async {
+    // 🛡️ Prevent double-taps while it's already saving
+    if (_isSavingToCameraRoll) return;
+
+    setState(() => _isSavingToCameraRoll = true); // 🎬 START LOADING
+
     try {
       Uint8List? imageBytes;
 
@@ -564,6 +601,7 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
       if (imageBytes == null) return;
 
       final bool hasAccess = await Gal.hasAccess();
+      // The spinner will keep rotating while this OS sheet is on screen!
       if (!hasAccess) await Gal.requestAccess();
 
       final directory = await getTemporaryDirectory();
@@ -584,6 +622,11 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
       }
     } catch (e) {
       debugPrint("Save error: $e");
+    } finally {
+      // 🛑 STOP LOADING (Guaranteed to run, even on error or permission denial)
+      if (mounted) {
+        setState(() => _isSavingToCameraRoll = false);
+      }
     }
   }
 
@@ -631,7 +674,8 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
       final response = await supabase
           .from('mta_stations')
           .select()
-          .inFilter('id', stationIds); 
+          .inFilter('id', stationIds)
+          .timeout(const Duration(seconds: 3)); // ⏱️ THE 3-SECOND SAFETY VALVE
 
       if (mounted) {
         setState(() {
@@ -642,7 +686,29 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
         _updateDefaultCardPosition(-1); 
       }
     } catch (e) {
-      debugPrint("SUPABASE ERROR: $e");
+      debugPrint("SUPABASE ERROR (Likely Offline): $e");
+      
+      // 🌟 GRACEFUL FALLBACK & TOAST
+      if (mounted) {
+        setState(() => _isLoadingStations = false);
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: const [
+                Icon(CupertinoIcons.wifi_exclamationmark, color: Colors.white, size: 20),
+                SizedBox(width: 12),
+                Expanded(child: Text("Offline. Displaying fallback transit data.", style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'SFPro'))),
+              ],
+            ),
+            backgroundColor: Colors.amber[800],
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            margin: const EdgeInsets.only(bottom: 20, left: 20, right: 20),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     }
   }
 
@@ -650,9 +716,10 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
     required IconData icon,
     required VoidCallback onTap,
     Color color = Colors.white,
+    bool isLoading = false, // 👈 NEW PARAMETER
   }) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: isLoading ? null : onTap, // Prevent tapping while loading
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 6),
         decoration: BoxDecoration(
@@ -687,7 +754,10 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
                   width: 1.2, 
                 ),
               ),
-              child: Icon(icon, size: 26, color: color),
+              // 👇 THE FIX: Swap to activity indicator when loading
+              child: isLoading 
+                  ? CupertinoActivityIndicator(color: color, radius: 13) 
+                  : Icon(icon, size: 26, color: color),
             ),
           ),
         ),
@@ -1113,6 +1183,7 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
                             children: [
                               _buildGroovedButton(
                                 icon: CupertinoIcons.arrow_down,
+                                isLoading: _isSavingToCameraRoll, // 👈 PASS THE STATE HERE
                                 onTap: _saveToCameraRoll,
                               ),
                               

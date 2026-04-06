@@ -26,18 +26,18 @@ class PassportService {
     ]);
   }
 
-  // 2. 📚 FETCH LIBRARY (Robust Version)
+  // 2. 📚 FETCH LIBRARY (Robust Offline Version)
   static Future<List<Map<String, dynamic>>> fetchUserLibrary({bool forceRefresh = false}) async {
     if (!forceRefresh && _libraryCache != null) return _libraryCache!;
 
     final userId = _client.auth.currentUser?.id;
 
-    // 👻 GUEST MODE
+    // 👻 GUEST MODE (Already works offline natively)
     if (userId == null) {
       return await _loadGuestBook();
     }
 
-    // ☁️ USER MODE (With Timeout Protection)
+    // ☁️ USER MODE (With Timeout & Offline Protection)
     try {
       final response = await _client
           .from('user_passport_books')
@@ -66,9 +66,29 @@ class PassportService {
       }
 
       _libraryCache = data;
+      
+      // 🌟 NEW: Save the successful fetch to the device for offline viewing!
+      await _savePremiumLibraryToDisk(data);
+      
       return data;
     } catch (e) {
-      debugPrint("⚠️ Cloud Fetch Failed (loading Guest Book instead): $e");
+      debugPrint("⚠️ Cloud Fetch Failed. Attempting to load Offline Cache...");
+      
+      // 🌟 THE AMNESIA FIX: Before loading the Guest Book, check the premium vault!
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final String? offlineData = prefs.getString('offline_premium_library');
+        
+        if (offlineData != null) {
+          debugPrint("✅ Offline Premium Cache restored successfully!");
+          _libraryCache = List<Map<String, dynamic>>.from(jsonDecode(offlineData));
+          return _libraryCache!;
+        }
+      } catch (cacheError) {
+        debugPrint("❌ Offline Cache corrupted or missing.");
+      }
+
+      // If all else fails, load the guest book so the screen doesn't crash
       return await _loadGuestBook();
     }
   }
@@ -583,6 +603,16 @@ class PassportService {
           .eq('id', bookId);
 
       await validateLibraryIntegrity();
+    }
+  }
+
+  // 💾 OFFLINE CACHE: Save Premium Library to Device
+  static Future<void> _savePremiumLibraryToDisk(List<Map<String, dynamic>> data) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('offline_premium_library', jsonEncode(data));
+    } catch (e) {
+      debugPrint("⚠️ Failed to cache premium library: $e");
     }
   }
 

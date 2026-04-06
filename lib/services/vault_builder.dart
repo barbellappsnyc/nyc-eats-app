@@ -25,18 +25,35 @@ class VaultBuilder {
       bool hasMore = true;
 
       while (hasMore) {
-        final response = await Supabase.instance.client
-            .from('restaurants')
-            // 🌟 THE FIX: Select ALL columns needed for Mapbox filtering!
-            .select('id, name, lat, lng, cuisine, michelin_stars, bib_gourmand, price, is_vegetarian, is_vegan, opening_hours')
-            .range(offset, offset + pageSize - 1)
-            .timeout(const Duration(seconds: 5)); // 🌟 THE ZOMBIE KILL SWITCH
+        bool chunkSuccess = false;
+        int retryCount = 0;
+        
+        while (!chunkSuccess) {
+          try {
+            final response = await Supabase.instance.client
+                .from('restaurants')
+                .select('id, name, lat, lng, cuisine, michelin_stars, bib_gourmand, price, is_vegetarian, is_vegan, opening_hours')
+                .range(offset, offset + pageSize - 1)
+                .timeout(const Duration(seconds: 15)); // 🌟 Increased to 15s to allow for real-world transit times
 
-        allRows.addAll(response);
-        if (response.length < pageSize) hasMore = false;
-        else offset += pageSize;
+            allRows.addAll(response);
+            if (response.length < pageSize) hasMore = false;
+            else offset += pageSize;
+            
+            chunkSuccess = true; // The fetch succeeded, break the retry loop!
+          } catch (e) {
+            retryCount++;
+            debugPrint("🚨 Chunk timeout. Retry $retryCount...");
+            
+            if (retryCount >= 3) {
+              rethrow; // If it fails 3 times in a row, the network is truly dead. Let it fail gracefully.
+            }
+            
+            // Give the socket 2 seconds to breathe before hammering Supabase again
+            await Future.delayed(const Duration(seconds: 2)); 
+          }
+        }
       }
-
       List<Map<String, dynamic>> heroesFeatures = [];
       List<Map<String, dynamic>> regularFeatures = [];
       Map<String, String> hoursDict = {}; // 🌟 Track hours separately

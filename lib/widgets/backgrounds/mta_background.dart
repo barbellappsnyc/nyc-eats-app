@@ -57,43 +57,69 @@ class _MtaBackgroundState extends State<MtaBackground> {
     super.dispose();
   }
 
-  // 🛑 REMOVED: The entire _tick(Duration elapsed) function with the math
-
   void _initializeBlobsIfNeed(double width, double height) {
-    final stations = _effectiveStations; // 👈 NEW: Grab the active or fallback list
+    final stations = _effectiveStations; 
 
-    // 🛠️ STEP 2 FIX: Also check if the number of stations has changed!
+    // IMPORTANT BUG FIX: Also check if the passport scale/position changed!
     if (_isInitialized && _screenSize.width == width && _blobs.length == stations.length) return;
     _screenSize = Size(width, height);
     _blobs.clear();
     
-    int count = stations.length; // 👈 CHANGED: use the local variable
-    double bW, bH;
+    int count = stations.length; 
+    bool hasBottomBlobs = count == 2 || count >= 4;
+
+    // 🧮 1. DYNAMIC SAFE ZONE MATH (Now reads actual scale!)
+    double expectedScale = widget.passportScale;
+    // Failsafe center if position isn't initialized yet
+    double expectedCenterY = widget.passportPosition.dy == 0 ? height / 2 : widget.passportPosition.dy;
+
+    double baseCardW = (width * 0.85).clamp(300.0, 400.0);
+    double visualCardH = baseCardW * expectedScale * (540 / 340);
+
+    double cardTop = expectedCenterY - (visualCardH / 2);
+    double cardBottom = expectedCenterY + (visualCardH / 2);
+
+    double notchMargin = 80.0; 
+    double pillMargin = 110.0; 
+    double minPadding = 16.0; // 🌟 The absolute minimum pixel gap before blobs squish
+
+    double maxTopBlobHeight = cardTop - notchMargin - minPadding;
+    double maxBottomBlobHeight = (height - pillMargin) - cardBottom - minPadding;
+
+    maxTopBlobHeight = max(maxTopBlobHeight, 60.0);
+    maxBottomBlobHeight = max(maxBottomBlobHeight, 60.0);
+
+    double targetBH = height * 0.13; 
+    double bH;
+
+    if (hasBottomBlobs) {
+      bH = min(targetBH, min(maxTopBlobHeight, maxBottomBlobHeight));
+    } else {
+      bH = min(targetBH, maxTopBlobHeight);
+    }
+
+    double topY = notchMargin;
+    double bottomY = (height - pillMargin) - bH;
+
+    double bW;
     
-    // 📏 SHAPE & HOME LOGIC
-    // 📏 SHAPE & HOME LOGIC
+    // ... (Keep the rest of your blob placement logic exactly the same)
     if (count == 1 || count == 2) {
-      bW = width * 0.90; 
-      bH = height * 0.12; 
-      
-      // 🚀 THE EXTREMES: Push Top up to the absolute SafeArea, push Bottom to the floor
-      double topY = height * 0.05; 
-      double bottomY = height * 0.95 - bH; 
-      
+      bW = width * 0.90;
       _blobs.add(BlobNode(x: (width - bW) / 2, y: topY, width: bW, height: bH)); // Top
       if (count == 2) {
         _blobs.add(BlobNode(x: (width - bW) / 2, y: bottomY, width: bW, height: bH)); // Bottom
       }
     } else if (count == 3) {
-      bW = width * 0.28; bH = height * 0.18;
+      bW = width * 0.28; 
       double spacing = (width - (bW * 3)) / 4;
-      for (int i = 0; i < 3; i++) _blobs.add(BlobNode(x: spacing + (i * (bW + spacing)), y: height * 0.1, width: bW, height: bH));
+      for (int i = 0; i < 3; i++) _blobs.add(BlobNode(x: spacing + (i * (bW + spacing)), y: topY, width: bW, height: bH));
     } else {
-      bW = width * 0.40; bH = height * 0.20;
-      _blobs.add(BlobNode(x: width * 0.05, y: height * 0.05, width: bW, height: bH)); // Top L
-      _blobs.add(BlobNode(x: width - bW - (width * 0.05), y: height * 0.05, width: bW, height: bH)); // Top R
-      _blobs.add(BlobNode(x: width * 0.05, y: height - bH - (height * 0.05), width: bW, height: bH)); // Bot L
-      _blobs.add(BlobNode(x: width - bW - (width * 0.05), y: height - bH - (height * 0.05), width: bW, height: bH)); // Bot R
+      bW = width * 0.44; 
+      _blobs.add(BlobNode(x: width * 0.04, y: topY, width: bW, height: bH)); // Top L
+      _blobs.add(BlobNode(x: width - bW - (width * 0.04), y: topY, width: bW, height: bH)); // Top R
+      _blobs.add(BlobNode(x: width * 0.04, y: bottomY, width: bW, height: bH)); // Bot L
+      _blobs.add(BlobNode(x: width - bW - (width * 0.04), y: bottomY, width: bW, height: bH)); // Bot R
     }
     _isInitialized = true;
   }
@@ -230,13 +256,13 @@ class _MtaBackgroundState extends State<MtaBackground> {
   }
 
   Widget _buildLTRContent(String stationName, List<String> lines, String borough, {required bool isDark}) {
-    // Keep your existing glassGradient logic here...
     List<Color> glassGradient = isDark 
         ? [Colors.white.withOpacity(0.08), Colors.white.withOpacity(0.02)]
         : [Colors.white, Colors.white.withOpacity(0.95)];
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      // 🌟 TWEAKED: Reduced vertical padding to 12 to maximize internal height
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       decoration: BoxDecoration(
         gradient: LinearGradient(colors: glassGradient),
         border: Border.all(color: isDark ? Colors.white.withOpacity(0.15) : Colors.white, width: 2.0),
@@ -246,62 +272,67 @@ class _MtaBackgroundState extends State<MtaBackground> {
         children: [
           // 🔣 LEFT ANCHOR: The Line Grid
           SizedBox(
-            width: 80, // Fixed width block for the icons
+            width: 80, 
             child: _buildDynamicLineGrid(lines, isDark),
           ),
           
-          const SizedBox(width: 16), // Padding between icons and text
+          const SizedBox(width: 16), 
           
           // 📝 RIGHT ANCHOR: The Typography
           Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "NYC TRANSIT",
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: isDark ? FontWeight.w800 : FontWeight.w900,
-                    letterSpacing: 2.0,
-                    color: isDark ? Colors.white54 : Colors.black45,
-                    fontFamily: 'Helvetica',
+            // 🛡️ THE FIX: Indestructible wrapper prevents RenderFlex overflow crashes
+            child: SingleChildScrollView(
+              physics: const NeverScrollableScrollPhysics(),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min, // 🌟 Tells the column to only take what it needs
+                children: [
+                  Text(
+                    "NYC TRANSIT",
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: isDark ? FontWeight.w800 : FontWeight.w900,
+                      letterSpacing: 2.0,
+                      color: isDark ? Colors.white54 : Colors.black45,
+                      fontFamily: 'Helvetica',
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  stationName,
-                  maxLines: 2, // 👈 THE FIX: Allows long names to wrap cleanly
-                  overflow: TextOverflow.visible,
-                  style: TextStyle(
-                    fontSize: 20, // 👈 Slightly smaller to ensure elegance
-                    fontWeight: isDark ? FontWeight.w700 : FontWeight.w800,
-                    letterSpacing: -0.5,
-                    color: isDark ? Colors.white : Colors.black87,
-                    height: 1.1,
-                    fontFamily: 'Helvetica',
+                  const SizedBox(height: 4),
+                  Text(
+                    stationName,
+                    maxLines: 2, 
+                    overflow: TextOverflow.ellipsis, // 🌟 Changed to ellipsis for a cleaner cutoff if it hits 3 lines
+                    style: TextStyle(
+                      fontSize: 20, 
+                      fontWeight: isDark ? FontWeight.w700 : FontWeight.w800,
+                      letterSpacing: -0.5,
+                      color: isDark ? Colors.white : Colors.black87,
+                      height: 1.1,
+                      fontFamily: 'Helvetica',
+                    ),
                   ),
-                ),
-                if (borough.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Icon(Icons.location_on, size: 12, color: isDark ? Colors.white54 : Colors.black54),
-                      const SizedBox(width: 4),
-                      Text(
-                        borough.toUpperCase(),
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.5,
-                          color: isDark ? Colors.white60 : Colors.black54,
-                          fontFamily: 'Helvetica',
+                  if (borough.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(Icons.location_on, size: 12, color: isDark ? Colors.white54 : Colors.black54),
+                        const SizedBox(width: 4),
+                        Text(
+                          borough.toUpperCase(),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.5,
+                            color: isDark ? Colors.white60 : Colors.black54,
+                            fontFamily: 'Helvetica',
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                ]
-              ],
+                      ],
+                    ),
+                  ]
+                ],
+              ),
             ),
           ),
         ],
@@ -417,12 +448,12 @@ class _MtaBackgroundState extends State<MtaBackground> {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final double cardWidth = constraints.maxWidth;
-          final bool isSmall = cardWidth < 160; 
+          final bool isSmall = cardWidth < 220; // 🌟 Trigger small mode earlier
           
-          final double circleSize = isSmall ? 24.0 : 32.0;
-          final double circleText = isSmall ? 13.0 : 16.0;
-          final double titleSize = isSmall ? 18.0 : 22.0;
-          final double boroughSize = isSmall ? 10.0 : 12.0;
+          final double circleSize = isSmall ? 22.0 : 32.0; // Shrunk circles
+          final double circleText = isSmall ? 11.0 : 16.0;
+          final double titleSize = isSmall ? 14.0 : 22.0; // Shrunk title
+          final double boroughSize = isSmall ? 9.0 : 12.0;
 
           return Stack(
             children: [
@@ -431,13 +462,13 @@ class _MtaBackgroundState extends State<MtaBackground> {
                 bottom: -25,
                 child: Icon(
                   Icons.directions_subway_filled,
-                  size: isSmall ? 100 : 140,
+                  size: isSmall ? 80 : 140, // Shrunk background icon
                   color: isDark ? Colors.white.withOpacity(0.04) : Colors.black.withOpacity(0.03), 
                 ),
               ),
               
               Padding(
-                padding: const EdgeInsets.all(12.0),
+                padding: const EdgeInsets.all(8.0), // 🌟 Tighter padding
                 child: Center(
                   child: SingleChildScrollView(
                     physics: const NeverScrollableScrollPhysics(),
@@ -455,7 +486,7 @@ class _MtaBackgroundState extends State<MtaBackground> {
                             fontFamily: 'Helvetica',
                           ),
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 6), // 🌟 Tighter gap
 
                         if (lines.isNotEmpty)
                           Wrap(
@@ -474,31 +505,18 @@ class _MtaBackgroundState extends State<MtaBackground> {
                                       color: Colors.black.withOpacity(0.3),
                                       blurRadius: isDark ? 4 : 6,
                                       offset: Offset(0, isDark ? 2 : 3),
-                                    ),
-                                    if (!isDark)
-                                      BoxShadow(
-                                        color: Colors.white.withOpacity(0.5),
-                                        blurRadius: 0,
-                                        spreadRadius: 0.5,
-                                        offset: const Offset(0, 0),
-                                      )
+                                    )
                                   ]
                                 ),
                                 child: Center(
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(4.0), 
-                                    child: FittedBox(
-                                      fit: BoxFit.scaleDown,
-                                      child: Text(
-                                        line,
-                                        maxLines: 1, 
-                                        style: TextStyle(
-                                          color: _getTextColor(line),
-                                          fontSize: circleText,
-                                          fontWeight: FontWeight.bold,
-                                          fontFamily: 'Helvetica', 
-                                        ),
-                                      ),
+                                  child: Text(
+                                    line,
+                                    maxLines: 1, 
+                                    style: TextStyle(
+                                      color: _getTextColor(line),
+                                      fontSize: circleText,
+                                      fontWeight: FontWeight.bold,
+                                      fontFamily: 'Helvetica', 
                                     ),
                                   ),
                                 ),
@@ -506,10 +524,12 @@ class _MtaBackgroundState extends State<MtaBackground> {
                             }).toList(),
                           ),
                         
-                        if (lines.isNotEmpty) const SizedBox(height: 14),
+                        if (lines.isNotEmpty) const SizedBox(height: 8), // 🌟 Tighter gap
                         
                         Text(
                           stationName,
+                          maxLines: 2, // 🌟 ALLOW WRAPPING
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: titleSize,
                             fontWeight: isDark ? FontWeight.w700 : FontWeight.w800,
@@ -520,27 +540,6 @@ class _MtaBackgroundState extends State<MtaBackground> {
                           ),
                           textAlign: TextAlign.center,
                         ),
-                        
-                        if (borough.isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.location_on, size: boroughSize, color: isDark ? Colors.white54 : Colors.black54),
-                              const SizedBox(width: 4),
-                              Text(
-                                borough.toUpperCase(),
-                                style: TextStyle(
-                                  fontSize: boroughSize,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 1.5,
-                                  color: isDark ? Colors.white60 : Colors.black54,
-                                  fontFamily: 'Helvetica',
-                                ),
-                              ),
-                            ],
-                          ),
-                        ]
                       ],
                     ),
                   ),

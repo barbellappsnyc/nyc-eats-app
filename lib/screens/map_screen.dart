@@ -92,6 +92,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
   final GlobalKey _profileKey = GlobalKey();
   final GlobalKey _wheelKey = GlobalKey();
   final GlobalKey _passportKey = GlobalKey();
+  final GlobalKey _conciergeKey = GlobalKey(); // 👈 NEW: Hook for the tutorial
 
   int _currentPhraseIndex = 0;
   Timer? _textTimer;
@@ -654,44 +655,82 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
 
     return AnimatedSize(
       duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOutBack,
       child: Container(
         width: double.infinity,
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-        decoration: BoxDecoration(
-          color: _isOffline ? const Color(0xFFD32F2F) : const Color(0xFFFFA000), 
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              _isOffline ? Icons.wifi_off : Icons.location_disabled, 
-              color: Colors.white, 
-              size: 16
-            ),
-            const SizedBox(width: 8),
-            Text(
-              _isOffline ? "YOU ARE OFFLINE" : "LOCATION SERVICES DISABLED",
-              style: const TextStyle(
-                color: Colors.white, 
-                fontWeight: FontWeight.bold, 
-                fontSize: 12,
-                letterSpacing: 1.0
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: BackdropFilter(
+            filter: ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              decoration: BoxDecoration(
+                // Frosted grey for offline, amber for GPS disabled
+                color: _isOffline 
+                    ? (isDarkMode ? Colors.black.withOpacity(0.65) : Colors.white.withOpacity(0.85))
+                    : const Color(0xFFFFA000).withOpacity(0.9), 
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: _isOffline 
+                      ? (isDarkMode ? Colors.white24 : Colors.black12)
+                      : Colors.white30,
+                  width: 1.0,
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Icon(
+                    _isOffline ? CupertinoIcons.wifi_exclamationmark : Icons.location_disabled, 
+                    color: _isOffline ? Colors.amber[700] : Colors.white, 
+                    size: 28
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _isOffline ? "YOU ARE OFFLINE" : "LOCATION SERVICES DISABLED",
+                          style: TextStyle(
+                            color: _isOffline ? (isDarkMode ? Colors.white : Colors.black87) : Colors.white, 
+                            fontWeight: FontWeight.bold, 
+                            fontFamily: 'SFPro',
+                            fontSize: 13,
+                            letterSpacing: 1.0
+                          ),
+                        ),
+                        if (_isOffline) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            "Map exploration available. Connect to the internet to view profiles and collect stamps.",
+                            style: TextStyle(
+                              color: isDarkMode ? Colors.white70 : Colors.black54,
+                              fontFamily: 'SFPro',
+                              fontSize: 12,
+                              height: 1.3,
+                            ),
+                          ),
+                        ]
+                      ],
+                    ),
+                  ),
+                  if (!_isOffline && _isGpsDisabled) ...[
+                     const SizedBox(width: 12),
+                     GestureDetector(
+                       onTap: geo.Geolocator.openLocationSettings,
+                       child: Container(
+                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                         decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(8)),
+                         child: const Text("ENABLE", style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold))
+                       ),
+                     )
+                  ]
+                ],
               ),
             ),
-            if (!_isOffline && _isGpsDisabled) ...[
-               const SizedBox(width: 12),
-               GestureDetector(
-                 onTap: geo.Geolocator.openLocationSettings,
-                 child: Container(
-                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                   decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(4)),
-                   child: const Text("ENABLE", style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold))
-                 ),
-               )
-            ]
-          ],
+          ),
         ),
       ),
     );
@@ -828,6 +867,18 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
           ),
         ],
       ),
+      // 🌟 NEW: The Concierge Tutorial Step
+      TargetFocus(
+        identify: "concierge_target",
+        keyTarget: _conciergeKey,
+        shape: ShapeLightFocus.Circle,
+        contents: [
+          TargetContent(
+            align: ContentAlign.top,
+            builder: (context, controller) => _buildTutorialText("THE CONCIERGE", "Summon your personal guide. We'll scan a 1-mile radius to find the highest-rated culinary gems right around the corner.", controller), 
+          ),
+        ],
+      ),
       TargetFocus(
         identify: "passport_target",
         keyTarget: _passportKey,
@@ -835,7 +886,8 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
         contents: [
           TargetContent(
             align: ContentAlign.top,
-            builder: (context, controller) => _buildTutorialText("THE COLLECTION", "Your Gourmet Passport. Check in to spots, collect official stamps, and build your culinary visa.", controller, isLast: true), 
+            // 🌟 THE FIX: Removed `isLast: true`. It will now default to "NEXT" and keep the Skip button!
+            builder: (context, controller) => _buildTutorialText("THE COLLECTION", "Your Gourmet Passport. Check in to spots, collect official stamps, and build your culinary visa.", controller), 
           ),
         ],
       ),
@@ -1285,11 +1337,37 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
   // 📡 5. SUPABASE SINGLE QUERY & UI TRIGGER
   // =========================================================================
   Future<void> _fetchAndShowRestaurant(int restaurantId) async {
-    // 🌟 1. THE BOUNCER: If we are already fetching, ignore any new taps!
+    // 🌟 1. THE OFFLINE BOUNCER
+    if (_isOffline) {
+      HapticFeedback.heavyImpact();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: const [
+                Icon(CupertinoIcons.wifi_exclamationmark, color: Colors.white, size: 20),
+                SizedBox(width: 12),
+                Expanded(child: Text("Connect to the internet to view restaurant profiles.", style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'SFPro'))),
+              ],
+            ),
+            backgroundColor: Colors.amber[800],
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            margin: const EdgeInsets.only(bottom: 20, left: 20, right: 20),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+      return; // Stop the function dead in its tracks
+    }
+
+    // 🌟 2. THE DOUBLE-TAP BOUNCER
     if (_isFetchingSheet) return; 
     
-    // 🌟 2. Lock the door
+    // 🌟 3. Lock the door
     _isFetchingSheet = true; 
+    
+    // ... (Keep the rest of your try/catch Supabase logic exactly the same)
 
     try {
       final data = await Supabase.instance.client
@@ -1441,11 +1519,13 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
   }
 
   @override
-  @override
-  build(BuildContext context) {
+  Widget build(BuildContext context) {
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
+      // 🌟 For Android: Controls the color of the icons directly
       statusBarIconBrightness: isDarkMode ? Brightness.light : Brightness.dark,
+      // 🌟 For iOS: Tells the OS the background is dark, so it makes the icons white
+      statusBarBrightness: isDarkMode ? Brightness.dark : Brightness.light, 
     ));
 
     return Scaffold(
@@ -1686,18 +1766,35 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    // 🌟 CONCIERGE BUTTON (Added right above the Game Wheel)
+                    // 🌟 CONCIERGE BUTTON
+                    // 🌟 CONCIERGE BUTTON
                     FloatingActionButton(
+                      key: _conciergeKey,
                       heroTag: 'concierge_btn',
                       mini: true, 
                       backgroundColor: isDarkMode ? Colors.grey[800] : Colors.white,
-                      foregroundColor: Colors.amber[700], 
+                      // Dim the icon to grey if offline to give a visual clue
+                      foregroundColor: _isOffline ? Colors.grey : Colors.amber[700], 
                       elevation: 6,
                       onPressed: () {
+                        // 🌟 THE OFFLINE BOUNCER
+                        if (_isOffline) {
+                          HapticFeedback.heavyImpact();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: const Text("The Concierge requires an active internet connection to scan the area.", style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'SFPro')),
+                              backgroundColor: Colors.redAccent[700],
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              margin: const EdgeInsets.only(bottom: 20, left: 20, right: 20),
+                            ),
+                          );
+                          return; // Bounce them
+                        }
+
                         setState(() {
                           _showConcierge = true;
                         });
-                        // 📡 TELEMETRY: Log that they summoned the concierge
                         TelemetryService.logInteraction(actionType: 'concierge_summoned');
                       },
                       child: const Icon(Icons.room_service),
@@ -1878,18 +1975,19 @@ class _VaultLoadingOverlayState extends State<VaultLoadingOverlay> with TickerPr
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 
-                // 🌟 1. THE SIRI ORB (V3.1 - Internal Mesh)
+                // 🌟 1. THE SIRI ORB (V3.3 - Flawless Continuous Mesh & Throbbing Core)
                 SizedBox(
                   width: 140, 
                   height: 140,
                   child: Center(
+                    // 🌟 FIX 1: The pulse is back! Wrapping the entire orb in the scale animation.
                     child: AnimatedBuilder(
                       animation: _pulseController,
                       builder: (context, child) {
                         return Transform.scale(
                           scale: widget.isOffline ? 1.0 : 1.0 + (_pulseController.value * 0.08),
                           child: Container(
-                            width: 90, // Slightly larger to show off the internal colors
+                            width: 90,
                             height: 90,
                             decoration: BoxDecoration(
                               color: Colors.black, // The deep black core
@@ -1900,35 +1998,33 @@ class _VaultLoadingOverlayState extends State<VaultLoadingOverlay> with TickerPr
                                 BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 15, offset: const Offset(0, 6))
                               ],
                             ),
-                            // 🌟 THE FIX: ClipOval traps the blurred colors strictly inside the black orb
                             child: ClipOval(
                               child: Stack(
                                 alignment: Alignment.center,
                                 children: [
-                                  // Layer A: The Internal Swirling Smoke
+                                  // Layer A: The Continuous Swirling Smoke
                                   if (!widget.isOffline)
                                     AnimatedBuilder(
                                       animation: _rotationController,
                                       builder: (context, child) {
-                                        return Transform.scale(
-                                          scale: 1.4, // Scale up so the heavy blur doesn't leave edge gaps
-                                          child: Transform.rotate(
-                                            angle: _rotationController.value * 2 * math.pi,
-                                            child: ImageFiltered(
-                                              imageFilter: ui.ImageFilter.blur(sigmaX: 14.0, sigmaY: 14.0),
-                                              child: Container(
-                                                decoration: BoxDecoration(
-                                                  shape: BoxShape.circle,
-                                                  gradient: SweepGradient(
-                                                    colors: [
-                                                      const Color(0xFF007AFF).withOpacity(0.75), // Blue
-                                                      const Color(0xFFFF2D55).withOpacity(0.75), // Red
-                                                      const Color(0xFFFFCC00).withOpacity(0.75), // Yellow
-                                                      const Color(0xFF007AFF).withOpacity(0.75), // Loop
-                                                    ],
-                                                    stops: const [0.0, 0.33, 0.66, 1.0],
-                                                  ),
-                                                ),
+                                        return ImageFiltered(
+                                          imageFilter: ui.ImageFilter.blur(sigmaX: 14.0, sigmaY: 14.0),
+                                          child: Container(
+                                            // 🌟 Make this larger than 90x90 so the blur doesn't fade at the edges
+                                            width: 120, 
+                                            height: 120,
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              gradient: SweepGradient(
+                                                // 🌟 FIX 2: Rotate the gradient mathematically. No more shutter!
+                                                transform: GradientRotation(_rotationController.value * 2 * math.pi),
+                                                colors: [
+                                                  const Color(0xFF007AFF).withOpacity(0.85), // Blue
+                                                  const Color(0xFFFF2D55).withOpacity(0.85), // Red
+                                                  const Color(0xFFFFCC00).withOpacity(0.85), // Yellow
+                                                  const Color(0xFF007AFF).withOpacity(0.85), // Seamless Loop
+                                                ],
+                                                stops: const [0.0, 0.33, 0.66, 1.0],
                                               ),
                                             ),
                                           ),
@@ -1949,7 +2045,7 @@ class _VaultLoadingOverlayState extends State<VaultLoadingOverlay> with TickerPr
                         );
                       }
                     ),
-                  ),
+                  ),  
                 ),
                 const SizedBox(height: 48),
                 
