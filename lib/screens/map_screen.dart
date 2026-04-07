@@ -71,7 +71,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
   );
 
   bool _isCheckingLocation = false;
-  bool _isFetchingSheet = false; // 🌟 THE BOUNCER
+  bool _isFetchingSheet = false;
+  bool _isFilteringMap = false; 
+  bool _showNoResultsOverlay = false; // 🌟 ADD THIS: Tracks empty filter states
 
   // 🌟 FIX 1: Applied 'geo.' prefix
   StreamSubscription<geo.Position>? _positionStreamSubscription;
@@ -1125,19 +1127,26 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
 
       // --- 1. THE LOCAL SOURCES ---
       await _mapboxController?.style.addSource(
-        GeoJsonSource(id: "regular-source", data: "file://${paths['regular']}", cluster: true, clusterRadius: 50, clusterMaxZoom: 14.0, buffer: 128.0)
+        GeoJsonSource(
+          id: "regular-source", 
+          data: "file://${paths['regular']}", 
+          cluster: true, 
+          clusterRadius: 75,       // 🌟 Sweet spot for your UI width
+          clusterMaxZoom: 20.0,    // 🌟 THE HYDRA KILLER: Cluster infinitely to street level
+          buffer: 128.0
+        )
       );
       await _mapboxController?.style.addSource(
         GeoJsonSource(id: "heroes-source", data: "file://${paths['heroes']}", buffer: 128.0)
       );
 
-      // 🌟 THE INJECTOR VESSEL: Now with Clustering turned ON!
+      // 🌟 THE INJECTOR VESSEL: Match the infinite clustering!
       await _mapboxController?.style.addSource(GeoJsonSource(
         id: "search-source", 
         data: '{"type":"FeatureCollection","features":[]}', 
-        cluster: true,        // 🌟 FIX: Cluster the Supabase data!
-        clusterRadius: 50, 
-        clusterMaxZoom: 14.0, 
+        cluster: true,        
+        clusterRadius: 75,       // 🌟 Match regular-source
+        clusterMaxZoom: 20.0,    // 🌟 Match regular-source
         buffer: 128.0
       ));
 
@@ -1149,7 +1158,13 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       await _mapboxController?.style.setStyleLayerProperty("cluster-circles", "circle-stroke-width", 3.5); 
       await _mapboxController?.style.setStyleLayerProperty("cluster-circles", "circle-radius", ["step", ["get", "point_count"], 18, 100, 22, 1000, 26]);
 
-      await _mapboxController?.style.addLayer(SymbolLayer(id: "cluster-text", sourceId: "regular-source"));
+      // 🌟 1. UPDATE DEFAULT CLUSTER TEXT
+      await _mapboxController?.style.addLayer(SymbolLayer(
+        id: "cluster-text", 
+        sourceId: "regular-source",
+        textAllowOverlap: true,      // 🌟 FORCED IN CONSTRUCTOR
+        textIgnorePlacement: true,   // 🌟 FORCED IN CONSTRUCTOR
+      ));
       await _mapboxController?.style.setStyleLayerProperty("cluster-text", "filter", ["has", "point_count"]);
       await _mapboxController?.style.setStyleLayerProperty("cluster-text", "text-field", ["case", ["<", ["get", "point_count"], 1000], ["to-string", ["get", "point_count"]], ["concat", ["to-string", ["floor", ["/", ["get", "point_count"], 1000]]], "k+"]]);
       await _mapboxController?.style.setStyleLayerProperty("cluster-text", "text-font", ["Source Code Pro Bold", "Open Sans Bold", "Arial Unicode MS Bold"]);
@@ -1172,7 +1187,16 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       final dynamicIconSize = ["interpolate", ["linear"], ["zoom"], 8.0, 0.40, 11.0, 0.55, 14.0, 0.75, 16.0, 0.90];
 
       // --- 4. DEFAULT REGULAR & HERO LAYERS ---
-      await _mapboxController?.style.addLayer(SymbolLayer(id: "regular-bubbles", sourceId: "regular-source", minZoom: 14.0, iconAllowOverlap: false, iconPitchAlignment: IconPitchAlignment.VIEWPORT));
+      
+      await _mapboxController?.style.addLayer(SymbolLayer(
+        id: "regular-bubbles", 
+        sourceId: "regular-source", 
+        minZoom: 1.0, 
+        iconAllowOverlap: false,     // 🌟 Turn the collision bouncer back on
+        // 🌟 (Make sure iconIgnorePlacement is completely deleted from this layer)
+        iconPitchAlignment: IconPitchAlignment.VIEWPORT
+      ));
+      
       await _mapboxController?.style.setStyleLayerProperty("regular-bubbles", "filter", notCluster);
       await _mapboxController?.style.setStyleLayerProperty("regular-bubbles", "icon-image", dynamicIconImage);
       await _mapboxController?.style.setStyleLayerProperty("regular-bubbles", "icon-size", dynamicIconSize);
@@ -1203,7 +1227,13 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       await _mapboxController?.style.setStyleLayerProperty("search-cluster-circles", "circle-stroke-width", 3.5); 
       await _mapboxController?.style.setStyleLayerProperty("search-cluster-circles", "circle-radius", ["step", ["get", "point_count"], 18, 100, 22, 1000, 26]);
 
-      await _mapboxController?.style.addLayer(SymbolLayer(id: "search-cluster-text", sourceId: "search-source"));
+      // 🌟 2. UPDATE SEARCH CLUSTER TEXT
+      await _mapboxController?.style.addLayer(SymbolLayer(
+        id: "search-cluster-text", 
+        sourceId: "search-source",
+        textAllowOverlap: true,      // 🌟 FORCED IN CONSTRUCTOR
+        textIgnorePlacement: true,   // 🌟 FORCED IN CONSTRUCTOR
+      ));
       await _mapboxController?.style.setStyleLayerProperty("search-cluster-text", "filter", ["has", "point_count"]);
       await _mapboxController?.style.setStyleLayerProperty("search-cluster-text", "text-field", ["case", ["<", ["get", "point_count"], 1000], ["to-string", ["get", "point_count"]], ["concat", ["to-string", ["floor", ["/", ["get", "point_count"], 1000]]], "k+"]]);
       await _mapboxController?.style.setStyleLayerProperty("search-cluster-text", "text-font", ["Source Code Pro Bold", "Open Sans Bold", "Arial Unicode MS Bold"]);
@@ -1211,7 +1241,7 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       await _mapboxController?.style.setStyleLayerProperty("search-cluster-text", "text-color", isDarkMode ? "#FFFFFF" : "#000000");
 
       // B. Search Regular
-      await _mapboxController?.style.addLayer(SymbolLayer(id: "search-regular-bubbles", sourceId: "search-source", iconAllowOverlap: true, iconIgnorePlacement: true, iconPitchAlignment: IconPitchAlignment.VIEWPORT));
+      await _mapboxController?.style.addLayer(SymbolLayer(id: "search-regular-bubbles", sourceId: "search-source", iconAllowOverlap: true, iconPitchAlignment: IconPitchAlignment.VIEWPORT));
       await _mapboxController?.style.setStyleLayerProperty("search-regular-bubbles", "filter", notCluster);
       await _mapboxController?.style.setStyleLayerProperty("search-regular-bubbles", "icon-image", dynamicIconImage);
       await _mapboxController?.style.setStyleLayerProperty("search-regular-bubbles", "icon-size", dynamicIconSize);
@@ -1265,9 +1295,6 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
 
     try {
       final screenCoord = await _mapboxController!.pixelForCoordinate(context.point);
-
-      // Increased back to 25.0 to ensure it catches fat-finger taps 
-      // on the far edges of your wide custom pills.
       final double tapRadius = 25.0; 
       final Map<String, dynamic> tapBoxMap = {
         "min": {"x": screenCoord.x - tapRadius, "y": screenCoord.y - tapRadius},
@@ -1280,44 +1307,33 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       );
 
       final options = RenderedQueryOptions(layerIds: [
-        "search-heroes-3-2-bubbles",
-        "heroes-3-2-bubbles", 
-        "search-heroes-1-bubbles",
-        "heroes-1-bubbles",   
-        "search-bib-bubbles",
-        "heroes-bib-bubbles", 
-        "search-regular-bubbles",
-        "regular-bubbles",    
-        "search-cluster-circles",
-        "cluster-circles"     
+        "search-heroes-3-2-bubbles", "heroes-3-2-bubbles", 
+        "search-heroes-1-bubbles", "heroes-1-bubbles",   
+        "search-bib-bubbles", "heroes-bib-bubbles", 
+        "search-regular-bubbles", "regular-bubbles",    
+        "search-cluster-circles", "cluster-circles"     
       ]);
       
       final features = await _mapboxController!.queryRenderedFeatures(geometry, options);
 
       if (features.isNotEmpty) {
-        
-        // 🌟 Prioritize clicks: 3-stars first, clusters last
         final List<String> layerPriority = [
-          "search-heroes-3-2-bubbles",
-          "heroes-3-2-bubbles",
-          "search-heroes-1-bubbles",
-          "heroes-1-bubbles",
-          "search-bib-bubbles",
-          "heroes-bib-bubbles",
-          "search-regular-bubbles",
-          "regular-bubbles",
-          "search-cluster-circles",
-          "cluster-circles"
+          "search-heroes-3-2-bubbles", "heroes-3-2-bubbles",
+          "search-heroes-1-bubbles", "heroes-1-bubbles",
+          "search-bib-bubbles", "heroes-bib-bubbles",
+          "search-regular-bubbles", "regular-bubbles",
+          "search-cluster-circles", "cluster-circles"
         ];
 
+        // 🌟 1. NEW HELPER VARIABLES 
         Map<String, dynamic>? selectedFeatureProps;
         Map<String, dynamic>? selectedFeatureGeom;
+        Map<String, dynamic>? selectedRawFeature; // 🌟 SAVES THE RAW FEATURE
         bool isClusterTap = false;
+        bool isSearchLayerTap = false; // 🌟 TRACKS WHICH SOURCE WAS TAPPED
 
         // Funnel through our strict hierarchy
         for (String layerId in layerPriority) {
-          
-          // 🌟 THE FIX: Mapbox stores layers in a list on the parent object
           final match = features.firstWhere(
             (f) => f?.layers?.contains(layerId) == true, 
             orElse: () => null
@@ -1328,27 +1344,55 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
             if (rawFeature != null) {
               final featureMap = Map<String, dynamic>.from(rawFeature);
               
+              selectedRawFeature = featureMap; // 🌟 SAVE IT HERE!
+              
               final rawProps = featureMap['properties'] as Map?;
               selectedFeatureProps = rawProps != null ? Map<String, dynamic>.from(rawProps) : null;
               
               final rawGeom = featureMap['geometry'] as Map?;
               selectedFeatureGeom = rawGeom != null ? Map<String, dynamic>.from(rawGeom) : null;
               
-              isClusterTap = layerId == "cluster-circles";
-              break; // Found the absolute highest-priority target! Stop looking.
+              isClusterTap = layerId == "cluster-circles" || layerId == "search-cluster-circles";
+              isSearchLayerTap = layerId.startsWith("search-"); 
+              
+              break; 
             }
           }
         }
 
         if (selectedFeatureProps == null) return;
-
+        
         // --- Execute the Interaction ---
         final isCluster = isClusterTap || selectedFeatureProps['cluster'] == true || selectedFeatureProps.containsKey('point_count');
         
         if (isCluster) {
+            final currentZoom = await _mapboxController!.getCameraState().then((s) => s.zoom);
+            
+            // 🌟 THE FIX: Lowered altitude trigger to 16.0
+            if (currentZoom >= 16.0 && selectedRawFeature != null) {
+              try {
+                String sourceToQuery = isSearchLayerTap ? "search-source" : "regular-source";
+
+                final extensionValue = await _mapboxController!.getGeoJsonClusterLeaves(
+                  sourceToQuery, 
+                  selectedRawFeature!, 
+                  50,  
+                  0   
+                );
+
+                if (mounted) {
+                  // 🌟 THE FIX: Send EVERYTHING. The Omni-parser will find the data.
+                  _showClusterCrackerSheet(extensionValue.value ?? extensionValue.featureCollection ?? extensionValue); 
+                }
+              } catch (e) {
+                debugPrint("🚨 Failed to crack cluster: $e");
+              }
+              return;
+            }
+
+            // Normal Zoom-In behavior for zooming out
             final coords = selectedFeatureGeom?['coordinates'] as List<dynamic>?;
             if (coords != null && coords.length >= 2) {
-              final currentZoom = await _mapboxController!.getCameraState().then((s) => s.zoom);
               _mapboxController!.flyTo(
                 CameraOptions(
                   center: Point(coordinates: Position((coords[0] as num).toDouble(), (coords[1] as num).toDouble())), 
@@ -1446,6 +1490,175 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
   }
 
   // =========================================================================
+  // 🏢 THE CLUSTER CRACKER MENU (For co-located restaurants)
+  // =========================================================================
+  void _showClusterCrackerSheet(dynamic leavesData) {
+    if (leavesData == null) return;
+
+    List<dynamic> leaves = [];
+
+    // 🌟 THE OMNI-PARSER: Mapbox returns strongly-typed objects that break standard Map casting.
+    // We force it through a JSON serialization tunnel to strip the types and get pure Maps.
+    try {
+      String jsonStr;
+      try {
+        jsonStr = jsonEncode(leavesData); // Tries standard encode
+      } catch (_) {
+        jsonStr = jsonEncode((leavesData as dynamic).toJson()); // Fallback to Mapbox's native .toJson()
+      }
+
+      final decoded = jsonDecode(jsonStr);
+
+      if (decoded is List) {
+        leaves = decoded;
+      } else if (decoded is Map && decoded.containsKey('features')) {
+        leaves = decoded['features'] as List<dynamic>;
+      } else if (decoded is Map && decoded.containsKey('value')) {
+        final inner = decoded['value'];
+        if (inner is List) leaves = inner;
+        else if (inner is Map && inner.containsKey('features')) leaves = inner['features'];
+      }
+    } catch (e) {
+      debugPrint("🚨 Omni-Parser Failed: $e");
+    }
+
+    List<Map<String, dynamic>> restaurantsInBuilding = [];
+    
+    for (var leaf in leaves) {
+      try {
+        // Now that the types are stripped, this standard Map cast will work flawlessly
+        final feature = leaf as Map<String, dynamic>;
+        final props = feature['properties'] as Map<String, dynamic>;
+        
+        // Mapbox converts ID to a string or int depending on the build, so check for name
+        if (props.containsKey('name')) {
+          restaurantsInBuilding.add(props);
+        }
+      } catch (e) {
+        debugPrint("🚨 Failed to parse leaf: $e");
+      }
+    }
+
+    if (restaurantsInBuilding.isEmpty) {
+       debugPrint("🚨 Cluster Cracker Aborted: No valid restaurants found in the parsed leaves.");
+       return;
+    }
+
+    HapticFeedback.mediumImpact();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          decoration: BoxDecoration(
+            color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // The Handle
+                Container(
+                  margin: const EdgeInsets.only(top: 12, bottom: 16),
+                  width: 40,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: isDarkMode ? Colors.white24 : Colors.black12,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                
+                // The Title
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Row(
+                    children: [
+                      Icon(Icons.domain, color: isDarkMode ? Colors.white70 : Colors.black54),
+                      const SizedBox(width: 12),
+                      Text(
+                        "Multiple Locations Here",
+                        style: TextStyle(
+                          color: isDarkMode ? Colors.white : Colors.black,
+                          fontFamily: 'AppleGaramond',
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Divider(color: isDarkMode ? Colors.white10 : Colors.black12),
+                
+                // The List of Restaurants
+                Flexible(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: restaurantsInBuilding.length,
+                    itemBuilder: (context, index) {
+                      final r = restaurantsInBuilding[index];
+                      
+                      // Extract pill design logic for the leading icon
+                      final stars = int.tryParse(r['michelin_stars']?.toString() ?? '0') ?? 0;
+                      final isBib = r['bib_gourmand']?.toString().toLowerCase() == 'true';
+                      Color ringColor = Colors.transparent;
+                      if (stars > 0) ringColor = const Color(0xFFFFD700); // Gold
+                      else if (isBib) ringColor = Colors.redAccent;
+
+                      return ListTile(
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+                        leading: Container(
+                          width: 40, height: 40,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: ringColor != Colors.transparent ? Border.all(color: ringColor, width: 2) : null,
+                            color: isDarkMode ? Colors.white10 : Colors.black.withOpacity(0.05),
+                          ),
+                          child: Center(
+                            child: Text(
+                              _formatCategoryDisplay(r['cuisine']?.toString() ?? '').split(' ').last, // Gets the emoji
+                              style: const TextStyle(fontSize: 18),
+                            ),
+                          ),
+                        ),
+                        title: Text(
+                          r['name']?.toString() ?? 'Unknown',
+                          style: TextStyle(
+                            color: isDarkMode ? Colors.white : Colors.black,
+                            fontWeight: FontWeight.w700,
+                            fontFamily: 'SFPro'
+                          ),
+                        ),
+                        subtitle: Text(
+                          "${_formatCategoryDisplay(r['cuisine']?.toString() ?? '').replaceAll(RegExp(r'[^\w\s]'), '')} • ${r['price']?.toString() ?? '\$'}",
+                          style: TextStyle(color: isDarkMode ? Colors.white54 : Colors.black54),
+                        ),
+                        onTap: () {
+                          // Close the cracker menu
+                          Navigator.pop(context);
+                          // Pass the selected ID to your existing full-screen logic
+                          final id = int.tryParse(r['id']?.toString() ?? '');
+                          if (id != null) {
+                            _fetchAndShowRestaurant(id);
+                          }
+                        },
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // =========================================================================
   // 🔍 INSTANT MAPBOX FILTER ENGINE
   // =========================================================================
   void _fetchRestaurants() async {
@@ -1460,8 +1673,12 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
                             _selectedMichelin.isNotEmpty || 
                             showOpenOnly;
 
+    // 🌟 INSTANT REACTION: Turn on the bridge immediately
+    if (mounted) setState(() => _isFilteringMap = true); 
+
     // Helper to clear map if a filter combination returns zero results
     Future<void> injectEmptySearch() async {
+      if (mounted) setState(() => _showNoResultsOverlay = true); // 🌟 SHOW THE OVERLAY
       await _mapboxController?.style.setStyleSourceProperty("search-source", "data", '{"type": "FeatureCollection", "features": []}');
       
       // Hide default
@@ -1483,7 +1700,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
 
     try {
       if (!hasActiveFilters) {
-        // 🌟 RESET: Restore default hierarchy, hide the search layers
+        // 🌟 RESET: Restore default hierarchy, hide the search layers & no-results overlay
+        if (mounted) setState(() => _showNoResultsOverlay = false); 
+        
         await _mapboxController?.style.setStyleLayerProperty("search-cluster-circles", "visibility", "none");
         await _mapboxController?.style.setStyleLayerProperty("search-cluster-text", "visibility", "none");
         await _mapboxController?.style.setStyleLayerProperty("search-regular-bubbles", "visibility", "none");
@@ -1568,6 +1787,15 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
       // 🌟 FETCH & CONVERT (Limit applied!)
       final data = await query.limit(2000);
       
+      // 🌟 CHECK FOR EMPTY DATA
+      if (data.isEmpty) {
+        await injectEmptySearch();
+        return;
+      }
+      
+      // 🌟 HIDE OVERLAY ON SUCCESS
+      if (mounted) setState(() => _showNoResultsOverlay = false);
+      
       List<Map<String, dynamic>> features = data.map((r) {
         return {
           "type": "Feature",
@@ -1603,6 +1831,9 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
 
     } catch (e) {
       debugPrint("🚨 Injector Error: $e");
+    } finally {
+      // 🌟 DROP THE BRIDGE: Whether it succeeds or fails, kill the loader when done.
+      if (mounted) setState(() => _isFilteringMap = false);
     }
   }
 
@@ -1836,6 +2067,123 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
                       onMichelinChanged: (v) { setState(() => _selectedMichelin = v); _fetchRestaurants(); },
                       onPriceChanged: (v) { setState(() => _selectedPrices = v); _fetchRestaurants(); },
                     ),
+                    
+                    // 🌟 THE NO RESULTS OVERLAY (Moved inside the Column for dynamic responsive anchoring)
+                    if (_showNoResultsOverlay && !_isFilteringMap) 
+                      Padding(
+                        padding: const EdgeInsets.only(top: 16.0, left: 16.0, right: 16.0), // Anchors dynamically!
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(32),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(isDarkMode ? 0.3 : 0.08),
+                                blurRadius: 30,
+                                offset: const Offset(0, 10),
+                              )
+                            ]
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(32),
+                            child: BackdropFilter(
+                              filter: ui.ImageFilter.blur(sigmaX: 40.0, sigmaY: 40.0),
+                              child: Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 36),
+                                decoration: BoxDecoration(
+                                  // Your updated opacity values here
+                                  color: isDarkMode 
+                                      ? const Color(0xFF1C1C1E).withOpacity(0.40) 
+                                      : Colors.white.withOpacity(0.50),
+                                  border: Border.all(
+                                    color: isDarkMode 
+                                        ? Colors.white.withOpacity(0.15) 
+                                        : Colors.white.withOpacity(0.5),
+                                    width: 1.0, 
+                                  ),
+                                ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(18),
+                                      decoration: BoxDecoration(
+                                        color: isDarkMode ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.04),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(
+                                        CupertinoIcons.search,
+                                        size: 36,
+                                        color: isDarkMode ? Colors.white70 : Colors.black54,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 24),
+                                    Text(
+                                      "No Results Found",
+                                      style: TextStyle(
+                                        color: isDarkMode ? Colors.white : Colors.black,
+                                        fontFamily: 'AppleGaramond',
+                                        fontSize: 26,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      "Try adjusting your filters or zooming out to cast a wider net across the city.",
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: isDarkMode ? Colors.white70 : Colors.black87,
+                                        fontFamily: 'SFPro',
+                                        fontSize: 15,
+                                        height: 1.4,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 32),
+                                    SizedBox(
+                                      width: 200,
+                                      height: 50,
+                                      child: ElevatedButton(
+                                        onPressed: () {
+                                          HapticFeedback.lightImpact();
+                                          setState(() {
+                                            selectedCategory = null;
+                                            selectedRestaurantName = null;
+                                            showOpenOnly = false;
+                                            savedOnly = false;
+                                            _showVegetarian = false;
+                                            _showVegan = false;
+                                            _selectedMichelin.clear();
+                                            _selectedPrices.clear();
+                                          });
+                                          _fetchRestaurants(); 
+                                        },
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: isDarkMode ? Colors.white : Colors.black,
+                                          foregroundColor: isDarkMode ? Colors.black : Colors.white,
+                                          elevation: 0,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(100),
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          "Clear Filters",
+                                          style: TextStyle(
+                                            fontFamily: 'SFPro',
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 15,
+                                            letterSpacing: 0.3,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -1934,6 +2282,60 @@ class _MapScreenState extends State<MapScreen> with TickerProviderStateMixin, Wi
                   ),
                 );
               },
+            ),
+
+          // 🌟 THE FILTER BRIDGE: A sleek, highly visible loading pill
+          if (_isFilteringMap)
+            Positioned(
+              top: 160, // 🌟 Pushed down further to clear the horizontal filter bar
+              left: 0,
+              right: 0,
+              child: Center(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(30), // Flawless rounded edges
+                  child: BackdropFilter(
+                    filter: ui.ImageFilter.blur(sigmaX: 15.0, sigmaY: 15.0), // Heavier glass blur
+                    child: Container(
+                      // 🌟 Bigger padding for a larger pill footprint
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14), 
+                      decoration: BoxDecoration(
+                        // Slightly more opaque so it punches through the map background
+                        color: isDarkMode ? Colors.black.withOpacity(0.75) : Colors.white.withOpacity(0.9),
+                        borderRadius: BorderRadius.circular(30),
+                        border: Border.all(
+                          color: isDarkMode ? Colors.white30 : Colors.black12, // Stronger border
+                          width: 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.15),
+                            blurRadius: 15,
+                            offset: const Offset(0, 6),
+                          )
+                        ]
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // 🌟 Bigger Apple-style spinner
+                          const CupertinoActivityIndicator(radius: 12), 
+                          const SizedBox(width: 12),
+                          Text(
+                            "Updating Map...",
+                            style: TextStyle(
+                              color: isDarkMode ? Colors.white : Colors.black,
+                              fontFamily: 'SFPro',
+                              fontSize: 15, // 🌟 Larger text
+                              fontWeight: FontWeight.w700, // 🌟 Bolder text
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ),
 
           if (_isJumpingToLocation)

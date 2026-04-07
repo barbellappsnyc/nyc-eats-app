@@ -38,9 +38,12 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      FocusScope.of(context).requestFocus(_searchFocus);
+    
+    // 🌟 THE FIX: Let the page finish sliding in before opening the heavy OS keyboard
+    Future.delayed(const Duration(milliseconds: 400), () {
+      if (mounted) FocusScope.of(context).requestFocus(_searchFocus);
     });
+    
     _filteredCategories = widget.availableCategories;
   }
 
@@ -169,9 +172,12 @@ class _SearchScreenState extends State<SearchScreen> {
                       child: TextField(
                         controller: _searchController,
                         focusNode: _searchFocus,
+                        autocorrect: false, // 🌟 THE FIX: Stops the OS dictionary from blocking the UI thread
+                        enableSuggestions: false, // 🌟 THE FIX: Disables predictive text lag
                         style: TextStyle(color: textColor, fontSize: 16),
                         onChanged: _onSearchChanged,
                         decoration: InputDecoration(
+                          // ... keep your decoration exactly as it is
                           hintText: "Search restaurants, cuisines...",
                           hintStyle: TextStyle(color: hintColor),
                           border: InputBorder.none,
