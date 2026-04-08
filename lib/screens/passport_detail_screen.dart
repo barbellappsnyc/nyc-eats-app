@@ -1135,6 +1135,34 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
               ),
             ),
 
+            // ℹ️ THE INFO BUTTON (TOP RIGHT)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 10,
+              right: 16,
+              child: GestureDetector(
+                onTap: _showArtworkInfoModal,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(30),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.4), 
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white.withOpacity(0.2), width: 1),
+                      ),
+                      child: const Icon(
+                        CupertinoIcons.info, 
+                        color: Colors.white, 
+                        size: 22,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
             Positioned(
               bottom: 40 + MediaQuery.of(context).padding.bottom,
               left: 0,
@@ -1250,6 +1278,127 @@ class _PassportDetailScreenState extends State<PassportDetailScreen> with Single
           ],
         ),
       ),
+    );
+  }
+
+  // 📚 THE CONTEXTUAL DATA DICTIONARY
+  Map<String, dynamic> _getBackgroundInfo(int index) {
+    switch (index) {
+      case 0: return {"title": "The Monolith", "desc": "A clean slate perfectly matched to your passport's primary color code.", "icon": CupertinoIcons.square_fill};
+      case 1: return {"title": "Baggage Claim", "desc": "Global airport baggage tags routing you directly from JFK to the world.", "icon": CupertinoIcons.ticket_fill};
+      case 2: return {"title": "The Pizzeria", "desc": "The classic red-and-white gingham tablecloth. Perfect for a slice.", "icon": Icons.local_pizza_outlined};
+      case 3: return {"title": "The Coordinates", "desc": "A pastel collage of the exact GPS locations from your culinary journey.", "icon": CupertinoIcons.compass};
+      case 4: return {"title": "Postage Stamps", "desc": "Custom stamps featuring native emojis.\n\nTap the camera icon to load your own memories.", "icon": CupertinoIcons.mail_solid};
+      case 5: return {"title": "The Commuter", "desc": "Live subway routings.\n\nTap the sun/moon icon to switch between day and night mode.", "icon": CupertinoIcons.train_style_one};
+      case 6: return {"title": "Transparent", "desc": "A completely clear background. Perfect for downloading your passport card exactly as it is.", "icon": Icons.grid_4x4};      case 7: return {"title": "Pop Art", "desc": "A tribute to the legendary New York artist Andy Warhol. A six-panel Marilyn Diptych style print featuring your cuisine's native emoji.", "icon": CupertinoIcons.paintbrush_fill};
+      case 8: return {"title": "The Photobooth", "desc": "A late-night photobooth strip.\n\nDrag to tear it off, and tap the squares to load 4 of your favorite snaps.", "icon": CupertinoIcons.camera_fill};
+      default: return {"title": "Artwork", "desc": "A unique visual memory of your travels.", "icon": CupertinoIcons.photo};
+    }
+  }
+
+  // 🖼️ THE CONTEXTUAL GALLERY PLAQUE
+  void _showArtworkInfoModal() {
+    HapticFeedback.lightImpact();
+    
+    // Pull the data for the exact background currently on screen
+    final info = _getBackgroundInfo(_currentBgIndex);
+
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: "Dismiss",
+      barrierColor: Colors.black.withOpacity(0.5), 
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return Center(
+          child: Material(
+            color: Colors.transparent,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(32),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+                child: Container(
+                  width: MediaQuery.of(context).size.width * 0.85,
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF111111).withOpacity(0.65), 
+                    border: Border.all(color: Colors.white.withOpacity(0.15), width: 1),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // 1. DISMISS BUTTON
+                      Align(
+                        alignment: Alignment.topRight,
+                        child: GestureDetector(
+                          onTap: () => Navigator.pop(context),
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.1), 
+                              shape: BoxShape.circle
+                            ),
+                            child: const Icon(Icons.close, color: Colors.white70, size: 18),
+                          ),
+                        ),
+                      ),
+                      
+                      // 2. THEMATIC ICON
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.05),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(info['icon'], size: 42, color: Colors.amber),
+                      ),
+                      const SizedBox(height: 24),
+                      
+                      // 3. TITLE
+                      Text(
+                        info['title'].toUpperCase(), 
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontFamily: 'AppleGaramond', 
+                          color: Colors.white, 
+                          fontSize: 28, 
+                          fontWeight: FontWeight.bold, 
+                          letterSpacing: 2.0
+                        )
+                      ),
+                      const SizedBox(height: 16),
+                      
+                      // 4. DESCRIPTION
+                      Text(
+                        info['desc'], 
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white70, 
+                          fontSize: 15, 
+                          height: 1.5,
+                          fontWeight: FontWeight.w500
+                        )
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+      // SLICK POP-IN ANIMATION
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        return FadeTransition(
+          opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.95, end: 1.0).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutBack)),
+            child: child,
+          ),
+        );
+      },
     );
   }
 }

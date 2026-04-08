@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -196,25 +198,19 @@ class _PassportCollectionScreenState extends State<PassportCollectionScreen> {
         newSku = 'store';
       } else {
         if (index - 1 < _library.length) {
+          // 🌟 REVERTED: Just use the raw SKU. Wildcard gets its Blue background back!
           newSku = _library[index - 1]['sku_type'] ?? 'free_tier';
           debugPrint("🔍 [SKU SWITCH] -> $newSku");
-        } else {
-          debugPrint("🛑 [PAGE CHANGE] Index OOB. Fallback to free_tier");
         }
       }
       _currentSku = newSku;
-
-      // ✅ NEW: Update System UI here, safely outside the build cycle
       _updateSystemUI(newSku);
     });
   }
 
-  // Helper function to keep things clean
   void _updateSystemUI(String sku) {
-    bool isLightBg = (sku == 'free_tier');
-    // Store (Dark Blue) needs Light UI (White text)
-    if (sku == 'store') isLightBg = false;
-
+    bool isLightBg = (sku == 'free_tier' || sku == 'single_visa' || sku == 'one_time_pass');
+    
     SystemChrome.setSystemUIOverlayStyle(
       isLightBg ? SystemUiOverlayStyle.dark : SystemUiOverlayStyle.light,
     );
@@ -528,9 +524,13 @@ class _PassportCollectionScreenState extends State<PassportCollectionScreen> {
     );
     // 🛡️ SAFE SYSTEM UI UPDATE
     // We move this calculation to be 100% safe against nulls
-    bool isLightBg = _currentSku == 'free_tier';
-    if (_currentSku == 'store')
+    bool isLightBg = _currentSku == 'free_tier' || 
+                     _currentSku == 'single_visa' || 
+                     _currentSku == 'single_page'; 
+                     
+    if (_currentSku == 'store') {
       isLightBg = false; // Store is Dark Mode (Dark Blue bg)
+    }
 
     // Only update if mounted to prevent "element dirty" errors
     // (Ideally call this in onPageChanged, but this is a quick patch)
@@ -544,126 +544,128 @@ class _PassportCollectionScreenState extends State<PassportCollectionScreen> {
         body: Center(child: CupertinoActivityIndicator(color: Colors.white, radius: 16)),
       );
     }
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Stack(
-        children: [
-          // 1. THE MOVING ATMOSPHERE
-          Positioned.fill(
-            // 🛡️ DEBUGGING: If this crashes, wrap it in a Container with color to check
-            child: AnimatedBackground(sku: _currentSku),
-          ),
-
-          // 2. PageView
-          Positioned.fill(
-            child: PageView.builder(
-              controller: _pageController,
-              // 🛡️ PREVENT OVERFLOW: Use max(1, ...) so we always have at least the store
-              itemCount: (_library.isEmpty) ? 1 : _library.length + 1,
-              onPageChanged: _onPageChanged,
-              itemBuilder: (context, index) {
-                // 1. PAGE 0: THE SHOP CARD
-                if (index == 0) {
-                  return const _StoreCardPlaceholder();
-                }
-
-                // 2. SAFETY CHECK: Accessing library
-                final bookIndex = index - 1;
-                if (bookIndex < 0 || bookIndex >= _library.length)
-                  return const SizedBox();
-
-                final book = _library[bookIndex];
-
-                // 1. CALCULATE HANDOFF
-                // We check if we have a pending stamp AND if this specific book instance
-                // matches the currently visible book (based on _currentIndex).
-                final bool isTargetBook = _pendingStampRestaurant != null &&
-                                          (_currentIndex - 1 >= 0 && _currentIndex - 1 < _library.length) &&
-                                          book['id'] == _library[_currentIndex - 1]['id'];
-
-                return Padding(
-                  // ❌ REMOVE the key from the Padding widget: key: bookIndex == (_currentIndex - 1) ? _wildcardKey : null, 
-                  padding: const EdgeInsets.only(top: 45),
-                  child: PassportStackScreen(
-                    key: ValueKey(book['id']),
-                    bookId: book['id'],
-                    skuType: book['sku_type'] ?? 'free_tier',
-                    isReadOnly: book['status'] != 'active',
-                    triggerOpenDetail: bookIndex == (_currentIndex - 1) ? _triggerDetailOpen : false,
-                    onDetailOpened: () => setState(() => _triggerDetailOpen = false),
-                    incomingRestaurant: (bookIndex == (_currentIndex - 1)) ? _activeStampRestaurant : null,
-                    autoTriggerRestaurant: isTargetBook ? _pendingStampRestaurant : null,
-                    onAutoTriggerComplete: () {
-                       _pendingStampRestaurant = null;
-                    },
-                    onStampComplete: () {
-                       _activeStampRestaurant = null; 
-                       _loadLibrary(preservePage: true);
-                    },
-                    onButtonVisibilityChanged: (isVisible) {
-                      if (_hideStatusPill != isVisible) {
-                        setState(() => _hideStatusPill = isVisible);
-                      }
-                    },
-                    onRequestBookSwitch: (targetId) {
-                      _activeStampRestaurant = null; 
-                      _switchToBook(targetId, stampPayload: widget.incomingRestaurant);
-                    },
-                    
-                    // 👇 ADD THESE TWO NEW LINES 👇
-                    tutorialKey: bookIndex == (_currentIndex - 1) ? _wildcardKey : null,
-                    onReady: bookIndex == (_currentIndex - 1) ? _checkAndShowTutorial : null,
-                  ),
-                );
-              },
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: isLightBg ? SystemUiOverlayStyle.dark : SystemUiOverlayStyle.light,
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          body: Stack(
+          children: [
+            // 1. THE MOVING ATMOSPHERE
+            Positioned.fill(
+              // 🛡️ DEBUGGING: If this crashes, wrap it in a Container with color to check
+              child: AnimatedBackground(sku: _currentSku),
             ),
-          ),
 
-          // 3. THE LOCKED FLOATING HEADER
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: SafeArea(
-              bottom: false,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8.0,
-                  vertical: 8.0,
-                ),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: Icon(
-                        Icons.arrow_back_ios_new,
-                        size: 20,
-                        color: textColor,
-                      ),
-                      onPressed: () => Navigator.pop(context),
+            // 2. PageView
+            Positioned.fill(
+              child: PageView.builder(
+                controller: _pageController,
+                // 🛡️ PREVENT OVERFLOW: Use max(1, ...) so we always have at least the store
+                itemCount: (_library.isEmpty) ? 1 : _library.length + 1,
+                onPageChanged: _onPageChanged,
+                itemBuilder: (context, index) {
+                  // 1. PAGE 0: THE SHOP CARD
+                  if (index == 0) {
+                    return const _StoreCardPlaceholder();
+                  }
+
+                  // 2. SAFETY CHECK: Accessing library
+                  final bookIndex = index - 1;
+                  if (bookIndex < 0 || bookIndex >= _library.length)
+                    return const SizedBox();
+
+                  final book = _library[bookIndex];
+
+                  // 1. CALCULATE HANDOFF
+                  // We check if we have a pending stamp AND if this specific book instance
+                  // matches the currently visible book (based on _currentIndex).
+                  final bool isTargetBook = _pendingStampRestaurant != null &&
+                                            (_currentIndex - 1 >= 0 && _currentIndex - 1 < _library.length) &&
+                                            book['id'] == _library[_currentIndex - 1]['id'];
+
+                  return Padding(
+                    // ❌ REMOVE the key from the Padding widget: key: bookIndex == (_currentIndex - 1) ? _wildcardKey : null, 
+                    padding: const EdgeInsets.only(top: 45),
+                    child: PassportStackScreen(
+                      key: ValueKey(book['id']),
+                      bookId: book['id'],
+                      skuType: book['sku_type'] ?? 'free_tier',
+                      isReadOnly: book['status'] != 'active',
+                      triggerOpenDetail: bookIndex == (_currentIndex - 1) ? _triggerDetailOpen : false,
+                      onDetailOpened: () => setState(() => _triggerDetailOpen = false),
+                      incomingRestaurant: (bookIndex == (_currentIndex - 1)) ? _activeStampRestaurant : null,
+                      autoTriggerRestaurant: isTargetBook ? _pendingStampRestaurant : null,
+                      onAutoTriggerComplete: () {
+                        _pendingStampRestaurant = null;
+                      },
+                      onStampComplete: () {
+                        _activeStampRestaurant = null; 
+                        _loadLibrary(preservePage: true);
+                      },
+                      onButtonVisibilityChanged: (isVisible) {
+                        if (_hideStatusPill != isVisible) {
+                          setState(() => _hideStatusPill = isVisible);
+                        }
+                      },
+                      onRequestBookSwitch: (targetId) {
+                        _activeStampRestaurant = null; 
+                        _switchToBook(targetId, stampPayload: widget.incomingRestaurant);
+                      },
+                      
+                      // 👇 ADD THESE TWO NEW LINES 👇
+                      tutorialKey: bookIndex == (_currentIndex - 1) ? _wildcardKey : null,
+                      onReady: bookIndex == (_currentIndex - 1) ? _checkAndShowTutorial : null,
                     ),
-                    Expanded(
-                      child: Text(
-                        "PASSPORT COLLECTION",
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
+                  );
+                },
+              ),
+            ),
+
+            // 3. THE LOCKED FLOATING HEADER
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8.0,
+                    vertical: 8.0,
+                  ),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: Icon(
+                          Icons.arrow_back_ios_new,
+                          size: 20,
                           color: textColor,
-                          fontFamily: 'Courier',
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 1.5,
-                          fontSize: 16,
+                        ),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                      Expanded(
+                        child: Text(
+                          "PASSPORT COLLECTION",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: textColor,
+                            fontFamily: 'Courier',
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.5,
+                            fontSize: 16,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 48),
-                  ],
+                      const SizedBox(width: 48),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-
-          // 4. STATUS CONTROL PANEL
-          _buildStatusControl(),
-        ],
+            // 4. STATUS CONTROL PANEL
+            _buildStatusControl(),
+          ],
+        ),
       ),
     );
   }

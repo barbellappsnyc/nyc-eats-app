@@ -123,13 +123,24 @@ class _AnimatedBackgroundState extends State<AnimatedBackground> with TickerProv
           const Color(0xFF662D8C),
         ];
         
+      case 'single_page':
+        // 🌟 THE WILDCARD BACKGROUND: Official Security Paper
+        // A blend of warm parchment, pale gold foil, and ice-blue security ink.
+        // This makes the single visa card look like it's floating on a government document.
+        return [
+          const Color(0xFFFDFBF7), // Warm parchment base
+          const Color(0xFFE8ECEF), // Pale ice-blue (security thread)
+          const Color(0xFFF4E8D1), // Soft champagne gold (hologram shimmer)
+          const Color(0xFFF5F3EC), // Creamy parchment shadow
+        ];
+
       case 'free_tier':
       default:
-        // WILDCARD: White, Sky Blue, Pale Pink, Cyan
+        // (Keep your original Wildcard/Default colors here as a fallback)
         return [
           const Color(0xFFE0EAFC),
           const Color(0xFFCFDEF3),
-          const Color(0xFFE2EBF5), // Very light hint
+          const Color(0xFFE2EBF5),
           const Color(0xFFB2EBF2),
         ];
     }
