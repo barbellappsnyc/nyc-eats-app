@@ -2,29 +2,29 @@ import 'package:flutter/material.dart';
 import 'dart:ui';
 
 class PassportDialogs {
-  
   // ---------------------------------------------------------------------------
   // 1. 🚦 SWITCH CONFIRMATION (The New Logic)
   // ---------------------------------------------------------------------------
   static Future<bool> showSwitchConfirmation({
     required BuildContext context,
     required String targetBookName, // e.g., "Standard Passport"
-    required String reason,         // e.g., "Found existing Japanese Visa"
+    required String reason, // e.g., "Found existing Japanese Visa"
   }) async {
     return await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => _buildBaseDialog(
-        icon: Icons.swap_horiz_rounded,
-        iconColor: const Color(0xFF1A237E), // Navy
-        title: "SWITCH REQUIRED",
-        body: "$reason\n\nSwitch to your $targetBookName to continue?",
-        confirmText: "SWITCH & STAMP",
-        cancelText: "CANCEL",
-        onConfirm: () => Navigator.pop(context, true),
-        onCancel: () => Navigator.pop(context, false),
-      ),
-    ) ?? false;
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => _buildBaseDialog(
+            icon: Icons.swap_horiz_rounded,
+            iconColor: const Color(0xFF1A237E), // Navy
+            title: "SWITCH REQUIRED",
+            body: "$reason\n\nSwitch to your $targetBookName to continue?",
+            confirmText: "SWITCH & STAMP",
+            cancelText: "CANCEL",
+            onConfirm: () => Navigator.pop(context, true),
+            onCancel: () => Navigator.pop(context, false),
+          ),
+        ) ??
+        false;
   }
 
   // ---------------------------------------------------------------------------
@@ -36,30 +36,32 @@ class PassportDialogs {
     required String restaurantName,
   }) async {
     return await showGeneralDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      barrierLabel: "Visa Application",
-      barrierColor: Colors.black.withOpacity(0.6), 
-      transitionDuration: const Duration(milliseconds: 300),
-      pageBuilder: (context, anim1, anim2) {
-        return ScaleTransition(
-          scale: CurvedAnimation(parent: anim1, curve: Curves.easeOutBack),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8), 
-            child: _buildBaseDialog(
-              icon: Icons.policy,
-              iconColor: const Color(0xFF1A237E),
-              title: "VISA REQUIRED",
-              body: "Entry to '$restaurantName' requires an official $cuisine Visa.\n\nDo you wish to issue this travel document?",
-              confirmText: "ISSUE VISA",
-              cancelText: "DECLINE",
-              onConfirm: () => Navigator.pop(context, true),
-              onCancel: () => Navigator.pop(context, false),
-            ),
-          ),
-        );
-      },
-    ) ?? false;
+          context: context,
+          barrierDismissible: false,
+          barrierLabel: "Visa Application",
+          barrierColor: Colors.black.withOpacity(0.6),
+          transitionDuration: const Duration(milliseconds: 300),
+          pageBuilder: (context, anim1, anim2) {
+            return ScaleTransition(
+              scale: CurvedAnimation(parent: anim1, curve: Curves.easeOutBack),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                child: _buildBaseDialog(
+                  icon: Icons.policy,
+                  iconColor: const Color(0xFF1A237E),
+                  title: "VISA REQUIRED",
+                  body:
+                      "Entry to '$restaurantName' requires an official $cuisine Visa.\n\nDo you wish to issue this travel document?",
+                  confirmText: "ISSUE VISA",
+                  cancelText: "DECLINE",
+                  onConfirm: () => Navigator.pop(context, true),
+                  onCancel: () => Navigator.pop(context, false),
+                ),
+              ),
+            );
+          },
+        ) ??
+        false;
   }
 
   // ---------------------------------------------------------------------------
@@ -70,21 +72,23 @@ class PassportDialogs {
     required String restaurantName,
   }) async {
     return await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => _buildBaseDialog(
-        icon: Icons.history,
-        iconColor: const Color(0xFFD32F2F), // Red
-        iconBgColor: const Color(0xFFFFF0F0),
-        title: "ALREADY STAMPED!",
-        body: "You've already got a stamp for\n'$restaurantName'.\n\nWant to double dip?",
-        confirmText: "YEP, STAMP IT!",
-        cancelText: "NAH, CANCEL",
-        confirmColor: const Color(0xFFD32F2F),
-        onConfirm: () => Navigator.pop(context, true),
-        onCancel: () => Navigator.pop(context, false),
-      ),
-    ) ?? false;
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => _buildBaseDialog(
+            icon: Icons.history,
+            iconColor: const Color(0xFFD32F2F), // Red
+            iconBgColor: const Color(0xFFFFF0F0),
+            title: "ALREADY STAMPED!",
+            body:
+                "You've already got a stamp for\n'$restaurantName'.\n\nWant to double dip?",
+            confirmText: "YEP, STAMP IT!",
+            cancelText: "NAH, CANCEL",
+            confirmColor: const Color(0xFFD32F2F),
+            onConfirm: () => Navigator.pop(context, true),
+            onCancel: () => Navigator.pop(context, false),
+          ),
+        ) ??
+        false;
   }
 
   // ---------------------------------------------------------------------------
@@ -95,19 +99,21 @@ class PassportDialogs {
     required String cuisine,
   }) async {
     return await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => _buildBaseDialog(
-        icon: Icons.add_to_photos_rounded,
-        iconColor: const Color(0xFF1A237E),
-        title: "PAGE FULL!",
-        body: "Your $cuisine Visa is completely filled.\n\nAdd a fresh page to keep collecting?",
-        confirmText: "ADD PAGE",
-        cancelText: "NO THANKS",
-        onConfirm: () => Navigator.pop(context, true),
-        onCancel: () => Navigator.pop(context, false),
-      ),
-    ) ?? false;
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => _buildBaseDialog(
+            icon: Icons.add_to_photos_rounded,
+            iconColor: const Color(0xFF1A237E),
+            title: "PAGE FULL!",
+            body:
+                "Your $cuisine Visa is completely filled.\n\nAdd a fresh page to keep collecting?",
+            confirmText: "ADD PAGE",
+            cancelText: "NO THANKS",
+            onConfirm: () => Navigator.pop(context, true),
+            onCancel: () => Navigator.pop(context, false),
+          ),
+        ) ??
+        false;
   }
 
   // ---------------------------------------------------------------------------
@@ -119,20 +125,21 @@ class PassportDialogs {
     required String message,
   }) async {
     return await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => _buildBaseDialog(
-        icon: Icons.lock_clock,
-        iconColor: Colors.orange[900]!,
-        iconBgColor: Colors.orange[50],
-        title: title,
-        body: message,
-        confirmText: "UPGRADE PASSPORT",
-        cancelText: "CANCEL",
-        onConfirm: () => Navigator.pop(context, true),
-        onCancel: () => Navigator.pop(context, false),
-      ),
-    ) ?? false;
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => _buildBaseDialog(
+            icon: Icons.lock_clock,
+            iconColor: Colors.orange[900]!,
+            iconBgColor: Colors.orange[50],
+            title: title,
+            body: message,
+            confirmText: "UPGRADE PASSPORT",
+            cancelText: "CANCEL",
+            onConfirm: () => Navigator.pop(context, true),
+            onCancel: () => Navigator.pop(context, false),
+          ),
+        ) ??
+        false;
   }
 
   // ===========================================================================
@@ -168,7 +175,7 @@ class PassportDialogs {
               child: Icon(icon, size: 40, color: iconColor),
             ),
             const SizedBox(height: 20),
-            
+
             // Title
             Text(
               title,
@@ -182,7 +189,7 @@ class PassportDialogs {
               ),
             ),
             const SizedBox(height: 12),
-            
+
             // Body
             Text(
               body,
@@ -195,7 +202,7 @@ class PassportDialogs {
               ),
             ),
             const SizedBox(height: 28),
-            
+
             // Buttons
             Row(
               children: [

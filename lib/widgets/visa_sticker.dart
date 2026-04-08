@@ -21,10 +21,7 @@ class VisaSticker extends StatelessWidget {
       decoration: BoxDecoration(
         color: mainColor.withOpacity(0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: mainColor.withOpacity(0.3),
-          width: 1,
-        ),
+        border: Border.all(color: mainColor.withOpacity(0.3), width: 1),
       ),
       clipBehavior: Clip.antiAlias,
       child: Stack(
@@ -39,7 +36,7 @@ class VisaSticker extends StatelessWidget {
               color: mainColor.withOpacity(0.05),
             ),
           ),
-          
+
           // 2. Security Pattern (Dots)
           Positioned(
             top: 5,
@@ -48,19 +45,22 @@ class VisaSticker extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: List.generate(
-                30, 
+                30,
                 (index) => Container(
-                  width: 2, 
-                  height: 2, 
-                  color: mainColor.withOpacity(0.5)
-                )
+                  width: 2,
+                  height: 2,
+                  color: mainColor.withOpacity(0.5),
+                ),
               ),
             ),
           ),
 
           // 3. Content
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0), // Reduced vertical padding
+            padding: const EdgeInsets.symmetric(
+              horizontal: 12.0,
+              vertical: 8.0,
+            ), // Reduced vertical padding
             child: Row(
               children: [
                 // Seal
@@ -77,7 +77,7 @@ class VisaSticker extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 15),
-                
+
                 // 🚀 FIX: Use Flexible inside a compact column
                 Expanded(
                   child: Column(
@@ -114,7 +114,7 @@ class VisaSticker extends StatelessWidget {
                     ],
                   ),
                 ),
-                
+
                 const SizedBox(width: 8),
 
                 // Date

@@ -13,11 +13,10 @@ class PizzeriaTableclothBackground extends StatelessWidget {
         child: Transform.scale(
           scale: 1.2, // Scaled up to hide the edges of the rotated canvas
           child: Transform.rotate(
-            angle: -math.pi / 24, // A very slight -7.5 degree tilt for that organic, thrown-on-a-table feel
-            child: CustomPaint(
-              size: Size.infinite,
-              painter: _GinghamPainter(),
-            ),
+            angle:
+                -math.pi /
+                24, // A very slight -7.5 degree tilt for that organic, thrown-on-a-table feel
+            child: CustomPaint(size: Size.infinite, painter: _GinghamPainter()),
           ),
         ),
       ),
@@ -29,23 +28,29 @@ class _GinghamPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     // The width of each square
-    const double squareSize = 45.0; 
-    
+    const double squareSize = 45.0;
+
     // THE ICONIC PIZZERIA BRIGHT RED (Vivid, clean, classic)
-    // 0xFFFF1111 is a pure, bright, punchy red. 
+    // 0xFFFF1111 is a pure, bright, punchy red.
     // Opacity 0.4 keeps it from being overwhelming and creates perfect, clean intersections.
     final Paint redPaint = Paint()
-      ..color = const Color(0xFFFF1111).withOpacity(0.4) 
+      ..color = const Color(0xFFFF1111).withOpacity(0.4)
       ..style = PaintingStyle.fill;
 
     // 1. Paint Vertical Stripes
     for (double x = 0; x < size.width; x += squareSize * 2) {
-      canvas.drawRect(Rect.fromLTWH(x, -100, squareSize, size.height + 200), redPaint);
+      canvas.drawRect(
+        Rect.fromLTWH(x, -100, squareSize, size.height + 200),
+        redPaint,
+      );
     }
 
     // 2. Paint Horizontal Stripes
     for (double y = -100; y < size.height + 200; y += squareSize * 2) {
-      canvas.drawRect(Rect.fromLTWH(-100, y, size.width + 200, squareSize), redPaint);
+      canvas.drawRect(
+        Rect.fromLTWH(-100, y, size.width + 200, squareSize),
+        redPaint,
+      );
     }
   }
 

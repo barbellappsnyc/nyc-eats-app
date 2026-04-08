@@ -5,7 +5,7 @@ import 'package:nyc_eats/screens/map_screen.dart';
 import 'package:nyc_eats/screens/passport_stack_screen.dart';
 import 'package:purchases_flutter/purchases_flutter.dart';
 import '../services/purchase_service.dart';
-import 'auth_screen.dart'; 
+import 'auth_screen.dart';
 import '../services/passport_service.dart';
 import 'passport_collection_screen.dart';
 import '../models/restaurant.dart';
@@ -20,7 +20,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class PaywallScreen extends StatefulWidget {
   final Restaurant? incomingRestaurant;
-  
+
   const PaywallScreen({super.key, this.incomingRestaurant});
 
   @override
@@ -33,7 +33,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
   int _currentShopIndex = 0;
   final PageController _pageController = PageController();
-  
+
   final List<Map<String, String>> _shopTiers = [
     {'sku': 'single_page', 'label': '1', 'title': 'SINGLE ENTRY'},
     {'sku': 'standard_book', 'label': 'S', 'title': 'STANDARD PASSPORT'},
@@ -51,7 +51,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
   void initState() {
     super.initState();
     _loadOfferings();
-    
+
     _tosRecognizer = TapGestureRecognizer()..onTap = _launchToS;
     _privacyRecognizer = TapGestureRecognizer()..onTap = _launchPrivacy;
 
@@ -65,7 +65,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
   Future<void> _checkAndShowTutorial() async {
     final prefs = await SharedPreferences.getInstance();
     final String? stage = prefs.getString('tutorial_stage');
-    
+
     if (stage == 'shop_screen') {
       Future.delayed(const Duration(milliseconds: 600), () {
         if (mounted) _showShopTutorial();
@@ -101,14 +101,49 @@ class _PaywallScreenState extends State<PaywallScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text("THE CONSUMABLES", style: TextStyle(fontFamily: 'AppleGaramond', fontWeight: FontWeight.bold, color: Colors.white, fontSize: 26, letterSpacing: 1.5)),
+                    const Text(
+                      "THE CONSUMABLES",
+                      style: TextStyle(
+                        fontFamily: 'AppleGaramond',
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        fontSize: 26,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
                     const SizedBox(height: 12),
-                    const Text("Passports are physical, one-time consumables. Swipe up and down to 'feel' the different tiers before you buy.", style: TextStyle(color: Colors.white70, fontSize: 16, height: 1.4, fontWeight: FontWeight.w500)),
+                    const Text(
+                      "Passports are physical, one-time consumables. Swipe up and down to 'feel' the different tiers before you buy.",
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 16,
+                        height: 1.4,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                     const SizedBox(height: 24),
                     ElevatedButton(
-                      onPressed: () => controller.next(), // 👈 Safe to use next() here, there is another slide!
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999))),
-                      child: const Text("NEXT", style: TextStyle(fontFamily: 'Courier', fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+                      onPressed: () => controller
+                          .next(), // 👈 Safe to use next() here, there is another slide!
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                      child: const Text(
+                        "NEXT",
+                        style: TextStyle(
+                          fontFamily: 'Courier',
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -125,9 +160,12 @@ class _PaywallScreenState extends State<PaywallScreen> {
           radius: 24,
           contents: [
             TargetContent(
-              align: ContentAlign.custom, // 👈 Bypass default alignment here too!
+              align:
+                  ContentAlign.custom, // 👈 Bypass default alignment here too!
               customPosition: CustomTargetContentPosition(
-                top: size.height * 0.15, // Keeps text in the exact same spot for a seamless transition
+                top:
+                    size.height *
+                    0.15, // Keeps text in the exact same spot for a seamless transition
               ),
               builder: (context, controller) => Container(
                 padding: const EdgeInsets.all(24),
@@ -140,28 +178,62 @@ class _PaywallScreenState extends State<PaywallScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text("THE PACT", style: TextStyle(fontFamily: 'AppleGaramond', fontWeight: FontWeight.bold, color: Colors.white, fontSize: 26, letterSpacing: 1.5)),
+                    const Text(
+                      "THE PACT",
+                      style: TextStyle(
+                        fontFamily: 'AppleGaramond',
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        fontSize: 26,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
                     const SizedBox(height: 12),
-                    const Text("No subscriptions. No recurring fees. You pay once, and the passport is yours forever.\n\nWelcome to Gourmet Passports.", style: TextStyle(color: Colors.white70, fontSize: 16, height: 1.4, fontWeight: FontWeight.w500)),
+                    const Text(
+                      "No subscriptions. No recurring fees. You pay once, and the passport is yours forever.\n\nWelcome to Gourmet Passports.",
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 16,
+                        height: 1.4,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                     const SizedBox(height: 24),
                     ElevatedButton(
                       onPressed: () {
                         // 1. Pass the baton back to the map screen
                         SharedPreferences.getInstance().then((prefs) {
-                          prefs.setString('tutorial_stage', 'final_map_screen'); 
+                          prefs.setString('tutorial_stage', 'final_map_screen');
                         });
-                        
+
                         // 2. Force the tutorial to close
-                        controller.skip(); 
+                        controller.skip();
 
                         // 3. Jump to MapScreen and clear everything else
                         Navigator.of(context).pushAndRemoveUntil(
-                          MaterialPageRoute(builder: (_) => const MapScreen()), 
-                          (route) => false
+                          MaterialPageRoute(builder: (_) => const MapScreen()),
+                          (route) => false,
                         );
-                      }, 
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999))),
-                      child: const Text("NEXT", style: TextStyle(fontFamily: 'Courier', fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                      child: const Text(
+                        "NEXT",
+                        style: TextStyle(
+                          fontFamily: 'Courier',
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -178,7 +250,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
         // 🏁 DESTROY THE BATON: The tour is completely finished!
         SharedPreferences.getInstance().then((prefs) {
           prefs.setBool('has_seen_tutorial', true);
-          prefs.remove('tutorial_stage'); 
+          prefs.remove('tutorial_stage');
         });
       },
     ).show(context: context);
@@ -191,6 +263,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
     _privacyRecognizer.dispose(); // 👈 Prevent memory leaks
     super.dispose();
   }
+
   Future<void> _loadOfferings() async {
     try {
       final packages = await PurchaseService().fetchOffers();
@@ -205,7 +278,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
       if (mounted) setState(() => _isLoading = false);
     }
   }
-  
+
   Future<void> _buy(Package package) async {
     setState(() => _isLoading = true);
     bool success = await PurchaseService().purchasePackage(package);
@@ -223,11 +296,11 @@ class _PaywallScreenState extends State<PaywallScreen> {
           final txs = customerInfo.nonSubscriptionTransactions
               .where((t) => t.productIdentifier == sku)
               .toList();
-              
+
           if (txs.isNotEmpty) {
-             // Sort by newest first to grab the one that just happened
-             txs.sort((a, b) => b.purchaseDate.compareTo(a.purchaseDate)); 
-             transactionId = txs.first.transactionIdentifier;
+            // Sort by newest first to grab the one that just happened
+            txs.sort((a, b) => b.purchaseDate.compareTo(a.purchaseDate));
+            transactionId = txs.first.transactionIdentifier;
           }
         } catch (e) {
           debugPrint("Could not fetch transaction ID: $e");
@@ -235,32 +308,32 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
         // 👈 Now we pass the transactionId, so the Zombie Catcher ignores it later!
         await PassportService.createBook(
-          userId: user.id, 
+          userId: user.id,
           sku: sku,
-          transactionId: transactionId, 
+          transactionId: transactionId,
         );
-        
+
         await PassportService.prewarmCache();
         if (mounted) {
           setState(() => _isLoading = false);
           Navigator.of(context).pushReplacement(
-             MaterialPageRoute(
-               builder: (_) => PassportCollectionScreen(
-                 initialBookId: 'newly_created_book',
-                 incomingRestaurant: widget.incomingRestaurant,
-               ),
-             ),
+            MaterialPageRoute(
+              builder: (_) => PassportCollectionScreen(
+                initialBookId: 'newly_created_book',
+                incomingRestaurant: widget.incomingRestaurant,
+              ),
+            ),
           );
         }
       } else {
         if (mounted) setState(() => _isLoading = false);
         Navigator.of(context).push(
-           MaterialPageRoute(
-             builder: (_) => AuthScreen(
-               purchasedSku: sku,
-               incomingRestaurant: widget.incomingRestaurant,
-             ),
-           ),
+          MaterialPageRoute(
+            builder: (_) => AuthScreen(
+              purchasedSku: sku,
+              incomingRestaurant: widget.incomingRestaurant,
+            ),
+          ),
         );
       }
     } else {
@@ -284,15 +357,18 @@ class _PaywallScreenState extends State<PaywallScreen> {
               color: Colors.white.withOpacity(isDiplomat ? 0.25 : 0.15),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: isDiplomat 
-                    ? const Color(0xFFFFD700).withOpacity(0.9) 
-                    : Colors.white.withOpacity(0.45), 
+                color: isDiplomat
+                    ? const Color(0xFFFFD700).withOpacity(0.9)
+                    : Colors.white.withOpacity(0.45),
                 width: 1.5,
               ),
             ),
             child: ListTile(
               // 👇 Slashed vertical padding to make it much shorter
-              contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 4,
+              ),
               title: Text(
                 product.title.toUpperCase(),
                 style: TextStyle(
@@ -305,7 +381,10 @@ class _PaywallScreenState extends State<PaywallScreen> {
               ),
               subtitle: Text(
                 product.description,
-                style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 11), // Scaled down
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.8),
+                  fontSize: 11,
+                ), // Scaled down
               ),
               trailing: Text(
                 product.priceString,
@@ -326,7 +405,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
   Package? _getActivePackage() {
     if (_packages.isEmpty) return null;
-    
+
     // 1. Get the internal UI name (e.g., 'standard_book')
     final String activeSku = _shopTiers[_currentShopIndex]['sku']!;
 
@@ -342,7 +421,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
     // 3. Find the matching package
     try {
-      return _packages.firstWhere((pkg) => pkg.storeProduct.identifier == revenueCatIdentifier);
+      return _packages.firstWhere(
+        (pkg) => pkg.storeProduct.identifier == revenueCatIdentifier,
+      );
     } catch (e) {
       return null;
     }
@@ -365,18 +446,22 @@ class _PaywallScreenState extends State<PaywallScreen> {
                 "AUTHENTICATION REQUIRED",
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontFamily: 'Courier', 
-                  fontSize: 18, 
-                  fontWeight: FontWeight.w900, 
-                  color: Colors.white, 
-                  letterSpacing: 1.0
+                  fontFamily: 'Courier',
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  letterSpacing: 1.0,
                 ),
               ),
               const SizedBox(height: 16),
               const Text(
                 "You need to create an account or log in to purchase the passport and save your stamps.",
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, color: Colors.white70, height: 1.5),
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.white70,
+                  height: 1.5,
+                ),
               ),
               const SizedBox(height: 28),
               Row(
@@ -385,24 +470,28 @@ class _PaywallScreenState extends State<PaywallScreen> {
                     child: TextButton(
                       onPressed: () => Navigator.pop(context),
                       style: TextButton.styleFrom(
-                        foregroundColor: Colors.grey, 
-                        padding: const EdgeInsets.symmetric(vertical: 16)
+                        foregroundColor: Colors.grey,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
-                      child: const Text("CANCEL", style: TextStyle(fontWeight: FontWeight.bold)),
+                      child: const Text(
+                        "CANCEL",
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () {
-                        Navigator.pop(context); 
+                        Navigator.pop(context);
                         Navigator.of(context).push(
                           MaterialPageRoute(
                             builder: (_) => AuthScreen(
-                              purchasedSku: _shopTiers[_currentShopIndex]['sku'],
+                              purchasedSku:
+                                  _shopTiers[_currentShopIndex]['sku'],
                               incomingRestaurant: widget.incomingRestaurant,
                             ),
-                          )
+                          ),
                         );
                       },
                       style: ElevatedButton.styleFrom(
@@ -410,13 +499,18 @@ class _PaywallScreenState extends State<PaywallScreen> {
                         foregroundColor: Colors.black,
                         elevation: 0,
                         padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
-                      child: const Text("LOGIN", style: TextStyle(fontWeight: FontWeight.bold)),
+                      child: const Text(
+                        "LOGIN",
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ),
                 ],
-              )
+              ),
             ],
           ),
         ),
@@ -427,56 +521,66 @@ class _PaywallScreenState extends State<PaywallScreen> {
   Widget _buildBuyButton() {
     final Package? activePackage = _getActivePackage();
     final bool isLoggedIn = Supabase.instance.client.auth.currentUser != null;
-    
+
     String buttonText = "LOADING...";
     if (!_isLoading) {
       if (!isLoggedIn) {
         buttonText = "LOGIN TO PURCHASE";
       } else if (activePackage != null) {
-        buttonText = "ACQUIRE PASSPORT - ${activePackage.storeProduct.priceString}";
+        buttonText =
+            "ACQUIRE PASSPORT - ${activePackage.storeProduct.priceString}";
       } else {
-        buttonText = "UNAVAILABLE"; 
+        buttonText = "UNAVAILABLE";
       }
     }
 
-    final bool isClickable = !_isLoading && (!isLoggedIn || activePackage != null);
+    final bool isClickable =
+        !_isLoading && (!isLoggedIn || activePackage != null);
 
     // 👇 CHANGED: Removed Positioned wrapper. Used SizedBox to force full width.
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
-          backgroundColor: (isLoggedIn && isClickable) ? Colors.white : Colors.grey[850],
-          foregroundColor: (isLoggedIn && isClickable) ? Colors.black : Colors.grey[400],
+          backgroundColor: (isLoggedIn && isClickable)
+              ? Colors.white
+              : Colors.grey[850],
+          foregroundColor: (isLoggedIn && isClickable)
+              ? Colors.black
+              : Colors.grey[400],
           padding: const EdgeInsets.symmetric(vertical: 20),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           elevation: (isLoggedIn && isClickable) ? 10 : 0,
-          side: isLoggedIn ? BorderSide.none : BorderSide(color: Colors.white.withOpacity(0.1)),
+          side: isLoggedIn
+              ? BorderSide.none
+              : BorderSide(color: Colors.white.withOpacity(0.1)),
         ),
         onPressed: isClickable
             ? () {
                 if (!isLoggedIn) {
                   _showAuthDialog();
                 } else if (activePackage != null) {
-                  _buy(activePackage); 
+                  _buy(activePackage);
                 }
               }
             : null,
-        child: _isLoading 
-          ? const CupertinoActivityIndicator(color: Colors.white) 
-          : Text(
-              buttonText,
-              style: const TextStyle(
-                fontFamily: 'Courier',
-                fontWeight: FontWeight.w900,
-                fontSize: 15,
-                letterSpacing: 1.2,
+        child: _isLoading
+            ? const CupertinoActivityIndicator(color: Colors.white)
+            : Text(
+                buttonText,
+                style: const TextStyle(
+                  fontFamily: 'Courier',
+                  fontWeight: FontWeight.w900,
+                  fontSize: 15,
+                  letterSpacing: 1.2,
+                ),
               ),
-            ),
       ),
     );
   }
-  
+
   Widget _buildLegalFooter() {
     return Text.rich(
       TextSpan(
@@ -486,7 +590,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
           TextSpan(
             text: "Terms of Service",
             style: const TextStyle(
-              decoration: TextDecoration.underline, 
+              decoration: TextDecoration.underline,
               color: Colors.black,
               fontWeight: FontWeight.bold,
             ),
@@ -496,14 +600,14 @@ class _PaywallScreenState extends State<PaywallScreen> {
           TextSpan(
             text: "Privacy Policy",
             style: const TextStyle(
-              decoration: TextDecoration.underline, 
+              decoration: TextDecoration.underline,
               color: Colors.black,
               fontWeight: FontWeight.bold,
             ),
             recognizer: _privacyRecognizer, // 👈 ADDED THIS
           ),
           const TextSpan(
-            text: ".\nPassports are one-time consumable purchases."
+            text: ".\nPassports are one-time consumable purchases.",
           ),
         ],
       ),
@@ -513,7 +617,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
   Future<void> _launchToS() async {
     // Replace with your actual Terms of Service URL later
-    final Uri url = Uri.parse('https://gourmetpassports.com/terms.html'); 
+    final Uri url = Uri.parse('https://gourmetpassports.com/terms.html');
     if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
       debugPrint('Could not launch $url');
     }
@@ -521,7 +625,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
   Future<void> _launchPrivacy() async {
     // Replace with your actual Privacy Policy URL later
-    final Uri url = Uri.parse('https://gourmetpassports.com/privacy.html'); 
+    final Uri url = Uri.parse('https://gourmetpassports.com/privacy.html');
     if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
       debugPrint('Could not launch $url');
     }
@@ -533,15 +637,18 @@ class _PaywallScreenState extends State<PaywallScreen> {
     Color accentColor = Colors.white;
 
     if (sku == 'single_page') {
-      description = "A single-entry travel document. Once a cuisine is assigned, this page is locked to that specific country forever.";
+      description =
+          "A single-entry travel document. Once a cuisine is assigned, this page is locked to that specific country forever.";
       capacity = "1 Visa Page • 4 Stamps Max";
       accentColor = Colors.blueAccent;
     } else if (sku == 'standard_book') {
-      description = "The classic traveler's companion. Bound in Imperial Burgundy, it allows for multiple cuisines and border crossings.";
+      description =
+          "The classic traveler's companion. Bound in Imperial Burgundy, it allows for multiple cuisines and border crossings.";
       capacity = "5 Visa Pages • 20 Stamps Max";
       accentColor = const Color(0xFF5C1026); // Burgundy
     } else if (sku == 'diplomat_book') {
-      description = "For the culinary elite. An expansive, heavyweight book featuring the exclusive Navy & Gold Foil cover.";
+      description =
+          "For the culinary elite. An expansive, heavyweight book featuring the exclusive Navy & Gold Foil cover.";
       capacity = "20 Visa Pages • 80 Stamps Max";
       accentColor = const Color(0xFFFFD700); // Gold
     }
@@ -562,16 +669,19 @@ class _PaywallScreenState extends State<PaywallScreen> {
                 title,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
-                  fontFamily: 'AppleGaramond', 
-                  fontSize: 22, 
-                  fontWeight: FontWeight.bold, 
-                  color: Colors.white, 
-                  letterSpacing: 1.2
+                  fontFamily: 'AppleGaramond',
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  letterSpacing: 1.2,
                 ),
               ),
               const SizedBox(height: 12),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: accentColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
@@ -593,9 +703,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
                 description,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
-                  fontSize: 14, 
-                  color: Colors.white70, 
-                  height: 1.5
+                  fontSize: 14,
+                  color: Colors.white70,
+                  height: 1.5,
                 ),
               ),
               const SizedBox(height: 28),
@@ -606,12 +716,17 @@ class _PaywallScreenState extends State<PaywallScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
                     foregroundColor: Colors.black,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
-                  child: const Text("CLOSE", style: TextStyle(fontWeight: FontWeight.bold)),
+                  child: const Text(
+                    "CLOSE",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ),
-              )
+              ),
             ],
           ),
         ),
@@ -621,20 +736,23 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final double cardWidth = (MediaQuery.of(context).size.width * 0.85).clamp(300.0, 400.0);
+    final double cardWidth = (MediaQuery.of(context).size.width * 0.85).clamp(
+      300.0,
+      400.0,
+    );
     final double cardHeight = cardWidth * (540 / 340);
 
     // 👇 Task 3: Forces black status bar icons (battery, wifi, time)
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.dark, 
+      value: SystemUiOverlayStyle.dark,
       child: Scaffold(
-        backgroundColor: Colors.transparent, 
+        backgroundColor: Colors.transparent,
         // 👈 Task 1: AppBar completely removed!
         body: Stack(
           fit: StackFit.expand,
           children: [
             const AnimatedBackground(sku: 'free_tier'),
-            
+
             PageView.builder(
               controller: _pageController,
               scrollDirection: Axis.vertical,
@@ -644,54 +762,57 @@ class _PaywallScreenState extends State<PaywallScreen> {
               itemCount: _shopTiers.length,
               itemBuilder: (context, index) {
                 final tier = _shopTiers[index];
-                
+
                 return Align(
                   // ❌ REMOVED KEY FROM HERE
-                  alignment: const Alignment(0, -0.3), 
+                  alignment: const Alignment(0, -0.3),
                   child: Transform.scale(
-                    scale: 0.85, 
+                    scale: 0.85,
                     child: Stack(
                       alignment: Alignment.center,
-                      clipBehavior: Clip.none, 
+                      clipBehavior: Clip.none,
                       children: [
                         // 1. THE 3D BOOK
                         SizedBox(
-                          key: index == _currentShopIndex ? _booksKey : null, 
+                          key: index == _currentShopIndex ? _booksKey : null,
                           width: cardWidth,
-                          height: cardHeight + 100, 
+                          height: cardHeight + 100,
                           child: PassportStackScreen(
-                            key: ValueKey(tier['sku']), // 👈 ADD THIS: Forces a clean State instance for each unique SKU
-                            isDemo: true, 
+                            key: ValueKey(
+                              tier['sku'],
+                            ), // 👈 ADD THIS: Forces a clean State instance for each unique SKU
+                            isDemo: true,
                             skuType: tier['sku'],
                           ),
                         ),
-                        
+
                         // 2. THE FLOATING INFO LABEL
                         Positioned(
-                          top: 0, 
+                          top: 0,
                           child: GestureDetector(
-                            behavior: HitTestBehavior.opaque, 
-                            onTap: () => _showPurchaseInfo(tier['sku']!, tier['title']!),
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () =>
+                                _showPurchaseInfo(tier['sku']!, tier['title']!),
                             child: Padding(
-                              padding: const EdgeInsets.only(bottom: 24.0), 
+                              padding: const EdgeInsets.only(bottom: 24.0),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
                                     tier['title']!,
                                     style: const TextStyle(
-                                      fontFamily: 'SFPro', 
+                                      fontFamily: 'SFPro',
                                       fontWeight: FontWeight.w800,
                                       fontSize: 15,
-                                      color: Colors.black, 
+                                      color: Colors.black,
                                       letterSpacing: 1.2,
                                     ),
                                   ),
                                   const SizedBox(width: 6),
                                   const Icon(
-                                    Icons.info_outline, 
-                                    color: Colors.black, 
-                                    size: 18
+                                    Icons.info_outline,
+                                    color: Colors.black,
+                                    size: 18,
                                   ),
                                 ],
                               ),
@@ -704,7 +825,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                 );
               },
             ),
-            
+
             // 📍 LAYER 3: SIDE INDICATORS
             _buildSideIndicators(),
 
@@ -715,19 +836,19 @@ class _PaywallScreenState extends State<PaywallScreen> {
                 key: _controlsKey, // 👈 ATTACH KEY HERE
                 child: Padding(
                   padding: EdgeInsets.symmetric(
-                    horizontal: MediaQuery.of(context).size.width * 0.06, 
+                    horizontal: MediaQuery.of(context).size.width * 0.06,
                     vertical: MediaQuery.of(context).size.height * 0.02,
                   ),
                   child: Column(
-                    mainAxisSize: MainAxisSize.min, 
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       // 👇 Task 4: Pushed text higher away from the button & made it dark
                       const Padding(
-                        padding: EdgeInsets.only(bottom: 22.0), 
+                        padding: EdgeInsets.only(bottom: 22.0),
                         child: Text(
                           "No subscriptions. Pay once, own it forever.",
                           style: TextStyle(
-                            color: Colors.black87, 
+                            color: Colors.black87,
                             fontSize: 18,
                             fontStyle: FontStyle.italic,
                             fontFamily: 'AppleGaramond',
@@ -736,7 +857,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
                         ),
                       ),
                       _buildBuyButton(),
-                      SizedBox(height: MediaQuery.of(context).size.height * 0.015), 
+                      SizedBox(
+                        height: MediaQuery.of(context).size.height * 0.015,
+                      ),
                       _buildLegalFooter(),
                     ],
                   ),
@@ -757,14 +880,19 @@ class _PaywallScreenState extends State<PaywallScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.3), // Apple frosted glass base
-                        border: Border.all(color: Colors.white.withOpacity(0.4), width: 1),
+                        color: Colors.white.withOpacity(
+                          0.3,
+                        ), // Apple frosted glass base
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.4),
+                          width: 1,
+                        ),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
-                        Icons.close, 
-                        color: Colors.black, 
-                        size: 20
+                        Icons.close,
+                        color: Colors.black,
+                        size: 20,
                       ),
                     ),
                   ),
@@ -793,7 +921,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
             double y = details.localPosition.dy;
             int index = (y / itemHeight).floor();
             index = index.clamp(0, itemCount - 1);
-            
+
             if (_currentShopIndex != index) {
               _pageController.animateToPage(
                 index,
@@ -804,7 +932,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
           },
           // Transparent container to catch the drag gestures
           child: Container(
-            color: Colors.transparent, 
+            color: Colors.transparent,
             height: totalHeight,
             width: 40,
             child: Column(
@@ -830,5 +958,4 @@ class _PaywallScreenState extends State<PaywallScreen> {
       ),
     );
   }
-
 }

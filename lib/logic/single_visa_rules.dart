@@ -2,7 +2,10 @@ import 'passport_rules.dart';
 
 class SingleVisaRules implements PassportRules {
   @override
-  String? validateStampAttempt(Map<String, dynamic> book, String targetCuisine) {
+  String? validateStampAttempt(
+    Map<String, dynamic> book,
+    String targetCuisine,
+  ) {
     final List visas = book['visas'] ?? [];
 
     // Rule 1: If empty, we welcome everyone.
@@ -22,7 +25,7 @@ class SingleVisaRules implements PassportRules {
   int findTargetPageIndex(Map<String, dynamic> book, String targetCuisine) {
     // 🛠 FIX: For a single page book, the target is ALWAYS index 0.
     // This prevents the "Flip away" behavior.
-    return 0; 
+    return 0;
   }
 
   @override

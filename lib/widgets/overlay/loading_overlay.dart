@@ -33,12 +33,15 @@ class LoadingOverlay extends StatelessWidget {
                     children: [
                       // Blur Effect (The Ghostbuster Shield)
                       BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 5 * value, sigmaY: 5 * value),
+                        filter: ImageFilter.blur(
+                          sigmaX: 5 * value,
+                          sigmaY: 5 * value,
+                        ),
                         child: Container(
                           color: Colors.black.withOpacity(0.3 * value),
                         ),
                       ),
-                      
+
                       // The Spinner & Message
                       Center(
                         child: Column(
@@ -57,11 +60,12 @@ class LoadingOverlay extends StatelessWidget {
                                   fontWeight: FontWeight.bold,
                                   fontSize: 16,
                                   letterSpacing: 1.2,
-                                  fontFamily: 'Courier', 
-                                  decoration: TextDecoration.none, // Fixes yellow underline
+                                  fontFamily: 'Courier',
+                                  decoration: TextDecoration
+                                      .none, // Fixes yellow underline
                                 ),
                               ),
-                            ]
+                            ],
                           ],
                         ),
                       ),

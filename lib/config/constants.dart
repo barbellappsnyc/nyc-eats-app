@@ -118,7 +118,7 @@ final Map<String, String> categoryFlags = {
   "Snack": "🍿",
   "Fruit": "🍎",
   "Omakase": "🍣",
-  
+
   // --- 🌎 AMERICAS ---
   "American": "🇺🇸",
   "New American": "🇺🇸",
@@ -286,7 +286,7 @@ final Map<String, String> categoryFlags = {
   // --- 🇦🇺 OCEANIA ---
   "Australian": "🇦🇺",
   "New Zealand": "🇳🇿",
-  
+
   // --- 🏛️ VENUE TYPES ---
   "Diner": "☕",
   "Bistro": "🍽️",
@@ -308,7 +308,7 @@ class AppTextStyles {
   // --- GOURMET (HEADERS & PASSPORTS) ---
   // Ensure 'AppleGaramond' matches exactly what you named it in pubspec.yaml
   static const TextStyle passportTitle = TextStyle(
-    fontFamily: 'AppleGaramond', 
+    fontFamily: 'AppleGaramond',
     fontWeight: FontWeight.w700,
     fontSize: 22,
     color: Colors.white,

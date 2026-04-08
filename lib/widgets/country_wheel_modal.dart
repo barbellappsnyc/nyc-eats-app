@@ -9,7 +9,7 @@ import '../services/telemetry_service.dart'; // Add this near your other imports
 
 class CountryWheelModal extends StatefulWidget {
   final bool isDarkMode;
-  final List<String> availableCuisines; 
+  final List<String> availableCuisines;
   final Function(String) onCountrySelected;
 
   const CountryWheelModal({
@@ -23,7 +23,8 @@ class CountryWheelModal extends StatefulWidget {
   State<CountryWheelModal> createState() => _CountryWheelModalState();
 }
 
-class _CountryWheelModalState extends State<CountryWheelModal> with TickerProviderStateMixin {
+class _CountryWheelModalState extends State<CountryWheelModal>
+    with TickerProviderStateMixin {
   late FixedExtentScrollController _scrollController;
   bool _isSpinning = false;
   bool _showWinner = false;
@@ -197,46 +198,203 @@ class _CountryWheelModalState extends State<CountryWheelModal> with TickerProvid
 
   // Full Asset List
   final List<String> _allCountries = [
-    'READY?', 
-    'afghan', 'albanian', 'algerian', 'andorra', 'angola', 'antigua_and_barbuda', 
-    'argentinian', 'armenian', 'australian', 'austrian', 'azerbaijan',
-    'bahamas', 'bahrain', 'bangladeshi', 'barbados', 'belarus', 'belgian', 
-    'belize', 'benin', 'bhutan', 'bolivia', 'bosnia_and_herzegovina', 'botswana', 
-    'brazilian', 'brunei', 'bulgaria', 'burkina_faso', 'burmese', 'burundi',
-    'cabo_verde', 'cambodian', 'cameroon', 'canadian', 'central_african_republic', 
-    'chad', 'chilean', 'chinese', 'colombian', 'comoros', 'congo', 'costa_rica', 
-    'croatia', 'cuban', 'cyprus', 'czech_republic',
-    'denmark', 'djibouti', 'dominica', 'dominican', 'east_timor', 'ecuadorian', 
-    'egyptian', 'el_salvador', 'equatorial_guinea', 'eritrea', 'estonia', 
+    'READY?',
+    'afghan',
+    'albanian',
+    'algerian',
+    'andorra',
+    'angola',
+    'antigua_and_barbuda',
+    'argentinian',
+    'armenian',
+    'australian',
+    'austrian',
+    'azerbaijan',
+    'bahamas',
+    'bahrain',
+    'bangladeshi',
+    'barbados',
+    'belarus',
+    'belgian',
+    'belize',
+    'benin',
+    'bhutan',
+    'bolivia',
+    'bosnia_and_herzegovina',
+    'botswana',
+    'brazilian',
+    'brunei',
+    'bulgaria',
+    'burkina_faso',
+    'burmese',
+    'burundi',
+    'cabo_verde',
+    'cambodian',
+    'cameroon',
+    'canadian',
+    'central_african_republic',
+    'chad',
+    'chilean',
+    'chinese',
+    'colombian',
+    'comoros',
+    'congo',
+    'costa_rica',
+    'croatia',
+    'cuban',
+    'cyprus',
+    'czech_republic',
+    'denmark',
+    'djibouti',
+    'dominica',
+    'dominican',
+    'east_timor',
+    'ecuadorian',
+    'egyptian',
+    'el_salvador',
+    'equatorial_guinea',
+    'eritrea',
+    'estonia',
     'ethiopian',
-    'fiji', 'finland', 'french', 'gabon', 'gambia', 'georgian', 'german', 
-    'ghana', 'greek', 'grenada', 'guatemalan', 'guinea', 'guinea_bissau', 
+    'fiji',
+    'finland',
+    'french',
+    'gabon',
+    'gambia',
+    'georgian',
+    'german',
+    'ghana',
+    'greek',
+    'grenada',
+    'guatemalan',
+    'guinea',
+    'guinea_bissau',
     'guyanese',
-    'haitian', 'honduran', 'hungary', 'iceland', 'indian', 'indonesian', 
-    'iran', 'iraq', 'irish', 'israeli', 'italian', 'ivory_coast',
-    'jamaican', 'japanese', 'jordan', 'kazakhstan', 'kenya', 'kiribati', 
-    'korean', 'kosovo', 'kuwait', 'kyrgyzstan',
-    'laos', 'latvia', 'lebanese', 'lesotho', 'liberia', 'libya', 
-    'liechtenstein', 'lithuania', 'luxembourg',
-    'madagascar', 'malawi', 'malaysian', 'maldives', 'mali', 'malta', 
-    'marshall_islands', 'mauritania', 'mauritius', 'mexican', 'micronesia', 
-    'moldova', 'monaco', 'mongolia', 'montenegro', 'moroccan', 'mozambique', 'myanmar',
-    'namibia', 'nauru', 'nepalese', 'netherlands', 'new_zealand', 'nicaragua', 
-    'niger', 'nigerian', 'north_macedonia', 'norway',
-    'oman', 'pakistani', 'palau', 'palestine', 'panama', 'papua_new_guinea', 
-    'paraguay', 'peruvian', 'filipino', 'polish', 'portuguese', 'puerto_rican',
-    'qatar', 'romanian', 'russian', 'rwanda',
-    'saint_kitts_and_nevis', 'saint_lucia', 'saint_vincent', 'samoa', 
-    'san_marino', 'sao_tome_and_principe', 'saudi_arabia', 'senegalese', 
-    'serbia', 'seychelles', 'sierra_leone', 'singapore', 'slovakia', 'slovenia', 
-    'solomon_islands', 'somalia', 'south_africa', 'south_sudan', 'spanish', 
-    'sri_lankan', 'sudan', 'suriname', 'sweden', 'swiss', 'syria',
-    'taiwanese', 'tajik', 'tanzania', 'thai', 'togo', 'tonga', 
-    'trinidadian', 'tunisia', 'turkish', 'turkmenistan', 'tuvalu',
-    'uganda', 'ukrainian', 'united_arab_emirates', 'british', 'american', 
-    'uruguayan', 'uzbek',
-    'vanuatu', 'vatican_city', 'venezuelan', 'vietnamese', 'yemeni', 
-    'zambia', 'zimbabwe'
+    'haitian',
+    'honduran',
+    'hungary',
+    'iceland',
+    'indian',
+    'indonesian',
+    'iran',
+    'iraq',
+    'irish',
+    'israeli',
+    'italian',
+    'ivory_coast',
+    'jamaican',
+    'japanese',
+    'jordan',
+    'kazakhstan',
+    'kenya',
+    'kiribati',
+    'korean',
+    'kosovo',
+    'kuwait',
+    'kyrgyzstan',
+    'laos',
+    'latvia',
+    'lebanese',
+    'lesotho',
+    'liberia',
+    'libya',
+    'liechtenstein',
+    'lithuania',
+    'luxembourg',
+    'madagascar',
+    'malawi',
+    'malaysian',
+    'maldives',
+    'mali',
+    'malta',
+    'marshall_islands',
+    'mauritania',
+    'mauritius',
+    'mexican',
+    'micronesia',
+    'moldova',
+    'monaco',
+    'mongolia',
+    'montenegro',
+    'moroccan',
+    'mozambique',
+    'myanmar',
+    'namibia',
+    'nauru',
+    'nepalese',
+    'netherlands',
+    'new_zealand',
+    'nicaragua',
+    'niger',
+    'nigerian',
+    'north_macedonia',
+    'norway',
+    'oman',
+    'pakistani',
+    'palau',
+    'palestine',
+    'panama',
+    'papua_new_guinea',
+    'paraguay',
+    'peruvian',
+    'filipino',
+    'polish',
+    'portuguese',
+    'puerto_rican',
+    'qatar',
+    'romanian',
+    'russian',
+    'rwanda',
+    'saint_kitts_and_nevis',
+    'saint_lucia',
+    'saint_vincent',
+    'samoa',
+    'san_marino',
+    'sao_tome_and_principe',
+    'saudi_arabia',
+    'senegalese',
+    'serbia',
+    'seychelles',
+    'sierra_leone',
+    'singapore',
+    'slovakia',
+    'slovenia',
+    'solomon_islands',
+    'somalia',
+    'south_africa',
+    'south_sudan',
+    'spanish',
+    'sri_lankan',
+    'sudan',
+    'suriname',
+    'sweden',
+    'swiss',
+    'syria',
+    'taiwanese',
+    'tajik',
+    'tanzania',
+    'thai',
+    'togo',
+    'tonga',
+    'trinidadian',
+    'tunisia',
+    'turkish',
+    'turkmenistan',
+    'tuvalu',
+    'uganda',
+    'ukrainian',
+    'united_arab_emirates',
+    'british',
+    'american',
+    'uruguayan',
+    'uzbek',
+    'vanuatu',
+    'vatican_city',
+    'venezuelan',
+    'vietnamese',
+    'yemeni',
+    'zambia',
+    'zimbabwe',
   ];
 
   late List<String> _activeCountries;
@@ -255,16 +413,18 @@ class _CountryWheelModalState extends State<CountryWheelModal> with TickerProvid
     if (_countryDisplayNames.containsKey(key.toLowerCase())) {
       return _countryDisplayNames[key.toLowerCase()]!;
     }
-    // Check if it was in the Search overrides (e.g. 'usa' -> 'American'), 
+    // Check if it was in the Search overrides (e.g. 'usa' -> 'American'),
     // though usually we want the key formatted if it's already a noun.
-    
+
     // Default: Just format the key (e.g. 'zimbabwe' -> 'Zimbabwe')
     return _formatName(key);
   }
 
   String _formatName(String raw) {
     if (raw == 'READY?') return raw;
-    return raw.replaceAll('_', ' ').split(' ')
+    return raw
+        .replaceAll('_', ' ')
+        .split(' ')
         .map((w) => w.isNotEmpty ? w[0].toUpperCase() + w.substring(1) : '')
         .join(' ');
   }
@@ -272,7 +432,7 @@ class _CountryWheelModalState extends State<CountryWheelModal> with TickerProvid
   @override
   void initState() {
     super.initState();
-    
+
     final availableSet = widget.availableCuisines
         .map((c) => c.toLowerCase().trim())
         .toSet();
@@ -280,24 +440,26 @@ class _CountryWheelModalState extends State<CountryWheelModal> with TickerProvid
     _activeCountries = _allCountries.where((key) {
       if (key == 'READY?') return true;
       final searchName = _getSearchName(key).toLowerCase();
-      return availableSet.any((avail) => avail.contains(searchName) || searchName.contains(avail));
+      return availableSet.any(
+        (avail) => avail.contains(searchName) || searchName.contains(avail),
+      );
     }).toList();
 
     if (_activeCountries.length <= 1) {
-      _activeCountries = List.from(_allCountries); 
+      _activeCountries = List.from(_allCountries);
     }
 
     int infiniteStart = _activeCountries.length * 50;
     _scrollController = FixedExtentScrollController(initialItem: infiniteStart);
-    
+
     _scrollController.addListener(() {
       if (!_scrollController.hasClients) return;
       int currentTick = _scrollController.selectedItem;
       if (currentTick != _lastTickIndex) {
         _lastTickIndex = currentTick;
         if (_isSpinning) {
-          SystemSound.play(SystemSoundType.click); 
-          HapticFeedback.lightImpact(); 
+          SystemSound.play(SystemSoundType.click);
+          HapticFeedback.lightImpact();
         }
       }
     });
@@ -311,7 +473,7 @@ class _CountryWheelModalState extends State<CountryWheelModal> with TickerProvid
 
   void _spinTheWheel() {
     if (_isSpinning) return;
-    
+
     // 📡 TELEMETRY: The user has committed to a random spin
     TelemetryService.logInteraction(actionType: 'wheel_spin_started');
 
@@ -323,24 +485,29 @@ class _CountryWheelModalState extends State<CountryWheelModal> with TickerProvid
     // ... rest of your existing code ...
 
     final random = Random();
-    int randomTarget = random.nextInt(_activeCountries.length - 1) + 1; 
-    
+    int randomTarget = random.nextInt(_activeCountries.length - 1) + 1;
+
     final currentItem = _scrollController.selectedItem;
-    final targetIndex = currentItem + (_activeCountries.length * 5) + (randomTarget - (currentItem % _activeCountries.length));
-    
-    _scrollController.animateToItem(
-      targetIndex,
-      duration: const Duration(seconds: 5), 
-      curve: Curves.fastLinearToSlowEaseIn, 
-    ).then((_) {
-      final actualIndex = targetIndex % _activeCountries.length;
-      _announceWinner(_activeCountries[actualIndex]);
-    });
+    final targetIndex =
+        currentItem +
+        (_activeCountries.length * 5) +
+        (randomTarget - (currentItem % _activeCountries.length));
+
+    _scrollController
+        .animateToItem(
+          targetIndex,
+          duration: const Duration(seconds: 5),
+          curve: Curves.fastLinearToSlowEaseIn,
+        )
+        .then((_) {
+          final actualIndex = targetIndex % _activeCountries.length;
+          _announceWinner(_activeCountries[actualIndex]);
+        });
   }
 
   void _announceWinner(String country) async {
     HapticFeedback.heavyImpact();
-    
+
     try {
       final player = AudioPlayer();
       await player.play(AssetSource('sounds/tada.mp3'));
@@ -350,15 +517,15 @@ class _CountryWheelModalState extends State<CountryWheelModal> with TickerProvid
 
     // 📡 TELEMETRY: Log what the wheel actually landed on
     TelemetryService.logInteraction(
-      actionType: 'wheel_result_shown', 
+      actionType: 'wheel_result_shown',
       metadata: {
         'country_key': country,
-        'search_target': _getSearchName(country)
-      }
+        'search_target': _getSearchName(country),
+      },
     );
 
     setState(() {
-// ... rest of your existing code ...
+      // ... rest of your existing code ...
       _isSpinning = false;
       _showWinner = true;
       _winnerCountry = country;
@@ -391,7 +558,7 @@ class _CountryWheelModalState extends State<CountryWheelModal> with TickerProvid
               Text(
                 "Where to next?",
                 style: TextStyle(
-                  fontSize: 22, 
+                  fontSize: 22,
                   fontWeight: FontWeight.bold,
                   color: widget.isDarkMode ? Colors.white : Colors.black,
                 ),
@@ -401,24 +568,25 @@ class _CountryWheelModalState extends State<CountryWheelModal> with TickerProvid
                   controller: _scrollController,
                   itemExtent: 60,
                   perspective: 0.003,
-                  physics: _isSpinning 
-                      ? const NeverScrollableScrollPhysics() 
+                  physics: _isSpinning
+                      ? const NeverScrollableScrollPhysics()
                       : const FixedExtentScrollPhysics(),
                   onSelectedItemChanged: (index) {
                     if (!_isSpinning) HapticFeedback.selectionClick();
                   },
                   childDelegate: ListWheelChildBuilderDelegate(
-                    childCount: _activeCountries.length * 1000, 
+                    childCount: _activeCountries.length * 1000,
                     builder: (context, index) {
-                      final countryKey = _activeCountries[index % _activeCountries.length];
+                      final countryKey =
+                          _activeCountries[index % _activeCountries.length];
                       return Center(
                         child: AnimatedDefaultTextStyle(
                           duration: const Duration(milliseconds: 200),
                           style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
-                            color: widget.isDarkMode 
-                                ? Colors.white.withOpacity(0.9) 
+                            color: widget.isDarkMode
+                                ? Colors.white.withOpacity(0.9)
                                 : Colors.black.withOpacity(0.9),
                           ),
                           child: Text(_formatName(countryKey)),
@@ -428,13 +596,13 @@ class _CountryWheelModalState extends State<CountryWheelModal> with TickerProvid
                   ),
                 ),
               ),
-              const SizedBox(height: 100), 
+              const SizedBox(height: 100),
             ],
           ),
 
           // THE HIGHLIGHT BAR
           Positioned(
-            top: 250, 
+            top: 250,
             child: IgnorePointer(
               child: Container(
                 width: 300,
@@ -444,9 +612,9 @@ class _CountryWheelModalState extends State<CountryWheelModal> with TickerProvid
                     color: widget.isDarkMode ? Colors.white24 : Colors.black12,
                     width: 2,
                   ),
-                  borderRadius: BorderRadius.circular(15), 
-                  color: widget.isDarkMode 
-                      ? Colors.white.withOpacity(0.05) 
+                  borderRadius: BorderRadius.circular(15),
+                  color: widget.isDarkMode
+                      ? Colors.white.withOpacity(0.05)
                       : Colors.black.withOpacity(0.05),
                 ),
               ),
@@ -463,11 +631,20 @@ class _CountryWheelModalState extends State<CountryWheelModal> with TickerProvid
                 child: ElevatedButton.icon(
                   onPressed: _spinTheWheel,
                   icon: const Icon(Icons.casino, size: 28),
-                  label: const Text("SPIN", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                  label: const Text(
+                    "SPIN",
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                  ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: widget.isDarkMode ? Colors.white : Colors.black,
-                    foregroundColor: widget.isDarkMode ? Colors.black : Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                    backgroundColor: widget.isDarkMode
+                        ? Colors.white
+                        : Colors.black,
+                    foregroundColor: widget.isDarkMode
+                        ? Colors.black
+                        : Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
                     elevation: 5,
                   ),
                 ),
@@ -478,7 +655,9 @@ class _CountryWheelModalState extends State<CountryWheelModal> with TickerProvid
           if (_showWinner && _winnerCountry != null)
             Positioned.fill(
               child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(30),
+                ),
                 child: Container(
                   color: Colors.black87,
                   child: Center(
@@ -493,10 +672,16 @@ class _CountryWheelModalState extends State<CountryWheelModal> with TickerProvid
                             width: 320,
                             padding: const EdgeInsets.all(24),
                             decoration: BoxDecoration(
-                              color: widget.isDarkMode ? const Color(0xFF303030) : Colors.white,
+                              color: widget.isDarkMode
+                                  ? const Color(0xFF303030)
+                                  : Colors.white,
                               borderRadius: BorderRadius.circular(25),
                               boxShadow: const [
-                                BoxShadow(color: Colors.black45, blurRadius: 20, spreadRadius: 5)
+                                BoxShadow(
+                                  color: Colors.black45,
+                                  blurRadius: 20,
+                                  spreadRadius: 5,
+                                ),
                               ],
                             ),
                             child: Column(
@@ -507,7 +692,9 @@ class _CountryWheelModalState extends State<CountryWheelModal> with TickerProvid
                                   child: SizedBox(
                                     height: 140,
                                     width: double.infinity,
-                                    child: AnimatedCuisinePlaceholder(cuisine: _winnerCountry!),
+                                    child: AnimatedCuisinePlaceholder(
+                                      cuisine: _winnerCountry!,
+                                    ),
                                   ),
                                 ),
                                 const SizedBox(height: 24),
@@ -516,7 +703,9 @@ class _CountryWheelModalState extends State<CountryWheelModal> with TickerProvid
                                   style: TextStyle(
                                     fontSize: 18,
                                     fontStyle: FontStyle.italic,
-                                    color: widget.isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                                    color: widget.isDarkMode
+                                        ? Colors.grey[400]
+                                        : Colors.grey[600],
                                   ),
                                 ),
                                 const SizedBox(height: 8),
@@ -526,7 +715,9 @@ class _CountryWheelModalState extends State<CountryWheelModal> with TickerProvid
                                   style: TextStyle(
                                     fontSize: 32,
                                     fontWeight: FontWeight.w900,
-                                    color: widget.isDarkMode ? Colors.white : Colors.black,
+                                    color: widget.isDarkMode
+                                        ? Colors.white
+                                        : Colors.black,
                                   ),
                                   textAlign: TextAlign.center,
                                 ),
@@ -541,8 +732,7 @@ class _CountryWheelModalState extends State<CountryWheelModal> with TickerProvid
               ),
             ),
           // CONFETTI
-          if (_showWinner)
-            const Positioned.fill(child: _SimpleConfetti()),
+          if (_showWinner) const Positioned.fill(child: _SimpleConfetti()),
         ],
       ),
     );
@@ -559,7 +749,8 @@ class _SimpleConfetti extends StatefulWidget {
   State<_SimpleConfetti> createState() => _SimpleConfettiState();
 }
 
-class _SimpleConfettiState extends State<_SimpleConfetti> with SingleTickerProviderStateMixin {
+class _SimpleConfettiState extends State<_SimpleConfetti>
+    with SingleTickerProviderStateMixin {
   late Ticker _ticker;
   final List<_ConfettiParticle> _particles = [];
   final Random _random = Random();
@@ -571,20 +762,22 @@ class _SimpleConfettiState extends State<_SimpleConfetti> with SingleTickerProvi
       setState(() {
         for (var p in _particles) {
           p.y += p.speed;
-          p.x += sin(p.y / 50) * 2; 
+          p.x += sin(p.y / 50) * 2;
           p.rotation += 0.1;
         }
       });
     });
-    
+
     for (int i = 0; i < 80; i++) {
-      _particles.add(_ConfettiParticle(
-        x: _random.nextDouble() * 400,
-        y: -_random.nextDouble() * 600, 
-        color: Colors.primaries[_random.nextInt(Colors.primaries.length)],
-        size: 5 + _random.nextDouble() * 10,
-        speed: 3 + _random.nextDouble() * 8,
-      ));
+      _particles.add(
+        _ConfettiParticle(
+          x: _random.nextDouble() * 400,
+          y: -_random.nextDouble() * 600,
+          color: Colors.primaries[_random.nextInt(Colors.primaries.length)],
+          size: 5 + _random.nextDouble() * 10,
+          speed: 3 + _random.nextDouble() * 8,
+        ),
+      );
     }
     _ticker.start();
   }
@@ -607,7 +800,13 @@ class _SimpleConfettiState extends State<_SimpleConfetti> with SingleTickerProvi
 class _ConfettiParticle {
   double x, y, size, speed, rotation = 0;
   Color color;
-  _ConfettiParticle({required this.x, required this.y, required this.color, required this.size, required this.speed});
+  _ConfettiParticle({
+    required this.x,
+    required this.y,
+    required this.color,
+    required this.size,
+    required this.speed,
+  });
 }
 
 class _ConfettiPainter extends CustomPainter {
@@ -621,10 +820,14 @@ class _ConfettiPainter extends CustomPainter {
       canvas.save();
       canvas.translate(p.x, p.y);
       canvas.rotate(p.rotation);
-      canvas.drawRect(Rect.fromCenter(center: Offset.zero, width: p.size, height: p.size), paint);
+      canvas.drawRect(
+        Rect.fromCenter(center: Offset.zero, width: p.size, height: p.size),
+        paint,
+      );
       canvas.restore();
     }
   }
+
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

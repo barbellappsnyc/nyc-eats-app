@@ -8,7 +8,7 @@ abstract class PassportRules {
   /// Returns the Page Index (1-based) where this stamp belongs.
   /// If it returns a number > current visas count, it implies claiming a new slot.
   int findTargetPageIndex(Map<String, dynamic> book, String targetCuisine);
-  
+
   /// 3. CLAIMER: Do we need to write a NEW Visa row to the DB?
   /// (True = We are claiming a blank slot. False = We are stamping an existing page).
   bool requiresNewVisaRow(Map<String, dynamic> book, String targetCuisine);

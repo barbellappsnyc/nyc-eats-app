@@ -19,7 +19,7 @@ class PassportService {
   // 1. 🔥 PRE-WARM
   static Future<void> prewarmCache() async {
     await _loadProfileFromDisk();
-    
+
     await Future.wait([
       fetchUserLibrary(forceRefresh: true),
       fetchUserProfile(forceRefresh: true),
@@ -27,7 +27,9 @@ class PassportService {
   }
 
   // 2. 📚 FETCH LIBRARY (Robust Offline Version)
-  static Future<List<Map<String, dynamic>>> fetchUserLibrary({bool forceRefresh = false}) async {
+  static Future<List<Map<String, dynamic>>> fetchUserLibrary({
+    bool forceRefresh = false,
+  }) async {
     if (!forceRefresh && _libraryCache != null) return _libraryCache!;
 
     final userId = _client.auth.currentUser?.id;
@@ -50,38 +52,46 @@ class PassportService {
           .order('created_at', ascending: false)
           .timeout(const Duration(seconds: 5)); // 🛡️ Safety Valve
 
-      final List<Map<String, dynamic>> data = List<Map<String, dynamic>>.from(response);
+      final List<Map<String, dynamic>> data = List<Map<String, dynamic>>.from(
+        response,
+      );
 
       if (data.isEmpty) return await _loadGuestBook(); // Fallback
 
       // Sort stamps/visas
       for (var book in data) {
         List visas = List.from(book['user_visas'] ?? []);
-        visas.sort((a, b) => (a['created_at'] ?? '').compareTo(b['created_at'] ?? ''));
-        book['visas'] = visas; 
+        visas.sort(
+          (a, b) => (a['created_at'] ?? '').compareTo(b['created_at'] ?? ''),
+        );
+        book['visas'] = visas;
 
         List stamps = List.from(book['collected_stamps'] ?? []);
-        stamps.sort((a, b) => (a['stamped_at'] ?? '').compareTo(b['stamped_at'] ?? ''));
+        stamps.sort(
+          (a, b) => (a['stamped_at'] ?? '').compareTo(b['stamped_at'] ?? ''),
+        );
         book['stamps'] = stamps;
       }
 
       _libraryCache = data;
-      
+
       // 🌟 NEW: Save the successful fetch to the device for offline viewing!
       await _savePremiumLibraryToDisk(data);
-      
+
       return data;
     } catch (e) {
       debugPrint("⚠️ Cloud Fetch Failed. Attempting to load Offline Cache...");
-      
+
       // 🌟 THE AMNESIA FIX: Before loading the Guest Book, check the premium vault!
       try {
         final prefs = await SharedPreferences.getInstance();
         final String? offlineData = prefs.getString('offline_premium_library');
-        
+
         if (offlineData != null) {
           debugPrint("✅ Offline Premium Cache restored successfully!");
-          _libraryCache = List<Map<String, dynamic>>.from(jsonDecode(offlineData));
+          _libraryCache = List<Map<String, dynamic>>.from(
+            jsonDecode(offlineData),
+          );
           return _libraryCache!;
         }
       } catch (cacheError) {
@@ -99,13 +109,13 @@ class PassportService {
       final prefs = await SharedPreferences.getInstance();
       final String? storedStamps = prefs.getString('guest_stamps');
       List<dynamic> localStamps = [];
-      
+
       if (storedStamps != null) {
         try {
           localStamps = jsonDecode(storedStamps);
         } catch (e) {
           debugPrint("❌ Corrupt Guest Data detected. Clearing.");
-          await prefs.remove('guest_stamps'); 
+          await prefs.remove('guest_stamps');
         }
       }
 
@@ -115,28 +125,30 @@ class PassportService {
         'status': 'active',
         'max_pages': 1,
         'cover_color': 'legacy',
-        'visas': [], 
-        'stamps': localStamps 
+        'visas': [],
+        'stamps': localStamps,
       };
-      
+
       _libraryCache = [guestBook];
       return _libraryCache!;
     } catch (e) {
-      return []; 
+      return [];
     }
   }
-  
+
   // 3. 👤 FETCH PROFILE
-  static Future<Map<String, dynamic>?> fetchUserProfile({bool forceRefresh = false}) async {
+  static Future<Map<String, dynamic>?> fetchUserProfile({
+    bool forceRefresh = false,
+  }) async {
     if (!forceRefresh && _profileCache != null) return _profileCache;
-    
+
     if (_profileCache == null) {
       await _loadProfileFromDisk();
       if (_profileCache != null && !forceRefresh) return _profileCache;
     }
 
     final userId = _client.auth.currentUser?.id;
-    
+
     // Guest Logic
     if (userId == null) {
       final prefs = await SharedPreferences.getInstance();
@@ -155,7 +167,7 @@ class PassportService {
           .select()
           .eq('user_id', userId)
           .maybeSingle();
-      
+
       if (data != null) {
         _profileCache = data;
         _saveProfileToDisk(data);
@@ -184,10 +196,10 @@ class PassportService {
 
   static Future<void> updateLocalProfile(Map<String, dynamic> updates) async {
     if (_profileCache == null) {
-      _profileCache = {}; 
+      _profileCache = {};
     }
     _profileCache!.addAll(updates);
-    
+
     // 1. Save standard cache
     await _saveProfileToDisk(_profileCache!);
 
@@ -202,13 +214,13 @@ class PassportService {
     if (updates.containsKey('gender')) {
       await prefs.setString('guest_gender', updates['gender']);
     }
-    
+
     if (updates.containsKey('photo_url')) {
       final String? url = updates['photo_url'];
       if (url != null) {
         await prefs.setString('guest_photo_local_path', url);
       } else {
-        await prefs.remove('guest_photo_local_path'); 
+        await prefs.remove('guest_photo_local_path');
       }
     }
   }
@@ -217,10 +229,11 @@ class PassportService {
   static Map<String, dynamic>? getCachedBook(String bookId) {
     if (_libraryCache == null) return null;
     return _libraryCache!.firstWhere(
-      (b) => b['id'] == bookId, 
-      orElse: () => <String, dynamic>{}
+      (b) => b['id'] == bookId,
+      orElse: () => <String, dynamic>{},
     );
   }
+
   static Map<String, dynamic>? getCachedProfile() => _profileCache;
 
   // 5. 🧠 STATE MEMORY
@@ -233,37 +246,54 @@ class PassportService {
   }
 
   static Future<void> createStarterBook(String userId) async {
-    final existing = await _client.from('user_passport_books').select().eq('user_id', userId).maybeSingle();
+    final existing = await _client
+        .from('user_passport_books')
+        .select()
+        .eq('user_id', userId)
+        .maybeSingle();
     if (existing == null) {
       await _client.from('user_passport_books').insert({
-        'user_id': userId, 'sku_type': 'free_tier', 'status': 'active', 'max_pages': 1, 'cover_color': 'legacy'
+        'user_id': userId,
+        'sku_type': 'free_tier',
+        'status': 'active',
+        'max_pages': 1,
+        'cover_color': 'legacy',
       });
-      _libraryCache = null; 
+      _libraryCache = null;
     }
   }
-  
-  static Future<void> issueVisa(String userId, String bookId, String cuisine) async {
+
+  static Future<void> issueVisa(
+    String userId,
+    String bookId,
+    String cuisine,
+  ) async {
     await _client.from('user_visas').insert({
-      'user_id': userId, 'book_id': bookId, 'cuisine': cuisine
+      'user_id': userId,
+      'book_id': bookId,
+      'cuisine': cuisine,
     });
-    _libraryCache = null; 
+    _libraryCache = null;
   }
 
   static void addStampToCache(String bookId, Map<String, dynamic> newStamp) {
     if (_libraryCache == null) return;
-    
+
     final bookIndex = _libraryCache!.indexWhere((b) => b['id'] == bookId);
     if (bookIndex != -1) {
       final cacheEntry = {
         'restaurant_name': newStamp['name'] ?? newStamp['restaurant_name'],
         'stamped_at': DateTime.now().toIso8601String(),
         'country_cuisine': newStamp['cuisine'] ?? newStamp['country_cuisine'],
-        'mta_station_id': newStamp['mta_station_id'], // 👈 NEW: Keep the ID in memory
+        'mta_station_id':
+            newStamp['mta_station_id'], // 👈 NEW: Keep the ID in memory
       };
-      
+
       List stamps = List.from(_libraryCache![bookIndex]['stamps'] ?? []);
       stamps.add(cacheEntry);
-      stamps.sort((a, b) => (a['stamped_at'] ?? '').compareTo(b['stamped_at'] ?? ''));
+      stamps.sort(
+        (a, b) => (a['stamped_at'] ?? '').compareTo(b['stamped_at'] ?? ''),
+      );
       _libraryCache![bookIndex]['stamps'] = stamps;
     }
   }
@@ -275,7 +305,9 @@ class PassportService {
     if (bookIndex != -1) {
       List visas = List.from(_libraryCache![bookIndex]['visas'] ?? []);
       visas.add(newVisa);
-      visas.sort((a, b) => (a['created_at'] ?? '').compareTo(b['created_at'] ?? ''));
+      visas.sort(
+        (a, b) => (a['created_at'] ?? '').compareTo(b['created_at'] ?? ''),
+      );
       _libraryCache![bookIndex]['visas'] = visas;
     }
   }
@@ -297,7 +329,7 @@ class PassportService {
   }) {
     // 1. Find the Active Book (The King)
     final activeIndex = library.indexWhere((b) => b['status'] == 'active');
-    
+
     if (activeIndex == -1) {
       // Fallback: Check for any Standard/Free book
       return {'action': 'ERROR', 'reason': 'No active passport found.'};
@@ -305,22 +337,25 @@ class PassportService {
 
     final activeBook = library[activeIndex];
     final String sku = activeBook['sku_type'] ?? 'free_tier';
-    
+
     // 🆓 Free Tier Bypass (Simple logic)
     if (sku == 'free_tier') {
-       final stamps = activeBook['stamps'] as List? ?? [];
-       if (stamps.length >= 4) return {'action': 'VIOLATION_FULL'};
-       return {
-         'action': 'PROCEED',
-         'bookId': activeBook['id'],
-         'pageIndex': 1,
-         'requiresNewRow': false
-       };
+      final stamps = activeBook['stamps'] as List? ?? [];
+      if (stamps.length >= 4) return {'action': 'VIOLATION_FULL'};
+      return {
+        'action': 'PROCEED',
+        'bookId': activeBook['id'],
+        'pageIndex': 1,
+        'requiresNewRow': false,
+      };
     }
 
     // 🤖 LOAD RULES ENGINE
     final rules = _getRulesForBook(sku);
-    final String? violation = rules.validateStampAttempt(activeBook, targetCuisine);
+    final String? violation = rules.validateStampAttempt(
+      activeBook,
+      targetCuisine,
+    );
 
     // ✅ SCENARIO A: ALL CLEAR
     if (violation == null) {
@@ -328,7 +363,7 @@ class PassportService {
         'action': 'PROCEED',
         'bookId': activeBook['id'],
         'pageIndex': rules.findTargetPageIndex(activeBook, targetCuisine),
-        'requiresNewRow': rules.requiresNewVisaRow(activeBook, targetCuisine)
+        'requiresNewRow': rules.requiresNewVisaRow(activeBook, targetCuisine),
       };
     }
 
@@ -336,8 +371,8 @@ class PassportService {
     if (violation == 'violation_monogamy' || violation == 'violation_full') {
       // Scan the library for a Savior Book
       for (var book in library) {
-        if (book['id'] == activeBook['id']) continue; 
-        
+        if (book['id'] == activeBook['id']) continue;
+
         final String altSku = book['sku_type'] ?? 'free_tier';
         if (altSku == 'single_page' || altSku == 'free_tier') continue;
 
@@ -346,7 +381,7 @@ class PassportService {
           return {
             'action': 'SWITCH_BOOK',
             'targetBookId': book['id'],
-            'reason': violation 
+            'reason': violation,
           };
         }
       }
@@ -362,7 +397,7 @@ class PassportService {
 
   // 8. 💾 UNIVERSAL STAMP SAVE
   static Future<void> addStamp({
-    required String? bookId, 
+    required String? bookId,
     required Map<String, dynamic> stampData,
   }) async {
     final userId = _client.auth.currentUser?.id;
@@ -387,10 +422,10 @@ class PassportService {
       'country_cuisine': stampData['cuisine'] ?? stampData['country_cuisine'],
       'stamped_at': DateTime.now().toIso8601String(),
     };
-    
+
     try {
       await _client.from('collected_stamps').insert(dbPayload);
-      
+
       // ✅ SUCCESS: Update local cache immediately
       addStampToCache(bookId, stampData);
       debugPrint("✅ Stamp saved to Cloud DB.");
@@ -403,7 +438,7 @@ class PassportService {
           'restaurant_name': stampData['name'] ?? stampData['restaurant_name'],
           'cuisine': stampData['cuisine'] ?? stampData['country_cuisine'],
           'book_id': bookId,
-        }
+        },
       );
 
       // 🆕 CHECK CAPACITY AFTER SAVING
@@ -416,24 +451,26 @@ class PassportService {
   // 6. 💾 GUEST: SAVE STAMP TO DISK
   static Future<void> saveGuestStamp(Map<String, dynamic> uiStamp) async {
     final prefs = await SharedPreferences.getInstance();
-    
+
     String? existingJson = prefs.getString('guest_stamps');
-    List<dynamic> currentList = existingJson != null ? jsonDecode(existingJson) : [];
-    
+    List<dynamic> currentList = existingJson != null
+        ? jsonDecode(existingJson)
+        : [];
+
     final String newName = uiStamp['name'] ?? uiStamp['restaurant_name'];
     final bool alreadyExists = currentList.any((s) {
       final existingName = s['restaurant_name'] ?? s['name'];
       return existingName == newName;
     });
 
-    if (alreadyExists) return; 
+    if (alreadyExists) return;
 
     final cloudFormatStamp = {
       'restaurant_name': newName,
       'country_cuisine': uiStamp['cuisine'],
       'stamped_at': DateTime.now().toIso8601String(),
     };
-    
+
     currentList.add(cloudFormatStamp);
     await prefs.setString('guest_stamps', jsonEncode(currentList));
     addStampToCache('guest_book_local', uiStamp);
@@ -442,10 +479,10 @@ class PassportService {
   // 🚀 MIGRATION: SAFE MERGE WITH 4-STAMP HARD CAP
   static Future<void> migrateGuestData(String userId) async {
     final prefs = await SharedPreferences.getInstance();
-    
+
     String? existingJson = prefs.getString('guest_stamps');
     if (existingJson == null) return;
-    
+
     List<dynamic> localStamps = jsonDecode(existingJson);
     if (localStamps.isEmpty) return;
 
@@ -454,7 +491,11 @@ class PassportService {
           .from('user_passport_books')
           .select('id')
           .eq('user_id', userId)
-          .inFilter('sku_type', ['free_tier', 'standard_book', 'nyceats_standard']) 
+          .inFilter('sku_type', [
+            'free_tier',
+            'standard_book',
+            'nyceats_standard',
+          ])
           .limit(1)
           .maybeSingle();
 
@@ -463,13 +504,17 @@ class PassportService {
       if (bookResponse != null) {
         targetBookId = bookResponse['id'];
       } else {
-        final newBook = await _client.from('user_passport_books').insert({
-          'user_id': userId,
-          'sku_type': 'free_tier',
-          'status': 'active',
-          'max_pages': 1,
-          'cover_color': 'legacy'
-        }).select().single();
+        final newBook = await _client
+            .from('user_passport_books')
+            .insert({
+              'user_id': userId,
+              'sku_type': 'free_tier',
+              'status': 'active',
+              'max_pages': 1,
+              'cover_color': 'legacy',
+            })
+            .select()
+            .single();
         targetBookId = newBook['id'];
       }
 
@@ -496,7 +541,7 @@ class PassportService {
         if (currentFillLevel >= MAX_CAPACITY) break;
 
         final String rName = stamp['restaurant_name'] ?? stamp['name'];
-        if (existingNames.contains(rName)) continue; 
+        if (existingNames.contains(rName)) continue;
 
         rowsToInsert.add({
           'user_id': userId,
@@ -514,7 +559,6 @@ class PassportService {
       }
 
       await prefs.remove('guest_stamps');
-
     } catch (e) {
       debugPrint("⚠️ Migration Error: $e");
     }
@@ -522,24 +566,24 @@ class PassportService {
 
   // 🔥 UPDATED: Create a specific book with SKU Translation & Transaction ID
   static Future<void> createBook({
-    required String userId, 
+    required String userId,
     required String sku,
     String? transactionId, // 👈 NEW: Accepts the receipt number
   }) async {
     int maxPages = 1;
     String coverColor = 'legacy';
-    String dbSku = 'free_tier'; 
-    
+    String dbSku = 'free_tier';
+
     if (sku.contains('diplomat')) {
       dbSku = 'diplomat_book';
-      maxPages = 21; 
+      maxPages = 21;
       coverColor = 'navy_gold';
     } else if (sku.contains('standard')) {
-      dbSku = 'standard_book'; 
+      dbSku = 'standard_book';
       maxPages = 6;
       coverColor = 'standard_blue';
     } else if (sku.contains('single')) {
-      dbSku = 'single_page'; 
+      dbSku = 'single_page';
       maxPages = 1;
     }
 
@@ -559,7 +603,7 @@ class PassportService {
 
     await _client.from('user_passport_books').insert(insertData);
 
-    _libraryCache = null; 
+    _libraryCache = null;
   }
 
   // 7. 🔄 ACTIVATE BOOK
@@ -586,19 +630,22 @@ class PassportService {
     if (book == null) return;
 
     final stamps = book['stamps'] as List? ?? [];
-    
+
     // 🧠 Smart Capacity Check
-    int maxPages = book['max_pages'] != null ? int.tryParse(book['max_pages'].toString()) ?? 1 : 1;
+    int maxPages = book['max_pages'] != null
+        ? int.tryParse(book['max_pages'].toString()) ?? 1
+        : 1;
     final sku = (book['sku_type'] ?? '').toString().toLowerCase();
     if (sku.contains('standard')) maxPages = 6;
     if (sku.contains('diplomat')) maxPages = 21;
-    
-    final int capacity = maxPages * 4; 
+
+    final int capacity = maxPages * 4;
 
     if (stamps.length >= capacity) {
       debugPrint("📚 Book $bookId is FULL. Archiving and rotating...");
 
-      await _client.from('user_passport_books')
+      await _client
+          .from('user_passport_books')
           .update({'status': 'archived'})
           .eq('id', bookId);
 
@@ -607,7 +654,9 @@ class PassportService {
   }
 
   // 💾 OFFLINE CACHE: Save Premium Library to Device
-  static Future<void> _savePremiumLibraryToDisk(List<Map<String, dynamic>> data) async {
+  static Future<void> _savePremiumLibraryToDisk(
+    List<Map<String, dynamic>> data,
+  ) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('offline_premium_library', jsonEncode(data));
@@ -625,7 +674,9 @@ class PassportService {
     if (userId == null) return false;
 
     // We only manage paid books in the succession line
-    final paidBooks = library.where((b) => (b['sku_type'] ?? 'free_tier') != 'free_tier').toList();
+    final paidBooks = library
+        .where((b) => (b['sku_type'] ?? 'free_tier') != 'free_tier')
+        .toList();
 
     List<Map<String, dynamic>> healthyHeirs = [];
 
@@ -633,20 +684,23 @@ class PassportService {
     for (var book in paidBooks) {
       final String bookId = book['id'];
       final String currentStatus = book['status'] ?? 'inactive';
-      
+
       final stamps = book['stamps'] as List? ?? [];
-      
+
       // 🧠 Smart Capacity Check
-      int maxPages = book['max_pages'] != null ? int.tryParse(book['max_pages'].toString()) ?? 1 : 1;
+      int maxPages = book['max_pages'] != null
+          ? int.tryParse(book['max_pages'].toString()) ?? 1
+          : 1;
       final sku = (book['sku_type'] ?? '').toString().toLowerCase();
       if (sku.contains('standard')) maxPages = 6;
       if (sku.contains('diplomat')) maxPages = 21;
-      
+
       final bool isFull = stamps.length >= (maxPages * 4);
 
       if (isFull && currentStatus != 'archived') {
         debugPrint("🧹 DBA: Book $bookId is full. Archiving.");
-        await Supabase.instance.client.from('user_passport_books')
+        await Supabase.instance.client
+            .from('user_passport_books')
             .update({'status': 'archived'})
             .eq('id', bookId);
         madeChanges = true;
@@ -667,7 +721,7 @@ class PassportService {
 
       // The True King is the oldest healthy book
       final String trueKingId = healthyHeirs.first['id'];
-      
+
       // Check if anyone else thinks they are King, or if the True King is asleep
       for (var heir in healthyHeirs) {
         final String heirId = heir['id'];
@@ -676,14 +730,16 @@ class PassportService {
         if (heirId == trueKingId && heirStatus != 'active') {
           // Crown the True King
           debugPrint("👑 DBA: Crowning True King -> $trueKingId");
-          await Supabase.instance.client.from('user_passport_books')
+          await Supabase.instance.client
+              .from('user_passport_books')
               .update({'status': 'active'})
               .eq('id', trueKingId);
           madeChanges = true;
         } else if (heirId != trueKingId && heirStatus == 'active') {
           // Strip the false kings of their title
           debugPrint("⚔️ DBA: Demoting False King -> $heirId");
-          await Supabase.instance.client.from('user_passport_books')
+          await Supabase.instance.client
+              .from('user_passport_books')
               .update({'status': 'inactive'})
               .eq('id', heirId);
           madeChanges = true;
@@ -694,7 +750,7 @@ class PassportService {
     if (madeChanges) {
       _libraryCache = null; // Flush cache so UI gets the perfect data
     }
-    
+
     return madeChanges;
   }
 }

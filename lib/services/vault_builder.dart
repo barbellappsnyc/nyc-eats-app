@@ -5,16 +5,27 @@ import 'package:path_provider/path_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class VaultBuilder {
-  static Future<Map<String, String>> buildVaultIfNeeded({bool forceRefresh = false}) async {
+  static Future<Map<String, String>> buildVaultIfNeeded({
+    bool forceRefresh = false,
+  }) async {
     try {
       final directory = await getApplicationDocumentsDirectory();
       final heroesFile = File('${directory.path}/nyc_heroes.geojson');
       final regularFile = File('${directory.path}/nyc_regular.geojson');
-      final hoursFile = File('${directory.path}/nyc_hours.json'); // 🌟 NEW: Time Dictionary
+      final hoursFile = File(
+        '${directory.path}/nyc_hours.json',
+      ); // 🌟 NEW: Time Dictionary
 
-      if (await heroesFile.exists() && await regularFile.exists() && await hoursFile.exists() && !forceRefresh) {
+      if (await heroesFile.exists() &&
+          await regularFile.exists() &&
+          await hoursFile.exists() &&
+          !forceRefresh) {
         debugPrint("✅ Split Vaults found. Bypassing download.");
-        return {'heroes': heroesFile.path, 'regular': regularFile.path, 'hours': hoursFile.path};
+        return {
+          'heroes': heroesFile.path,
+          'regular': regularFile.path,
+          'hours': hoursFile.path,
+        };
       }
 
       debugPrint("📥 Building Split Vaults...");
@@ -27,30 +38,36 @@ class VaultBuilder {
       while (hasMore) {
         bool chunkSuccess = false;
         int retryCount = 0;
-        
+
         while (!chunkSuccess) {
           try {
             final response = await Supabase.instance.client
                 .from('restaurants')
-                .select('id, name, lat, lng, cuisine, michelin_stars, bib_gourmand, price, is_vegetarian, is_vegan, opening_hours')
+                .select(
+                  'id, name, lat, lng, cuisine, michelin_stars, bib_gourmand, price, is_vegetarian, is_vegan, opening_hours',
+                )
                 .range(offset, offset + pageSize - 1)
-                .timeout(const Duration(seconds: 15)); // 🌟 Increased to 15s to allow for real-world transit times
+                .timeout(
+                  const Duration(seconds: 15),
+                ); // 🌟 Increased to 15s to allow for real-world transit times
 
             allRows.addAll(response);
-            if (response.length < pageSize) hasMore = false;
-            else offset += pageSize;
-            
+            if (response.length < pageSize)
+              hasMore = false;
+            else
+              offset += pageSize;
+
             chunkSuccess = true; // The fetch succeeded, break the retry loop!
           } catch (e) {
             retryCount++;
             debugPrint("🚨 Chunk timeout. Retry $retryCount...");
-            
+
             if (retryCount >= 3) {
               rethrow; // If it fails 3 times in a row, the network is truly dead. Let it fail gracefully.
             }
-            
+
             // Give the socket 2 seconds to breathe before hammering Supabase again
-            await Future.delayed(const Duration(seconds: 2)); 
+            await Future.delayed(const Duration(seconds: 2));
           }
         }
       }
@@ -59,8 +76,12 @@ class VaultBuilder {
       Map<String, String> hoursDict = {}; // 🌟 Track hours separately
 
       for (var row in allRows) {
-        final double lat = row['lat'] is num ? row['lat'].toDouble() : double.tryParse(row['lat']?.toString() ?? '') ?? 0.0;
-        final double lng = row['lng'] is num ? row['lng'].toDouble() : double.tryParse(row['lng']?.toString() ?? '') ?? 0.0;
+        final double lat = row['lat'] is num
+            ? row['lat'].toDouble()
+            : double.tryParse(row['lat']?.toString() ?? '') ?? 0.0;
+        final double lng = row['lng'] is num
+            ? row['lng'].toDouble()
+            : double.tryParse(row['lng']?.toString() ?? '') ?? 0.0;
 
         // Clean nulls to prevent Mapbox parsing errors
         final cleanProperties = Map<String, dynamic>.from(row);
@@ -68,19 +89,26 @@ class VaultBuilder {
 
         final feature = {
           "type": "Feature",
-          "geometry": {"type": "Point", "coordinates": [lng, lat]},
-          "properties": cleanProperties, 
+          "geometry": {
+            "type": "Point",
+            "coordinates": [lng, lat],
+          },
+          "properties": cleanProperties,
         };
 
         // Populate the Time Dictionary
-        if (row['opening_hours'] != null && row['opening_hours'].toString().isNotEmpty) {
-           hoursDict[row['id'].toString()] = row['opening_hours'].toString();
+        if (row['opening_hours'] != null &&
+            row['opening_hours'].toString().isNotEmpty) {
+          hoursDict[row['id'].toString()] = row['opening_hours'].toString();
         }
 
         final stars = row['michelin_stars'];
-        final int starCount = stars is num ? stars.toInt() : int.tryParse(stars?.toString() ?? '0') ?? 0;
+        final int starCount = stars is num
+            ? stars.toInt()
+            : int.tryParse(stars?.toString() ?? '0') ?? 0;
         final bib = row['bib_gourmand'];
-        final bool isBib = bib == true || bib?.toString().toLowerCase() == 'true';
+        final bool isBib =
+            bib == true || bib?.toString().toLowerCase() == 'true';
 
         if (starCount > 0 || isBib) {
           heroesFeatures.add(feature);
@@ -89,13 +117,24 @@ class VaultBuilder {
         }
       }
 
-      await heroesFile.writeAsString(jsonEncode({"type": "FeatureCollection", "features": heroesFeatures}));
-      await regularFile.writeAsString(jsonEncode({"type": "FeatureCollection", "features": regularFeatures}));
-      await hoursFile.writeAsString(jsonEncode(hoursDict)); // 🌟 Save the Time Dictionary
+      await heroesFile.writeAsString(
+        jsonEncode({"type": "FeatureCollection", "features": heroesFeatures}),
+      );
+      await regularFile.writeAsString(
+        jsonEncode({"type": "FeatureCollection", "features": regularFeatures}),
+      );
+      await hoursFile.writeAsString(
+        jsonEncode(hoursDict),
+      ); // 🌟 Save the Time Dictionary
 
-      debugPrint("🔥 Vaults sealed! Heroes: ${heroesFeatures.length}, Regular: ${regularFeatures.length}");
-      return {'heroes': heroesFile.path, 'regular': regularFile.path, 'hours': hoursFile.path};
-
+      debugPrint(
+        "🔥 Vaults sealed! Heroes: ${heroesFeatures.length}, Regular: ${regularFeatures.length}",
+      );
+      return {
+        'heroes': heroesFile.path,
+        'regular': regularFile.path,
+        'hours': hoursFile.path,
+      };
     } catch (e) {
       debugPrint("🚨 Error building vault: $e");
       rethrow;

@@ -9,19 +9,38 @@ class WarholBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final String safeCuisine = cuisine.toLowerCase().trim();
-    final List<String> emojis = CuisineConstants.emojiPalettes[safeCuisine] ?? 
-                                CuisineConstants.emojiPalettes['default']!;
-    
+    final List<String> emojis =
+        CuisineConstants.emojiPalettes[safeCuisine] ??
+        CuisineConstants.emojiPalettes['default']!;
+
     final String targetEmoji = emojis.isNotEmpty ? emojis[0] : '🍽️';
 
     // 2. The True Marilyn Diptych Palettes
     final List<Map<String, Color>> palettes = [
-      {'bg': const Color(0xFFE32462), 'tint': const Color(0xFFFFD700)}, // Top L: Crimson / Gold
-      {'bg': const Color(0xFF93C6D6), 'tint': const Color(0xFFFF69B4)}, // Top M: Dusty Blue / Hot Pink
-      {'bg': const Color(0xFFD58145), 'tint': const Color(0xFF98FF98)}, // Top R: Burnt Orange / Mint
-      {'bg': const Color(0xFFDE6725), 'tint': const Color(0xFF87CEFA)}, // Bot L: Bright Orange / Sky Blue
-      {'bg': const Color(0xFF0D7A84), 'tint': const Color(0xFFFF00FF)}, // Bot M: Deep Teal / Magenta
-      {'bg': const Color(0xFFD81682), 'tint': const Color(0xFFBFFF00)}, // Bot R: Hot Pink / Lime
+      {
+        'bg': const Color(0xFFE32462),
+        'tint': const Color(0xFFFFD700),
+      }, // Top L: Crimson / Gold
+      {
+        'bg': const Color(0xFF93C6D6),
+        'tint': const Color(0xFFFF69B4),
+      }, // Top M: Dusty Blue / Hot Pink
+      {
+        'bg': const Color(0xFFD58145),
+        'tint': const Color(0xFF98FF98),
+      }, // Top R: Burnt Orange / Mint
+      {
+        'bg': const Color(0xFFDE6725),
+        'tint': const Color(0xFF87CEFA),
+      }, // Bot L: Bright Orange / Sky Blue
+      {
+        'bg': const Color(0xFF0D7A84),
+        'tint': const Color(0xFFFF00FF),
+      }, // Bot M: Deep Teal / Magenta
+      {
+        'bg': const Color(0xFFD81682),
+        'tint': const Color(0xFFBFFF00),
+      }, // Bot R: Hot Pink / Lime
     ];
 
     return Column(
@@ -29,24 +48,60 @@ class WarholBackground extends StatelessWidget {
         Expanded(
           child: Row(
             children: [
-              Expanded(child: _buildPanel(palettes[0]['bg']!, palettes[0]['tint']!, targetEmoji)), 
-              Expanded(child: _buildPanel(palettes[1]['bg']!, palettes[1]['tint']!, targetEmoji)), 
+              Expanded(
+                child: _buildPanel(
+                  palettes[0]['bg']!,
+                  palettes[0]['tint']!,
+                  targetEmoji,
+                ),
+              ),
+              Expanded(
+                child: _buildPanel(
+                  palettes[1]['bg']!,
+                  palettes[1]['tint']!,
+                  targetEmoji,
+                ),
+              ),
             ],
           ),
         ),
         Expanded(
           child: Row(
             children: [
-              Expanded(child: _buildPanel(palettes[2]['bg']!, palettes[2]['tint']!, targetEmoji)), 
-              Expanded(child: _buildPanel(palettes[3]['bg']!, palettes[3]['tint']!, targetEmoji)), 
+              Expanded(
+                child: _buildPanel(
+                  palettes[2]['bg']!,
+                  palettes[2]['tint']!,
+                  targetEmoji,
+                ),
+              ),
+              Expanded(
+                child: _buildPanel(
+                  palettes[3]['bg']!,
+                  palettes[3]['tint']!,
+                  targetEmoji,
+                ),
+              ),
             ],
           ),
         ),
         Expanded(
           child: Row(
             children: [
-              Expanded(child: _buildPanel(palettes[4]['bg']!, palettes[4]['tint']!, targetEmoji)), 
-              Expanded(child: _buildPanel(palettes[5]['bg']!, palettes[5]['tint']!, targetEmoji)), 
+              Expanded(
+                child: _buildPanel(
+                  palettes[4]['bg']!,
+                  palettes[4]['tint']!,
+                  targetEmoji,
+                ),
+              ),
+              Expanded(
+                child: _buildPanel(
+                  palettes[5]['bg']!,
+                  palettes[5]['tint']!,
+                  targetEmoji,
+                ),
+              ),
             ],
           ),
         ),
@@ -68,7 +123,10 @@ class WarholBackground extends StatelessWidget {
               child: FittedBox(
                 fit: BoxFit.contain,
                 child: Transform.translate(
-                  offset: const Offset(0, -100), // Keeping your optical center nudge
+                  offset: const Offset(
+                    0,
+                    -100,
+                  ), // Keeping your optical center nudge
                   child: Stack(
                     alignment: Alignment.center,
                     clipBehavior: Clip.none,
@@ -76,7 +134,7 @@ class WarholBackground extends StatelessWidget {
                       // 🌑 LAYER 1: The Heavy Ink Shadow
                       // Increased and made slightly uneven (70, 90) for a sloppy print feel
                       Transform.translate(
-                        offset: const Offset(70, 90), 
+                        offset: const Offset(70, 90),
                         child: ShaderMask(
                           blendMode: BlendMode.srcATop,
                           shaderCallback: (bounds) => const LinearGradient(
@@ -85,25 +143,36 @@ class WarholBackground extends StatelessWidget {
                           child: Text(
                             emoji,
                             textAlign: TextAlign.center,
-                            style: const TextStyle(fontSize: 1000, height: 1.0, decoration: TextDecoration.none),
+                            style: const TextStyle(
+                              fontSize: 1000,
+                              height: 1.0,
+                              decoration: TextDecoration.none,
+                            ),
                           ),
                         ),
                       ),
-                      
+
                       // 💥 LAYER 2: The "Primer Bleed" (NEW)
                       // Shifts up and left to create that misregistered color-spill glitch
                       Transform.translate(
-                        offset: const Offset(-40, -25), 
+                        offset: const Offset(-40, -25),
                         child: ShaderMask(
                           blendMode: BlendMode.srcATop,
                           shaderCallback: (bounds) => LinearGradient(
                             // Opacity lets it blend slightly with the background
-                            colors: [tintColor.withOpacity(0.85), tintColor.withOpacity(0.85)],
+                            colors: [
+                              tintColor.withOpacity(0.85),
+                              tintColor.withOpacity(0.85),
+                            ],
                           ).createShader(bounds),
                           child: Text(
                             emoji,
                             textAlign: TextAlign.center,
-                            style: const TextStyle(fontSize: 1000, height: 1.0, decoration: TextDecoration.none),
+                            style: const TextStyle(
+                              fontSize: 1000,
+                              height: 1.0,
+                              decoration: TextDecoration.none,
+                            ),
                           ),
                         ),
                       ),
@@ -117,7 +186,11 @@ class WarholBackground extends StatelessWidget {
                         child: Text(
                           emoji,
                           textAlign: TextAlign.center,
-                          style: const TextStyle(fontSize: 1000, height: 1.0, decoration: TextDecoration.none),
+                          style: const TextStyle(
+                            fontSize: 1000,
+                            height: 1.0,
+                            decoration: TextDecoration.none,
+                          ),
                         ),
                       ),
                     ],

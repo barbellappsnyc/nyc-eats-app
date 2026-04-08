@@ -11,10 +11,7 @@ class PhotoboothBackground extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       color: const Color(0xFF050505), // Pitch black base
-      child: CustomPaint(
-        painter: StaticBokehPainter(),
-        size: Size.infinite,
-      ),
+      child: CustomPaint(painter: StaticBokehPainter(), size: Size.infinite),
     );
   }
 }
@@ -22,10 +19,10 @@ class PhotoboothBackground extends StatelessWidget {
 class StaticBokehPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    // We use a fixed seed so the bokeh looks exactly the same every time 
+    // We use a fixed seed so the bokeh looks exactly the same every time
     // the user opens this specific screen, adding to the "memory" vibe.
-    final random = Random(42); 
-    
+    final random = Random(42);
+
     final colors = [
       const Color(0x66FF3B30), // Apple Red
       const Color(0x55FFCC00), // Warm Amber
@@ -41,7 +38,10 @@ class StaticBokehPainter extends CustomPainter {
 
       final paint = Paint()
         ..color = color
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 25.0); // Heavy blur
+        ..maskFilter = const MaskFilter.blur(
+          BlurStyle.normal,
+          25.0,
+        ); // Heavy blur
 
       canvas.drawCircle(Offset(x, y), radius, paint);
     }
@@ -73,16 +73,22 @@ class PhotoStripCard extends StatelessWidget {
     required this.onRotatePhoto, // 👈 Required
     this.loadingSlotIndex, // 👈 2. ADD THIS TO CONSTRUCTOR
   });
-//... (build method stays the same, it just passes index to _buildPhotoSlot)
+  //... (build method stays the same, it just passes index to _buildPhotoSlot)
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF0A192F), 
-        borderRadius: BorderRadius.circular(12), // Slightly softer corners for the fat rectangle
+        color: const Color(0xFF0A192F),
+        borderRadius: BorderRadius.circular(
+          12,
+        ), // Slightly softer corners for the fat rectangle
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 25, offset: const Offset(0, 15))
+          BoxShadow(
+            color: Colors.black.withOpacity(0.5),
+            blurRadius: 25,
+            offset: const Offset(0, 15),
+          ),
         ],
       ),
       child: Stack(
@@ -95,38 +101,41 @@ class PhotoStripCard extends StatelessWidget {
               builder: (context, constraints) {
                 final emojis = ["🍕", "🌮", "🍣", "🍔", "🍩", "🍷", "🍝", "🥟"];
                 List<Widget> pattern = [];
-                
-                double spacing = 55.0; // Slightly wider spacing for the fat rectangle
+
+                double spacing =
+                    55.0; // Slightly wider spacing for the fat rectangle
                 int rows = (constraints.maxHeight / spacing).ceil() + 1;
                 int cols = (constraints.maxWidth / spacing).ceil() + 1;
-                
+
                 int emojiIndex = 0;
-                
+
                 for (int r = -1; r <= rows; r++) {
                   for (int c = -1; c <= cols; c++) {
                     double xOffset = (r % 2 == 0) ? 0.0 : spacing / 2.0;
                     pattern.add(
                       Positioned(
-                        left: (c * spacing) + xOffset - 10, 
-                        top: (r * spacing) - 10,            
+                        left: (c * spacing) + xOffset - 10,
+                        top: (r * spacing) - 10,
                         child: Text(
                           emojis[emojiIndex % emojis.length],
-                          style: const TextStyle(fontSize: 34), 
+                          style: const TextStyle(fontSize: 34),
                         ),
-                      )
+                      ),
                     );
                     emojiIndex++;
                   }
                 }
-                
+
                 return Stack(children: pattern);
-              }
+              },
             ),
           ),
-          
+
           // 📸 THE FOREGROUND (2x2 Grid + White Label)
           Padding(
-            padding: const EdgeInsets.all(16.0), // More padding for the fat rectangle
+            padding: const EdgeInsets.all(
+              16.0,
+            ), // More padding for the fat rectangle
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -152,32 +161,35 @@ class PhotoStripCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
-                
+
                 // 🏷️ THE WHITE LABEL
                 GestureDetector(
-                  onTap: onDateTapped, 
+                  onTap: onDateTapped,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8), 
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 16,
+                      horizontal: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: FittedBox(
-                      fit: BoxFit.scaleDown, 
+                      fit: BoxFit.scaleDown,
                       child: Text(
                         "📍 $borough • $dateText",
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           fontFamily: 'Courier',
                           fontSize: 18, // Nice and bold
-                          fontWeight: FontWeight.w900, 
-                          letterSpacing: 1.5, 
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.5,
                           color: Colors.black87,
                         ),
                       ),
                     ),
                   ),
-                )
+                ),
               ],
             ),
           ),
@@ -186,13 +198,15 @@ class PhotoStripCard extends StatelessWidget {
     );
   }
 
-  Widget _buildPhotoSlot(int index, int? loadingSlotIndex) { // 👈 Fixed signature
+  Widget _buildPhotoSlot(int index, int? loadingSlotIndex) {
+    // 👈 Fixed signature
     final path = photoPaths[index];
     final turns = photoRotations[index];
-    final isLoading = loadingSlotIndex == index; // 👈 Check if this specific slot is loading
+    final isLoading =
+        loadingSlotIndex == index; // 👈 Check if this specific slot is loading
 
     return Expanded(
-      child: Container( 
+      child: Container(
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           color: Colors.grey[800],
@@ -206,10 +220,7 @@ class PhotoStripCard extends StatelessWidget {
             if (path != null && !isLoading)
               RotatedBox(
                 quarterTurns: turns,
-                child: Image.file(
-                  File(path),
-                  fit: BoxFit.cover,
-                ),
+                child: Image.file(File(path), fit: BoxFit.cover),
               ),
 
             // ➕ LAYER 2: THE EMPTY STATE ICON
@@ -221,23 +232,24 @@ class PhotoStripCard extends StatelessWidget {
             // 🎡 LAYER 3: THE CUPERTINO LOADER
             if (isLoading)
               const Center(
-                child: CupertinoActivityIndicator(color: Colors.white, radius: 15),
+                child: CupertinoActivityIndicator(
+                  color: Colors.white,
+                  radius: 15,
+                ),
               ),
 
             // 🛡️ LAYER 4: THE 100% INVISIBLE TOUCH TARGET
-            // This creates a solid block over the entire grey square 
+            // This creates a solid block over the entire grey square
             // so tapping anywhere triggers the gallery.
             Positioned.fill(
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: () => onPhotoTapped(index),
-                child: Container(
-                  color: Colors.transparent, 
-                ),
+                child: Container(color: Colors.transparent),
               ),
             ),
 
-            // 🔄 LAYER 5: THE ROTATE BUTTON 
+            // 🔄 LAYER 5: THE ROTATE BUTTON
             // Placed last so it sits on top of the touch target.
             if (path != null && !isLoading)
               Positioned(

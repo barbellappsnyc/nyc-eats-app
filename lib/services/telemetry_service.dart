@@ -12,7 +12,7 @@ class TelemetryService {
     try {
       final user = _client.auth.currentUser;
       // We only want to train the algorithm on authenticated users to ensure data quality
-      if (user == null) return; 
+      if (user == null) return;
 
       await _client.from('interaction_logs').insert({
         'user_id': user.id,
@@ -21,7 +21,7 @@ class TelemetryService {
       });
       debugPrint('📡 Telemetry Logged: $actionType');
     } catch (e) {
-      // We catch and swallow errors here. 
+      // We catch and swallow errors here.
       // Telemetry should NEVER crash the app or interrupt the user.
       debugPrint('📡 Telemetry Error: $e');
     }

@@ -1,24 +1,24 @@
 import 'package:flutter/material.dart';
 import 'dart:io'; // Needed for File checks if you use them here
 import '../widgets/immigration_stamp.dart';
-import '../widgets/visa_document.dart'; 
+import '../widgets/visa_document.dart';
 
 class PassportCard extends StatelessWidget {
   final int pageIndex;
   final String passportSku;
   final String userName;
   final List<Map<String, String>> pageStamps;
-  final List<GlobalKey>? slotKeys; 
+  final List<GlobalKey>? slotKeys;
   final GlobalKey? cardKey;
-  final bool useKeys; 
+  final bool useKeys;
   final Color cutoutColor;
-  
+
   final bool isVacant;
-  final String visaTitle; 
+  final String visaTitle;
   final String? visaDate;
   final Color? visaColor;
   final VoidCallback? onNameTap;
-  final VoidCallback? onAddSlotTap; 
+  final VoidCallback? onAddSlotTap;
 
   final String? photoUrl;
   final String? gender;
@@ -35,16 +35,18 @@ class PassportCard extends StatelessWidget {
     const double stripHeight = 12.0;
     const double foldHeight = 20.0;
     const double fixedVertical = stripHeight + foldHeight;
-    
+
     final double availableHeight = cardSize.height - fixedVertical;
     final double bottomSectionHeight = availableHeight * (48 / 100);
     final double bottomSectionTop = cardSize.height - bottomSectionHeight;
 
-    final double x = (slotIndex % 2 == 0) ? cardSize.width * 0.25 : cardSize.width * 0.75;
-    final double rowY = (slotIndex < 2) 
-        ? bottomSectionHeight * 0.25 
+    final double x = (slotIndex % 2 == 0)
+        ? cardSize.width * 0.25
+        : cardSize.width * 0.75;
+    final double rowY = (slotIndex < 2)
+        ? bottomSectionHeight * 0.25
         : bottomSectionHeight * 0.75;
-    
+
     return Offset(x, bottomSectionTop + rowY);
   }
 
@@ -54,7 +56,7 @@ class PassportCard extends StatelessWidget {
     required this.passportSku,
     required this.userName,
     required this.pageStamps,
-    this.slotKeys, 
+    this.slotKeys,
     this.cardKey,
     this.useKeys = false,
     required this.cutoutColor,
@@ -63,16 +65,16 @@ class PassportCard extends StatelessWidget {
     this.visaDate,
     this.visaColor,
     this.onNameTap,
-    this.onAddSlotTap, 
+    this.onAddSlotTap,
     this.photoUrl,
     this.gender,
     this.age,
-    
+
     this.isFlying = false,
     this.flyingSlotIndex,
     this.flyingStampName,
     this.flyingStampDate,
-  }); 
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -80,7 +82,8 @@ class PassportCard extends StatelessWidget {
     final double cardWidth = (screenWidth * 0.85).clamp(300.0, 400.0);
     final double cardHeight = cardWidth * (540 / 340);
 
-    final bool isBooklet = passportSku == 'diplomat_book' || passportSku == 'standard_book';
+    final bool isBooklet =
+        passportSku == 'diplomat_book' || passportSku == 'standard_book';
     final bool isCover = pageIndex == 0 && isBooklet;
 
     if (isCover) {
@@ -88,11 +91,16 @@ class PassportCard extends StatelessWidget {
     }
 
     final List<Color> stripColors = [
-      Colors.blueAccent, Colors.redAccent, Colors.green, 
-      Colors.orange, Colors.purple, Colors.teal
+      Colors.blueAccent,
+      Colors.redAccent,
+      Colors.green,
+      Colors.orange,
+      Colors.purple,
+      Colors.teal,
     ];
-    
-    Color finalStripColor = visaColor ?? stripColors[pageIndex % stripColors.length];
+
+    Color finalStripColor =
+        visaColor ?? stripColors[pageIndex % stripColors.length];
     final double contentOpacity = isVacant ? 0.65 : 1.0;
     // 🛠 FIX: FORCE BLANK VIEW FOR NEW SINGLE PAGES
     // Even if the logic says it's "assigned", we don't want to show the Global Visa artwork.
@@ -115,9 +123,10 @@ class PassportCard extends StatelessWidget {
               // 2. 📦 THE PHYSICAL CARD (Clipped Content)
               Container(
                 key: useKeys ? cardKey : null,
-                clipBehavior: Clip.antiAlias, // Keep corners rounded for the card itself
+                clipBehavior:
+                    Clip.antiAlias, // Keep corners rounded for the card itself
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFDFBF7), 
+                  color: const Color(0xFFFDFBF7),
                   borderRadius: BorderRadius.circular(24),
                   boxShadow: [
                     BoxShadow(
@@ -135,16 +144,21 @@ class PassportCard extends StatelessWidget {
                       height: 12,
                       decoration: BoxDecoration(
                         color: finalStripColor,
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(24),
+                        ),
                       ),
                     ),
-                    
+
                     // Main Content
                     Expanded(
-                      flex: 52, 
+                      flex: 52,
                       child: isSovereignPage
-                          ? _buildSovereignVisaView(finalStripColor) 
-                          : _buildGlobalOrVacantView(contentOpacity, finalStripColor), 
+                          ? _buildSovereignVisaView(finalStripColor)
+                          : _buildGlobalOrVacantView(
+                              contentOpacity,
+                              finalStripColor,
+                            ),
                     ),
 
                     // Fold Line
@@ -152,18 +166,54 @@ class PassportCard extends StatelessWidget {
                       height: 20,
                       child: Row(
                         children: [
-                          SizedBox(width: 10, height: 20, child: DecoratedBox(decoration: BoxDecoration(color: cutoutColor, borderRadius: const BorderRadius.horizontal(right: Radius.circular(10))))),
-                          Expanded(child: LayoutBuilder(
-                            builder: (context, constraints) {
-                              return Flex(
-                                direction: Axis.horizontal,
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                mainAxisSize: MainAxisSize.max,
-                                children: List.generate((constraints.constrainWidth() / 10).floor(), (index) => const SizedBox(width: 5, height: 1, child: DecoratedBox(decoration: BoxDecoration(color: Colors.black12)))),
-                              );
-                            },
-                          )),
-                          SizedBox(width: 10, height: 20, child: DecoratedBox(decoration: BoxDecoration(color: cutoutColor, borderRadius: const BorderRadius.horizontal(left: Radius.circular(10))))),
+                          SizedBox(
+                            width: 10,
+                            height: 20,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: cutoutColor,
+                                borderRadius: const BorderRadius.horizontal(
+                                  right: Radius.circular(10),
+                                ),
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                return Flex(
+                                  direction: Axis.horizontal,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  mainAxisSize: MainAxisSize.max,
+                                  children: List.generate(
+                                    (constraints.constrainWidth() / 10).floor(),
+                                    (index) => const SizedBox(
+                                      width: 5,
+                                      height: 1,
+                                      child: DecoratedBox(
+                                        decoration: BoxDecoration(
+                                          color: Colors.black12,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          SizedBox(
+                            width: 10,
+                            height: 20,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: cutoutColor,
+                                borderRadius: const BorderRadius.horizontal(
+                                  left: Radius.circular(10),
+                                ),
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -176,10 +226,21 @@ class PassportCard extends StatelessWidget {
                           return Stack(
                             children: [
                               for (int i = 0; i < 4; i++)
-                                 _buildExactPosSlot(i, constraints.maxWidth, constraints.maxHeight, isVacant),
+                                _buildExactPosSlot(
+                                  i,
+                                  constraints.maxWidth,
+                                  constraints.maxHeight,
+                                  isVacant,
+                                ),
 
                               for (int i = 0; i < pageStamps.length; i++)
-                                 if(i < 4) _buildExactPosStamp(i, constraints.maxWidth, constraints.maxHeight, pageStamps[i]),
+                                if (i < 4)
+                                  _buildExactPosStamp(
+                                    i,
+                                    constraints.maxWidth,
+                                    constraints.maxHeight,
+                                    pageStamps[i],
+                                  ),
                             ],
                           );
                         },
@@ -192,7 +253,7 @@ class PassportCard extends StatelessWidget {
               // 3. ✈️ THE FLYING STAMP (Floating Above Everything)
               // We perform the layout math relative to the card size here
               if (isFlying && flyingSlotIndex != null)
-                 _buildFlyingStamp(flyingSlotIndex!, cardWidth, cardHeight),
+                _buildFlyingStamp(flyingSlotIndex!, cardWidth, cardHeight),
             ],
           ),
         ),
@@ -203,7 +264,7 @@ class PassportCard extends StatelessWidget {
   Widget _buildExactPosSlot(int index, double w, double h, bool vacant) {
     final double x = (index % 2 == 0) ? w * 0.25 : w * 0.75;
     final double y = (index < 2) ? h * 0.25 : h * 0.75;
-    
+
     final double boxW = w * 0.4;
     final double boxH = h * 0.4;
 
@@ -213,21 +274,40 @@ class PassportCard extends StatelessWidget {
       width: boxW,
       height: boxH,
       child: GestureDetector(
-        onTap: onAddSlotTap, 
-        behavior: HitTestBehavior.opaque, 
+        onTap: onAddSlotTap,
+        behavior: HitTestBehavior.opaque,
         child: Container(
-          key: (slotKeys != null && index < slotKeys!.length) ? slotKeys![index] : null,
+          key: (slotKeys != null && index < slotKeys!.length)
+              ? slotKeys![index]
+              : null,
           decoration: BoxDecoration(
-            border: Border.all(color: vacant ? Colors.black.withOpacity(0.04) : Colors.black.withOpacity(0.06), width: 2),
+            border: Border.all(
+              color: vacant
+                  ? Colors.black.withOpacity(0.04)
+                  : Colors.black.withOpacity(0.06),
+              width: 2,
+            ),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Center(child: Icon(Icons.add, color: vacant ? Colors.transparent : Colors.black.withOpacity(0.05))),
+          child: Center(
+            child: Icon(
+              Icons.add,
+              color: vacant
+                  ? Colors.transparent
+                  : Colors.black.withOpacity(0.05),
+            ),
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildExactPosStamp(int index, double w, double h, Map<String, String> data) {
+  Widget _buildExactPosStamp(
+    int index,
+    double w,
+    double h,
+    Map<String, String> data,
+  ) {
     final double x = (index % 2 == 0) ? w * 0.25 : w * 0.75;
     final double y = (index < 2) ? h * 0.25 : h * 0.75;
 
@@ -235,7 +315,7 @@ class PassportCard extends StatelessWidget {
     const double stampHeight = 90.0;
 
     return Positioned(
-      left: x - (stampWidth / 2), 
+      left: x - (stampWidth / 2),
       top: y - (stampHeight / 2),
       width: stampWidth,
       height: stampHeight,
@@ -244,21 +324,21 @@ class PassportCard extends StatelessWidget {
         child: FittedBox(
           fit: BoxFit.contain,
           child: ImmigrationStamp(
-             restaurant: data['name'] ?? 'Unknown', 
-             date: data['date'] ?? 'Unknown'
+            restaurant: data['name'] ?? 'Unknown',
+            date: data['date'] ?? 'Unknown',
           ),
         ),
       ),
     );
   }
-  
+
   Widget _buildCoverView(BuildContext context, double width, double height) {
     // 🎨 DYNAMIC THEME ENGINE
     final Color baseColor;
     final Color highlightColor;
 
     if (passportSku == 'diplomat_book') {
-      baseColor = const Color(0xFF041022); 
+      baseColor = const Color(0xFF041022);
       highlightColor = const Color(0xFF162538);
     } else {
       // Imperial Burgundy
@@ -274,7 +354,7 @@ class PassportCard extends StatelessWidget {
         key: useKeys ? cardKey : null,
         width: width,
         height: height,
-        clipBehavior: Clip.antiAlias, 
+        clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           color: baseColor,
           borderRadius: BorderRadius.circular(12),
@@ -289,20 +369,20 @@ class PassportCard extends StatelessWidget {
               color: Colors.black.withOpacity(0.8),
               blurRadius: 20,
               offset: const Offset(4, 8),
-            )
+            ),
           ],
         ),
         child: Stack(
           children: [
             Positioned(
-              left: 0, top: 0, bottom: 0, width: 30,
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: 30,
               child: Container(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [
-                      Colors.black.withOpacity(0.8), 
-                      Colors.transparent
-                    ],
+                    colors: [Colors.black.withOpacity(0.8), Colors.transparent],
                     begin: Alignment.centerLeft,
                     end: Alignment.centerRight,
                   ),
@@ -311,7 +391,10 @@ class PassportCard extends StatelessWidget {
             ),
 
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 40.0, horizontal: 20.0),
+              padding: const EdgeInsets.symmetric(
+                vertical: 40.0,
+                horizontal: 20.0,
+              ),
               child: SizedBox.expand(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -339,9 +422,9 @@ class PassportCard extends StatelessWidget {
                         ),
                         child: Center(
                           child: Icon(
-                            Icons.public, 
-                            size: 90, 
-                            color: Colors.white
+                            Icons.public,
+                            size: 90,
+                            color: Colors.white,
                           ),
                         ),
                       ),
@@ -353,7 +436,7 @@ class PassportCard extends StatelessWidget {
                           child: Column(
                             children: [
                               Text(
-                                "COLLECTION", 
+                                "COLLECTION",
                                 style: TextStyle(
                                   fontFamily: 'Times New Roman',
                                   fontWeight: FontWeight.bold,
@@ -363,7 +446,9 @@ class PassportCard extends StatelessWidget {
                               ),
                               const SizedBox(height: 10),
                               Text(
-                                passportSku == 'diplomat_book' ? "DIPLOMATIC" : "STANDARD",
+                                passportSku == 'diplomat_book'
+                                    ? "DIPLOMATIC"
+                                    : "STANDARD",
                                 style: TextStyle(
                                   fontFamily: 'Times New Roman',
                                   fontWeight: FontWeight.bold,
@@ -374,9 +459,9 @@ class PassportCard extends StatelessWidget {
                             ],
                           ),
                         ),
-                        
+
                         const SizedBox(height: 20),
-                        
+
                         _FoilEffect(
                           child: Container(
                             width: 34,
@@ -418,16 +503,16 @@ class PassportCard extends StatelessWidget {
         child: VisaDocument(
           // 🛠 FIX: logic was forcing Page 0 to be "Global".
           // We must allow Single Page passports to show their specific cuisine on Page 0.
-          cuisine: (pageIndex == 0 && passportSku != 'single_page') 
-              ? "Global" 
+          cuisine: (pageIndex == 0 && passportSku != 'single_page')
+              ? "Global"
               : visaTitle.replaceAll('OFFICIAL ', '').replaceAll(' VISA', ''),
-              
+
           userName: userName,
-          dateIssued: visaDate ?? "EST. 2026", 
+          dateIssued: visaDate ?? "EST. 2026",
           mainColor: (pageIndex == 0 && passportSku != 'single_page')
-              ? const Color(0xFF1A237E) 
-              : mainColor, 
-          photoUrl: photoUrl ?? "", 
+              ? const Color(0xFF1A237E)
+              : mainColor,
+          photoUrl: photoUrl ?? "",
           gender: gender,
           age: age,
         ),
@@ -436,9 +521,10 @@ class PassportCard extends StatelessWidget {
   }
 
   Widget _buildGlobalOrVacantView(double opacity, Color stripColor) {
-    final bool isBooklet = passportSku == 'diplomat_book' || passportSku == 'standard_book';
+    final bool isBooklet =
+        passportSku == 'diplomat_book' || passportSku == 'standard_book';
     final int displayNum = isBooklet ? pageIndex : pageIndex + 1;
-    
+
     // 🛠 FIX: Determine the correct label
     // If we forced it to be blank (Single Page), show "SINGLE ENTRY"
     String displayTitle = isVacant ? "BLANK PAGE" : visaTitle;
@@ -463,34 +549,34 @@ class PassportCard extends StatelessWidget {
                     Text(
                       displayTitle, // 👈 Uses our new logic
                       style: TextStyle(
-                        fontSize: 12, 
-                        fontWeight: FontWeight.bold, 
-                        letterSpacing: 1.5, 
-                        color: Colors.grey[500] 
-                      )
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.5,
+                        color: Colors.grey[500],
+                      ),
                     ),
                   ],
                 ),
                 Text(
-                  "00$displayNum", 
+                  "00$displayNum",
                   style: const TextStyle(
-                    fontSize: 14, 
-                    fontWeight: FontWeight.bold, 
-                    color: Colors.black12
-                  )
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black12,
+                  ),
                 ),
               ],
             ),
             const Spacer(),
             const Text(
-              "TRAVELER", 
+              "TRAVELER",
               style: TextStyle(
-                fontSize: 10, 
+                fontSize: 10,
                 color: Colors.black38,
-                fontWeight: FontWeight.bold
-              )
+                fontWeight: FontWeight.bold,
+              ),
             ),
-            
+
             GestureDetector(
               onTap: onNameTap,
               child: Row(
@@ -501,37 +587,54 @@ class PassportCard extends StatelessWidget {
                       fit: BoxFit.scaleDown,
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        userName, 
+                        userName,
                         style: const TextStyle(
-                          fontSize: 28, 
-                          fontWeight: FontWeight.w900, 
-                          fontFamily: 'Courier', 
+                          fontSize: 28,
+                          fontWeight: FontWeight.w900,
+                          fontFamily: 'Courier',
                           letterSpacing: -1,
-                          color: Colors.black
-                        )
+                          color: Colors.black,
+                        ),
                       ),
                     ),
                   ),
-                  if (useKeys) Padding(padding: const EdgeInsets.only(left: 8.0), child: Icon(Icons.edit, size: 14, color: Colors.grey[400]))
+                  if (useKeys)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 8.0),
+                      child: Icon(
+                        Icons.edit,
+                        size: 14,
+                        color: Colors.grey[400],
+                      ),
+                    ),
                 ],
               ),
             ),
 
             const SizedBox(height: 8),
-            
-            if (!isVacant || passportSku == 'single_page') // Show label for single page too
+
+            if (!isVacant ||
+                passportSku == 'single_page') // Show label for single page too
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(color: Colors.black.withOpacity(0.05), borderRadius: BorderRadius.circular(20)),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(20),
+                ),
                 child: Text(
-                  passportSku == 'single_page' 
-                      ? "ONE-TIME PASS" 
-                      : (passportSku == 'free_tier' ? "TOURIST STATUS" : "CITIZEN OF THE WORLD"), 
+                  passportSku == 'single_page'
+                      ? "ONE-TIME PASS"
+                      : (passportSku == 'free_tier'
+                            ? "TOURIST STATUS"
+                            : "CITIZEN OF THE WORLD"),
                   style: const TextStyle(
-                    fontSize: 10, 
-                    color: Colors.black54, 
-                    fontWeight: FontWeight.bold
-                  )
+                    fontSize: 10,
+                    color: Colors.black54,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
           ],
@@ -549,16 +652,18 @@ class PassportCard extends StatelessWidget {
     final double offsetY = stripHeight + topSectionH + foldHeight;
 
     final double relX = (index % 2 == 0) ? cardW * 0.25 : cardW * 0.75;
-    final double relY = (index < 2) ? bottomSectionH * 0.25 : bottomSectionH * 0.75;
+    final double relY = (index < 2)
+        ? bottomSectionH * 0.25
+        : bottomSectionH * 0.75;
 
     const double stampWidth = 140.0;
     const double stampHeight = 90.0;
-    
+
     final double finalX = relX - (stampWidth / 2);
     final double finalY = offsetY + relY - (stampHeight / 2);
 
     final double targetRotation = (index % 2 == 0) ? -0.1 : 0.1;
-    final double startRotation = targetRotation * 3.0; 
+    final double startRotation = targetRotation * 3.0;
 
     return Positioned(
       left: finalX,
@@ -568,9 +673,8 @@ class PassportCard extends StatelessWidget {
       child: TweenAnimationBuilder<double>(
         tween: Tween(begin: 0.0, end: 1.0),
         duration: const Duration(milliseconds: 900),
-        curve: Curves.linear, 
+        curve: Curves.linear,
         builder: (context, value, child) {
-          
           double scale;
           double rotation;
           double opacity;
@@ -579,18 +683,20 @@ class PassportCard extends StatelessWidget {
 
           if (value < impactTime) {
             final t = Curves.easeInQuint.transform(value / impactTime);
-            scale = 5.0 - (4.2 * t); 
+            scale = 5.0 - (4.2 * t);
             rotation = startRotation + ((targetRotation - startRotation) * t);
-            opacity = (t * 5).clamp(0.0, 1.0); 
+            opacity = (t * 5).clamp(0.0, 1.0);
           } else {
-            final t = Curves.elasticOut.transform((value - impactTime) / (1 - impactTime));
+            final t = Curves.elasticOut.transform(
+              (value - impactTime) / (1 - impactTime),
+            );
             scale = 0.8 + (0.2 * t);
             rotation = targetRotation;
             opacity = 1.0;
           }
 
           return Transform.scale(
-            scale: scale, 
+            scale: scale,
             child: Transform.rotate(
               angle: rotation,
               child: Opacity(
@@ -621,10 +727,10 @@ class _FoilEffect extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xFFE6C685), 
-            Color(0xFFD4AF37), 
-            Color(0xFFC5A028), 
-            Color(0xFFE6C685), 
+            Color(0xFFE6C685),
+            Color(0xFFD4AF37),
+            Color(0xFFC5A028),
+            Color(0xFFE6C685),
           ],
           stops: [0.1, 0.4, 0.7, 0.9],
         ).createShader(bounds);

@@ -11,7 +11,7 @@ class _PassportScreenState extends State<PassportScreen> {
   @override
   Widget build(BuildContext context) {
     // 🔧 TWEAK: Changed from 1.45 to 1.35 to give you more vertical space (less "stubby")
-    const double bookAspectRatio = 1.35; 
+    const double bookAspectRatio = 1.35;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -31,27 +31,38 @@ class _PassportScreenState extends State<PassportScreen> {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.8), blurRadius: 30, spreadRadius: 5),
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.8),
+                  blurRadius: 30,
+                  spreadRadius: 5,
+                ),
               ],
               // 📖 LEATHER COVER
               image: DecorationImage(
-                image: AssetImage('assets/images/leather_cover.jpg'), 
+                image: AssetImage('assets/images/leather_cover.jpg'),
                 fit: BoxFit.cover,
-                colorFilter: ColorFilter.mode(Colors.black.withOpacity(0.2), BlendMode.darken), 
-              ), 
+                colorFilter: ColorFilter.mode(
+                  Colors.black.withOpacity(0.2),
+                  BlendMode.darken,
+                ),
+              ),
             ),
-            padding: EdgeInsets.all(14), 
+            padding: EdgeInsets.all(14),
             child: Row(
               children: [
                 // 📄 LEFT PAGE (Visa)
                 Expanded(child: _buildRealisticPage(isLeft: true)),
-                
+
                 // 📚 SPINE
                 Container(
                   width: 4,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [Color(0xFF0D0D0D), Color(0xFF202020), Color(0xFF0D0D0D)],
+                      colors: [
+                        Color(0xFF0D0D0D),
+                        Color(0xFF202020),
+                        Color(0xFF0D0D0D),
+                      ],
                     ),
                   ),
                 ),
@@ -70,11 +81,17 @@ class _PassportScreenState extends State<PassportScreen> {
     return Container(
       decoration: BoxDecoration(
         color: Color(0xFFFDFBF7),
-        borderRadius: isLeft 
-            ? BorderRadius.only(topLeft: Radius.circular(4), bottomLeft: Radius.circular(4))
-            : BorderRadius.only(topRight: Radius.circular(4), bottomRight: Radius.circular(4)),
+        borderRadius: isLeft
+            ? BorderRadius.only(
+                topLeft: Radius.circular(4),
+                bottomLeft: Radius.circular(4),
+              )
+            : BorderRadius.only(
+                topRight: Radius.circular(4),
+                bottomRight: Radius.circular(4),
+              ),
         image: DecorationImage(
-          image: AssetImage('assets/images/passport_paper.jpg'), 
+          image: AssetImage('assets/images/passport_paper.jpg'),
           fit: BoxFit.cover,
         ),
       ),
@@ -84,10 +101,13 @@ class _PassportScreenState extends State<PassportScreen> {
           LayoutBuilder(
             builder: (context, constraints) {
               return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 12.0),
-                child: isLeft 
-                  ? _buildVisaContent(constraints) 
-                  : _buildStampsContent(),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10.0,
+                  vertical: 12.0,
+                ),
+                child: isLeft
+                    ? _buildVisaContent(constraints)
+                    : _buildStampsContent(),
               );
             },
           ),
@@ -100,22 +120,22 @@ class _PassportScreenState extends State<PassportScreen> {
                   begin: isLeft ? Alignment.centerRight : Alignment.centerLeft,
                   end: isLeft ? Alignment.centerLeft : Alignment.centerRight,
                   colors: [
-                    Colors.black.withOpacity(0.25), 
-                    Colors.transparent,             
-                    Colors.black.withOpacity(0.05), 
+                    Colors.black.withOpacity(0.25),
+                    Colors.transparent,
+                    Colors.black.withOpacity(0.05),
                   ],
                   stops: [0.0, 0.15, 1.0],
                 ),
               ),
             ),
           ),
-          
+
           // 3. NOISE LAYER (Texture)
           Positioned.fill(
-             child: Opacity(
-               opacity: 0.03,
-               child: Container(color: Colors.black), 
-             ),
+            child: Opacity(
+              opacity: 0.03,
+              child: Container(color: Colors.black),
+            ),
           ),
         ],
       ),
@@ -131,7 +151,11 @@ class _PassportScreenState extends State<PassportScreen> {
         Center(
           child: ShaderMask(
             shaderCallback: (bounds) => LinearGradient(
-              colors: [Color(0xFF8B6F3A), Color(0xFFF2D57E), Color(0xFFB88A44)], // Darker start
+              colors: [
+                Color(0xFF8B6F3A),
+                Color(0xFFF2D57E),
+                Color(0xFFB88A44),
+              ], // Darker start
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ).createShader(bounds),
@@ -140,26 +164,30 @@ class _PassportScreenState extends State<PassportScreen> {
                 Text(
                   "NYC EXPLORER",
                   style: TextStyle(
-                    fontFamily: 'Courier', 
-                    fontWeight: FontWeight.w900, 
-                    fontSize: constraints.maxWidth * 0.1, // Responsive Text Size
-                    color: Colors.white, 
+                    fontFamily: 'Courier',
+                    fontWeight: FontWeight.w900,
+                    fontSize:
+                        constraints.maxWidth * 0.1, // Responsive Text Size
+                    color: Colors.white,
                     letterSpacing: 3.0,
                   ),
                 ),
                 SizedBox(height: 4),
-                Divider(color: Colors.white, thickness: 1, height: 2), 
+                Divider(color: Colors.white, thickness: 1, height: 2),
                 Divider(color: Colors.white, thickness: 0.5, height: 4),
               ],
             ),
           ),
         ),
-        
+
         Spacer(flex: 1),
-        
+
         // 🖋️ INK BLEED DATA
         ColorFiltered(
-          colorFilter: ColorFilter.mode(Colors.black.withOpacity(0.85), BlendMode.srcATop),
+          colorFilter: ColorFilter.mode(
+            Colors.black.withOpacity(0.85),
+            BlendMode.srcATop,
+          ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -171,10 +199,12 @@ class _PassportScreenState extends State<PassportScreen> {
                   border: Border.all(color: Colors.black12),
                   color: Colors.grey[100],
                 ),
-                child: Center(child: Icon(Icons.person, color: Colors.grey[300], size: 40)),
+                child: Center(
+                  child: Icon(Icons.person, color: Colors.grey[300], size: 40),
+                ),
               ),
               SizedBox(width: 8),
-              
+
               // Text Fields
               Expanded(
                 child: Column(
@@ -193,7 +223,7 @@ class _PassportScreenState extends State<PassportScreen> {
             ],
           ),
         ),
-        
+
         Spacer(flex: 2),
 
         // 🤖 MACHINE READABLE ZONE
@@ -204,7 +234,7 @@ class _PassportScreenState extends State<PassportScreen> {
             child: Text(
               "P<USAEXPLORER<<VIBE<CODER<<<<<<<<<<<<<<<<\n8904326M2301175USA<<<<<<<<<<<<<<<<<<<<<<<4",
               style: TextStyle(
-                fontFamily: 'Courier', 
+                fontFamily: 'Courier',
                 fontWeight: FontWeight.w700,
                 color: Color(0xFF2A2A2A),
               ),
@@ -220,13 +250,14 @@ class _PassportScreenState extends State<PassportScreen> {
       children: [
         Center(
           child: Opacity(
-            opacity: 0.08, 
+            opacity: 0.08,
             child: Icon(Icons.local_pizza, size: 100, color: Colors.brown),
           ),
         ),
         // Example Stamp
         Positioned(
-          top: 40, left: 10,
+          top: 40,
+          left: 10,
           child: Transform.rotate(
             angle: -0.2,
             child: Opacity(
@@ -239,8 +270,18 @@ class _PassportScreenState extends State<PassportScreen> {
                 ),
                 child: Column(
                   children: [
-                    Text("CARBONE", style: TextStyle(color: Colors.red[900], fontWeight: FontWeight.bold, fontSize: 12)),
-                    Text("17 JAN 2026", style: TextStyle(color: Colors.red[900], fontSize: 9)),
+                    Text(
+                      "CARBONE",
+                      style: TextStyle(
+                        color: Colors.red[900],
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
+                    ),
+                    Text(
+                      "17 JAN 2026",
+                      style: TextStyle(color: Colors.red[900], fontSize: 9),
+                    ),
                   ],
                 ),
               ),
@@ -255,15 +296,22 @@ class _PassportScreenState extends State<PassportScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: TextStyle(fontSize: 8, color: Colors.black45, letterSpacing: 0.5)),
         Text(
-          value, 
+          label,
+          style: TextStyle(
+            fontSize: 8,
+            color: Colors.black45,
+            letterSpacing: 0.5,
+          ),
+        ),
+        Text(
+          value,
           style: TextStyle(
             fontSize: 11, // Slightly smaller to be safe
-            fontWeight: FontWeight.bold, 
-            color: Color(0xFF1F1F1F), 
-            letterSpacing: 0.5
-          )
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1F1F1F),
+            letterSpacing: 0.5,
+          ),
         ),
       ],
     );

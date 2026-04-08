@@ -32,16 +32,16 @@
 //     final List<int> zooms = [13, 14];
 //     final String theme = isDarkMode ? 'dark_all' : 'voyager';
 //     // CartoDB uses subdomains a, b, c. We'll pick 'a' for simplicity.
-//     const String subdomain = 'a'; 
+//     const String subdomain = 'a';
 
 //     for (var z in zooms) {
 //       final center = _getTileXY(lat, lng, z);
-      
+
 //       // 📦 DOWNLOAD A 3x3 GRID (Center + 8 neighbors)
 //       for (var x = center.x - 1; x <= center.x + 1; x++) {
 //         for (var y = center.y - 1; y <= center.y + 1; y++) {
 //           final url = 'https://$subdomain.basemaps.cartocdn.com/rastertiles/$theme/$z/$x/$y@2x.png';
-          
+
 //           try {
 //             // This triggers the download and saves it to disk automatically
 //             final provider = CachedNetworkImageProvider(

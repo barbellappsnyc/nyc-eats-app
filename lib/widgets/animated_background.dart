@@ -5,20 +5,17 @@ class AnimatedBackground extends StatefulWidget {
   final String sku; // 'free_tier', 'diplomat_book', 'standard_book', 'store'
   final Widget? child;
 
-  const AnimatedBackground({
-    super.key,
-    required this.sku,
-    this.child,
-  });
+  const AnimatedBackground({super.key, required this.sku, this.child});
 
   @override
   State<AnimatedBackground> createState() => _AnimatedBackgroundState();
 }
 
-class _AnimatedBackgroundState extends State<AnimatedBackground> with TickerProviderStateMixin {
+class _AnimatedBackgroundState extends State<AnimatedBackground>
+    with TickerProviderStateMixin {
   late AnimationController _motionController;
   late AnimationController _transitionController;
-  
+
   // COLOR STATE
   late List<Color> _targetColors;
   late List<Color> _previousColors;
@@ -31,8 +28,8 @@ class _AnimatedBackgroundState extends State<AnimatedBackground> with TickerProv
     // We use a shorter duration so you can actually SEE it moving
     _motionController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 7), 
-    )..repeat(reverse: true); 
+      duration: const Duration(seconds: 7),
+    )..repeat(reverse: true);
 
     // 2. SETUP COLORS
     _targetColors = _getThemeColors(widget.sku);
@@ -65,7 +62,6 @@ class _AnimatedBackgroundState extends State<AnimatedBackground> with TickerProv
   // 🎨 RICH PALETTES (4 Colors for complexity)
   List<Color> _getThemeColors(String sku) {
     switch (sku) {
-
       case 'auth':
         // 🌸 Plum & White Palette for Auth
         return [
@@ -85,13 +81,13 @@ class _AnimatedBackgroundState extends State<AnimatedBackground> with TickerProv
           const Color(0xFF03050A), // Almost Black (Anchors the bottom)
         ];
 
-      case 'profile': 
+      case 'profile':
         // 👤 PROFILE: Deep Space (Midnight, Dark Purple, Obsidian)
         // This provides high contrast for the white Official Data card.
         return [
-          const Color(0xFF0F2027), 
-          const Color(0xFF203A43), 
-          const Color(0xFF2C5364), 
+          const Color(0xFF0F2027),
+          const Color(0xFF203A43),
+          const Color(0xFF2C5364),
           const Color(0xFF0F2027),
         ];
 
@@ -112,7 +108,7 @@ class _AnimatedBackgroundState extends State<AnimatedBackground> with TickerProv
           const Color(0xFF000046),
           const Color(0xFF1A2980),
         ];
-        
+
       case 'store':
       case 'shop':
         // STORE: Violet, Orange, Magenta, Deep Purple
@@ -122,7 +118,7 @@ class _AnimatedBackgroundState extends State<AnimatedBackground> with TickerProv
           const Color(0xFFD4145A),
           const Color(0xFF662D8C),
         ];
-        
+
       case 'single_page':
         // 🌟 THE WILDCARD BACKGROUND: Official Security Paper
         // A blend of warm parchment, pale gold foil, and ice-blue security ink.
@@ -151,12 +147,11 @@ class _AnimatedBackgroundState extends State<AnimatedBackground> with TickerProv
     return AnimatedBuilder(
       animation: Listenable.merge([_motionController, _transitionController]),
       builder: (context, child) {
-        
         // 🌊 LIQUID MOTION LOGIC
         // Instead of rotating, we move the start/end points in independent sine waves.
         // This causes the gradient to "stretch" and "compress" like liquid.
         final double t = _motionController.value;
-        
+
         // Point A wanders top-left to top-center
         final Alignment beginAlign = Alignment(
           -1.0 + (0.5 * math.sin(t * math.pi)), // X: -1 to -0.5
@@ -172,9 +167,15 @@ class _AnimatedBackgroundState extends State<AnimatedBackground> with TickerProv
         // 🎨 COLOR BLENDING
         List<Color> gradientColors = [];
         for (int i = 0; i < 4; i++) {
-          Color start = _previousColors.length > i ? _previousColors[i] : Colors.black;
-          Color end = _targetColors.length > i ? _targetColors[i] : Colors.black;
-          gradientColors.add(Color.lerp(start, end, _transitionController.value) ?? end);
+          Color start = _previousColors.length > i
+              ? _previousColors[i]
+              : Colors.black;
+          Color end = _targetColors.length > i
+              ? _targetColors[i]
+              : Colors.black;
+          gradientColors.add(
+            Color.lerp(start, end, _transitionController.value) ?? end,
+          );
         }
 
         return Container(
@@ -184,7 +185,7 @@ class _AnimatedBackgroundState extends State<AnimatedBackground> with TickerProv
               begin: beginAlign,
               end: endAlign,
               // Stops create "harder" edges that make movement more visible
-              stops: const [0.0, 0.3, 0.7, 1.0], 
+              stops: const [0.0, 0.3, 0.7, 1.0],
             ),
           ),
           child: widget.child,

@@ -33,11 +33,12 @@ class _PassportCollectionScreenState extends State<PassportCollectionScreen> {
   bool _isLoading = true;
   String _currentSku = 'store';
   int _currentIndex = 0;
-  bool _hideStatusPill = false; 
+  bool _hideStatusPill = false;
   bool _triggerDetailOpen = false; // 👈 ADD THIS STATE VARIABLE
   // 📨 HANDOFF STATE
   Restaurant? _pendingStampRestaurant;
-  Restaurant? _activeStampRestaurant; // 👈 NEW: A mutable copy of the payload we can destroy
+  Restaurant?
+  _activeStampRestaurant; // 👈 NEW: A mutable copy of the payload we can destroy
   final GlobalKey _wildcardKey = GlobalKey(); // 👈 ADD THIS KEY
 
   @override
@@ -56,7 +57,7 @@ class _PassportCollectionScreenState extends State<PassportCollectionScreen> {
   Future<void> _checkAndShowTutorial() async {
     final prefs = await SharedPreferences.getInstance();
     final String? stage = prefs.getString('tutorial_stage');
-    
+
     if (stage == 'collection_screen') {
       // ❌ No more blind timers here! Just execute immediately.
       if (mounted) _showCollectionTutorial();
@@ -77,7 +78,8 @@ class _PassportCollectionScreenState extends State<PassportCollectionScreen> {
             TargetContent(
               align: ContentAlign.custom, // 👈 BYPASS DEFAULT ALIGNMENT
               customPosition: CustomTargetContentPosition(
-                top: size.height * 0.15, // 👈 Lock it 15% down from the top edge
+                top:
+                    size.height * 0.15, // 👈 Lock it 15% down from the top edge
               ),
               builder: (context, controller) => Container(
                 // 👈 Add a dark backing so it's readable floating OVER the card
@@ -91,14 +93,48 @@ class _PassportCollectionScreenState extends State<PassportCollectionScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text("THE WILDCARD", style: TextStyle(fontFamily: 'AppleGaramond', fontWeight: FontWeight.bold, color: Colors.white, fontSize: 26, letterSpacing: 1.5)),
+                    const Text(
+                      "THE WILDCARD",
+                      style: TextStyle(
+                        fontFamily: 'AppleGaramond',
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        fontSize: 26,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
                     const SizedBox(height: 12),
-                    const Text("This is your default travel document. It can hold up to 4 stamps from any cuisine.\n\nTap NEXT, then tap the passport to open it.", style: TextStyle(color: Colors.white70, fontSize: 16, height: 1.4, fontWeight: FontWeight.w500)),
+                    const Text(
+                      "This is your default travel document. It can hold up to 4 stamps from any cuisine.\n\nTap NEXT, then tap the passport to open it.",
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 16,
+                        height: 1.4,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                     const SizedBox(height: 24),
                     ElevatedButton(
-                      onPressed: () => controller.next(), 
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999))),
-                      child: const Text("NEXT", style: TextStyle(fontFamily: 'Courier', fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+                      onPressed: () => controller.next(),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                      child: const Text(
+                        "NEXT",
+                        style: TextStyle(
+                          fontFamily: 'Courier',
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -114,7 +150,7 @@ class _PassportCollectionScreenState extends State<PassportCollectionScreen> {
       onFinish: () {
         SharedPreferences.getInstance().then((prefs) {
           prefs.setString('tutorial_stage', 'detail_screen');
-          setState(() => _triggerDetailOpen = true); 
+          setState(() => _triggerDetailOpen = true);
         });
       },
     ).show(context: context);
@@ -170,10 +206,10 @@ class _PassportCollectionScreenState extends State<PassportCollectionScreen> {
           }
           // Only reset controller if we are NOT preserving the page (or it's the first load)
           if (!preservePage || _isLoading) {
-             _pageController = PageController(
-               initialPage: targetIndex,
-               viewportFraction: 1.0,
-             );
+            _pageController = PageController(
+              initialPage: targetIndex,
+              viewportFraction: 1.0,
+            );
           }
         });
       }
@@ -209,8 +245,9 @@ class _PassportCollectionScreenState extends State<PassportCollectionScreen> {
   }
 
   void _updateSystemUI(String sku) {
-    bool isLightBg = (sku == 'free_tier' || sku == 'single_visa' || sku == 'one_time_pass');
-    
+    bool isLightBg =
+        (sku == 'free_tier' || sku == 'single_visa' || sku == 'one_time_pass');
+
     SystemChrome.setSystemUIOverlayStyle(
       isLightBg ? SystemUiOverlayStyle.dark : SystemUiOverlayStyle.light,
     );
@@ -303,7 +340,7 @@ class _PassportCollectionScreenState extends State<PassportCollectionScreen> {
     required Color color,
     required IconData icon,
     Color textColor = Colors.white,
-    VoidCallback? onTap, 
+    VoidCallback? onTap,
   }) {
     final bool isInteractive = onTap != null;
 
@@ -321,13 +358,18 @@ class _PassportCollectionScreenState extends State<PassportCollectionScreen> {
               onTap: onTap,
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 400),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: color,
                   borderRadius: BorderRadius.circular(30),
                   boxShadow: [
                     BoxShadow(
-                      color: isInteractive ? Colors.black.withOpacity(0.3) : color.withOpacity(0.4),
+                      color: isInteractive
+                          ? Colors.black.withOpacity(0.3)
+                          : color.withOpacity(0.4),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -347,13 +389,17 @@ class _PassportCollectionScreenState extends State<PassportCollectionScreen> {
                         alignment: Alignment.center,
                         children: [
                           // Forces old fading widgets to not affect the layout bounds
-                          ...previousChildren.map((child) => Positioned(child: child)), 
+                          ...previousChildren.map(
+                            (child) => Positioned(child: child),
+                          ),
                           if (currentChild != null) currentChild,
                         ],
                       );
                     },
                     child: Row(
-                      key: ValueKey(text), // 👈 Triggers the animation when text changes
+                      key: ValueKey(
+                        text,
+                      ), // 👈 Triggers the animation when text changes
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(icon, size: 18, color: textColor),
@@ -383,22 +429,22 @@ class _PassportCollectionScreenState extends State<PassportCollectionScreen> {
     // 1. ⚡️ ACTIVATE THE TARGET BOOK LEGALLY
     // ✂️ REMOVED: setState(() => _isLoading = true); -> This caused the black screen glitch!
     await PassportService.activateBook(bookId);
-    
-    // 2. 🔄 REFRESH LIBRARY 
+
+    // 2. 🔄 REFRESH LIBRARY
     // Pass preservePage: true so the UI stays rock solid while data loads
-    await _loadLibrary(preservePage: true); 
-    
+    await _loadLibrary(preservePage: true);
+
     // 3. 🎬 FLIP THE PAGE
     final index = _library.indexWhere((b) => b['id'] == bookId);
     if (index != -1) {
       if (stampPayload != null) {
-         _pendingStampRestaurant = stampPayload;
+        _pendingStampRestaurant = stampPayload;
       }
 
       _pageController.animateToPage(
-        index + 1, 
-        duration: const Duration(milliseconds: 600), 
-        curve: Curves.easeInOutQuart
+        index + 1,
+        duration: const Duration(milliseconds: 600),
+        curve: Curves.easeInOutQuart,
       );
     }
   }
@@ -406,7 +452,7 @@ class _PassportCollectionScreenState extends State<PassportCollectionScreen> {
   Future<void> _checkAndShowTravelerNote() async {
     final prefs = await SharedPreferences.getInstance();
     final String? stage = prefs.getString('tutorial_stage');
-    
+
     // 🛑 SUPPRESS MANIFESTO DURING THE TOUR
     if (stage == 'collection_screen') return;
     // Default to true so it shows the first time
@@ -425,7 +471,9 @@ class _PassportCollectionScreenState extends State<PassportCollectionScreen> {
           builder: (context, setDialogState) {
             return Dialog(
               backgroundColor: const Color(0xFF1A1A1A), // Very dark grey
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 400),
                 child: Padding(
@@ -437,11 +485,15 @@ class _PassportCollectionScreenState extends State<PassportCollectionScreen> {
                       Align(
                         alignment: Alignment.topLeft,
                         child: IconButton(
-                          icon: const Icon(Icons.close, color: Color(0xFFF5F5F5), size: 24),
+                          icon: const Icon(
+                            Icons.close,
+                            color: Color(0xFFF5F5F5),
+                            size: 24,
+                          ),
                           onPressed: () => Navigator.pop(context),
                         ),
                       ),
-                      
+
                       Flexible(
                         child: SingleChildScrollView(
                           padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -474,10 +526,12 @@ class _PassportCollectionScreenState extends State<PassportCollectionScreen> {
                                 ),
                               ),
                               const SizedBox(height: 28),
-                              
+
                               // ✅ "DO NOT SHOW AGAIN" CHECKBOX
                               GestureDetector(
-                                onTap: () => setDialogState(() => doNotShowAgain = !doNotShowAgain),
+                                onTap: () => setDialogState(
+                                  () => doNotShowAgain = !doNotShowAgain,
+                                ),
                                 child: Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
@@ -485,15 +539,20 @@ class _PassportCollectionScreenState extends State<PassportCollectionScreen> {
                                       value: doNotShowAgain,
                                       activeColor: Colors.white,
                                       checkColor: Colors.black,
-                                      side: const BorderSide(color: Colors.white54),
-                                      onChanged: (val) => setDialogState(() => doNotShowAgain = val!),
+                                      side: const BorderSide(
+                                        color: Colors.white54,
+                                      ),
+                                      onChanged: (val) => setDialogState(
+                                        () => doNotShowAgain = val!,
+                                      ),
                                     ),
                                     const Text(
                                       "Do not show again",
                                       style: TextStyle(
-                                        color: Colors.white70, 
-                                        fontSize: 13, 
-                                        fontFamily: 'SFPro' // Using the utility font for the control
+                                        color: Colors.white70,
+                                        fontSize: 13,
+                                        fontFamily:
+                                            'SFPro', // Using the utility font for the control
                                       ),
                                     ),
                                   ],
@@ -524,10 +583,11 @@ class _PassportCollectionScreenState extends State<PassportCollectionScreen> {
     );
     // 🛡️ SAFE SYSTEM UI UPDATE
     // We move this calculation to be 100% safe against nulls
-    bool isLightBg = _currentSku == 'free_tier' || 
-                     _currentSku == 'single_visa' || 
-                     _currentSku == 'single_page'; 
-                     
+    bool isLightBg =
+        _currentSku == 'free_tier' ||
+        _currentSku == 'single_visa' ||
+        _currentSku == 'single_page';
+
     if (_currentSku == 'store') {
       isLightBg = false; // Store is Dark Mode (Dark Blue bg)
     }
@@ -541,14 +601,16 @@ class _PassportCollectionScreenState extends State<PassportCollectionScreen> {
       // 🛡️ Use a color so you know it's loading, not crashed
       return const Scaffold(
         backgroundColor: Color(0xFF111111),
-        body: Center(child: CupertinoActivityIndicator(color: Colors.white, radius: 16)),
+        body: Center(
+          child: CupertinoActivityIndicator(color: Colors.white, radius: 16),
+        ),
       );
     }
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: isLightBg ? SystemUiOverlayStyle.dark : SystemUiOverlayStyle.light,
-        child: Scaffold(
-          backgroundColor: Colors.transparent,
-          body: Stack(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Stack(
           children: [
             // 1. THE MOVING ATMOSPHERE
             Positioned.fill(
@@ -579,27 +641,36 @@ class _PassportCollectionScreenState extends State<PassportCollectionScreen> {
                   // 1. CALCULATE HANDOFF
                   // We check if we have a pending stamp AND if this specific book instance
                   // matches the currently visible book (based on _currentIndex).
-                  final bool isTargetBook = _pendingStampRestaurant != null &&
-                                            (_currentIndex - 1 >= 0 && _currentIndex - 1 < _library.length) &&
-                                            book['id'] == _library[_currentIndex - 1]['id'];
+                  final bool isTargetBook =
+                      _pendingStampRestaurant != null &&
+                      (_currentIndex - 1 >= 0 &&
+                          _currentIndex - 1 < _library.length) &&
+                      book['id'] == _library[_currentIndex - 1]['id'];
 
                   return Padding(
-                    // ❌ REMOVE the key from the Padding widget: key: bookIndex == (_currentIndex - 1) ? _wildcardKey : null, 
+                    // ❌ REMOVE the key from the Padding widget: key: bookIndex == (_currentIndex - 1) ? _wildcardKey : null,
                     padding: const EdgeInsets.only(top: 45),
                     child: PassportStackScreen(
                       key: ValueKey(book['id']),
                       bookId: book['id'],
                       skuType: book['sku_type'] ?? 'free_tier',
                       isReadOnly: book['status'] != 'active',
-                      triggerOpenDetail: bookIndex == (_currentIndex - 1) ? _triggerDetailOpen : false,
-                      onDetailOpened: () => setState(() => _triggerDetailOpen = false),
-                      incomingRestaurant: (bookIndex == (_currentIndex - 1)) ? _activeStampRestaurant : null,
-                      autoTriggerRestaurant: isTargetBook ? _pendingStampRestaurant : null,
+                      triggerOpenDetail: bookIndex == (_currentIndex - 1)
+                          ? _triggerDetailOpen
+                          : false,
+                      onDetailOpened: () =>
+                          setState(() => _triggerDetailOpen = false),
+                      incomingRestaurant: (bookIndex == (_currentIndex - 1))
+                          ? _activeStampRestaurant
+                          : null,
+                      autoTriggerRestaurant: isTargetBook
+                          ? _pendingStampRestaurant
+                          : null,
                       onAutoTriggerComplete: () {
                         _pendingStampRestaurant = null;
                       },
                       onStampComplete: () {
-                        _activeStampRestaurant = null; 
+                        _activeStampRestaurant = null;
                         _loadLibrary(preservePage: true);
                       },
                       onButtonVisibilityChanged: (isVisible) {
@@ -608,13 +679,20 @@ class _PassportCollectionScreenState extends State<PassportCollectionScreen> {
                         }
                       },
                       onRequestBookSwitch: (targetId) {
-                        _activeStampRestaurant = null; 
-                        _switchToBook(targetId, stampPayload: widget.incomingRestaurant);
+                        _activeStampRestaurant = null;
+                        _switchToBook(
+                          targetId,
+                          stampPayload: widget.incomingRestaurant,
+                        );
                       },
-                      
+
                       // 👇 ADD THESE TWO NEW LINES 👇
-                      tutorialKey: bookIndex == (_currentIndex - 1) ? _wildcardKey : null,
-                      onReady: bookIndex == (_currentIndex - 1) ? _checkAndShowTutorial : null,
+                      tutorialKey: bookIndex == (_currentIndex - 1)
+                          ? _wildcardKey
+                          : null,
+                      onReady: bookIndex == (_currentIndex - 1)
+                          ? _checkAndShowTutorial
+                          : null,
                     ),
                   );
                 },

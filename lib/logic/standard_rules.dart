@@ -2,13 +2,17 @@ import 'passport_rules.dart';
 
 class StandardRules implements PassportRules {
   @override
-  String? validateStampAttempt(Map<String, dynamic> book, String targetCuisine) {
+  String? validateStampAttempt(
+    Map<String, dynamic> book,
+    String targetCuisine,
+  ) {
     final int maxCapacity = book['max_pages'] ?? 6; // Default to Standard size
     final List visas = book['visas'] ?? [];
 
     // Rule 1: Do we already have a page for this country?
     for (var visa in visas) {
-      if (visa['cuisine'].toString().toLowerCase() == targetCuisine.toLowerCase()) {
+      if (visa['cuisine'].toString().toLowerCase() ==
+          targetCuisine.toLowerCase()) {
         return null; // ✅ ALLOW: "Stamp Page 3 (Italian)."
       }
     }
@@ -18,7 +22,7 @@ class StandardRules implements PassportRules {
     if (visas.length < (maxCapacity - 1)) {
       return null; // ✅ ALLOW
     }
-    
+
     // Rule 3: No room.
     return 'violation_full'; // 🛑 BLOCK: "Book is full."
   }
@@ -29,7 +33,8 @@ class StandardRules implements PassportRules {
 
     // A. Look for existing page
     for (int i = 0; i < visas.length; i++) {
-      if (visas[i]['cuisine'].toString().toLowerCase() == targetCuisine.toLowerCase()) {
+      if (visas[i]['cuisine'].toString().toLowerCase() ==
+          targetCuisine.toLowerCase()) {
         return i + 1; // Return existing index (1-based)
       }
     }
@@ -42,10 +47,11 @@ class StandardRules implements PassportRules {
   @override
   bool requiresNewVisaRow(Map<String, dynamic> book, String targetCuisine) {
     final List visas = book['visas'] ?? [];
-    
+
     // Scan logic: If cuisine exists, we DON'T need a row. If it's new, we DO.
     for (var visa in visas) {
-      if (visa['cuisine'].toString().toLowerCase() == targetCuisine.toLowerCase()) {
+      if (visa['cuisine'].toString().toLowerCase() ==
+          targetCuisine.toLowerCase()) {
         return false;
       }
     }
