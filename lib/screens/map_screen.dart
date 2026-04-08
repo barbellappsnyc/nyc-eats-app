@@ -26,9 +26,8 @@ import 'passport_collection_screen.dart';
 import '../services/passport_service.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
-import 'package:flutter/services.dart'; // Required for HapticFeedback
+// Required for HapticFeedback
 import '../widgets/map_filter_bar.dart';
 import '../widgets/concierge_overlay.dart'; // Add this near the top
 import 'dart:math' as math;
@@ -44,7 +43,7 @@ class _MapScreenState extends State<MapScreen>
     with TickerProviderStateMixin, WidgetsBindingObserver {
   MapboxMap? _mapboxController;
 
-  bool _isJumpingToLocation = false;
+  final bool _isJumpingToLocation = false;
   bool _isBuildingVault = false;
   bool _isExecutingBoot = false; // 🌟 THE BOOT LOCKOUT
   bool _hasPerformedInitialCameraFly = false;
@@ -302,10 +301,11 @@ class _MapScreenState extends State<MapScreen>
 
   Future<void> _checkLocationOnResume() async {
     bool serviceEnabled = await geo.Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled && mounted && myLocation == null)
+    if (!serviceEnabled && mounted && myLocation == null) {
       _showLocationDialog();
-    else
+    } else {
       _checkPermissionAndListen();
+    }
   }
 
   Future<void> _initLocationService() async {
@@ -650,9 +650,9 @@ class _MapScreenState extends State<MapScreen>
   }
 
   void _recenterMap() {
-    if (myLocation != null)
+    if (myLocation != null) {
       _animatedMapMove(myLocation!, 15.0);
-    else {
+    } else {
       _animatedMapMove(const LatLng(40.735, -73.99), 13.0);
       _showLocationDialog();
     }
@@ -673,11 +673,12 @@ class _MapScreenState extends State<MapScreen>
   void _startTextAnimation() {
     _textTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
       if (selectedCategory == null && selectedRestaurantName == null) {
-        if (mounted)
+        if (mounted) {
           setState(
             () => _currentPhraseIndex =
                 (_currentPhraseIndex + 1) % _searchPhrases.length,
           );
+        }
       }
     });
   }
@@ -1977,12 +1978,12 @@ class _MapScreenState extends State<MapScreen>
         // Funnel through our strict hierarchy
         for (String layerId in layerPriority) {
           final match = features.firstWhere(
-            (f) => f?.layers?.contains(layerId) == true,
+            (f) => f?.layers.contains(layerId) == true,
             orElse: () => null,
           );
 
           if (match != null) {
-            final rawFeature = match.queriedFeature?.feature as Map?;
+            final rawFeature = match.queriedFeature.feature as Map?;
             if (rawFeature != null) {
               final featureMap = Map<String, dynamic>.from(rawFeature);
 
@@ -2031,7 +2032,7 @@ class _MapScreenState extends State<MapScreen>
               final extensionValue = await _mapboxController!
                   .getGeoJsonClusterLeaves(
                     sourceToQuery,
-                    selectedRawFeature!,
+                    selectedRawFeature,
                     50,
                     0,
                   );
@@ -2200,9 +2201,9 @@ class _MapScreenState extends State<MapScreen>
         leaves = decoded['features'] as List<dynamic>;
       } else if (decoded is Map && decoded.containsKey('value')) {
         final inner = decoded['value'];
-        if (inner is List)
+        if (inner is List) {
           leaves = inner;
-        else if (inner is Map && inner.containsKey('features'))
+        } else if (inner is Map && inner.containsKey('features'))
           leaves = inner['features'];
       }
     } catch (e) {
@@ -2302,9 +2303,9 @@ class _MapScreenState extends State<MapScreen>
                       final isBib =
                           r['bib_gourmand']?.toString().toLowerCase() == 'true';
                       Color ringColor = Colors.transparent;
-                      if (stars > 0)
+                      if (stars > 0) {
                         ringColor = const Color(0xFFFFD700); // Gold
-                      else if (isBib)
+                      } else if (isBib)
                         ringColor = Colors.redAccent;
 
                       return ListTile(
@@ -2390,8 +2391,9 @@ class _MapScreenState extends State<MapScreen>
 
     // Helper to clear map if a filter combination returns zero results
     Future<void> injectEmptySearch() async {
-      if (mounted)
+      if (mounted) {
         setState(() => _showNoResultsOverlay = true); // 🌟 SHOW THE OVERLAY
+      }
       await _mapboxController?.style.setStyleSourceProperty(
         "search-source",
         "data",
@@ -2573,14 +2575,18 @@ class _MapScreenState extends State<MapScreen>
 
       if (_selectedMichelin.isNotEmpty) {
         List<String> orConditions = [];
-        if (_selectedMichelin.contains("Bib Gourmand"))
+        if (_selectedMichelin.contains("Bib Gourmand")) {
           orConditions.add('bib_gourmand.eq.true');
-        if (_selectedMichelin.contains("1 Star"))
+        }
+        if (_selectedMichelin.contains("1 Star")) {
           orConditions.add('michelin_stars.eq.1');
-        if (_selectedMichelin.contains("2 Stars"))
+        }
+        if (_selectedMichelin.contains("2 Stars")) {
           orConditions.add('michelin_stars.eq.2');
-        if (_selectedMichelin.contains("3 Stars"))
+        }
+        if (_selectedMichelin.contains("3 Stars")) {
           orConditions.add('michelin_stars.eq.3');
+        }
 
         if (orConditions.isNotEmpty) {
           query = query.or(orConditions.join(','));
@@ -2593,8 +2599,9 @@ class _MapScreenState extends State<MapScreen>
           const Duration(hours: 4),
         );
         _restaurantHours.forEach((id, hoursString) {
-          if (OSMTimeParser.isOpen(hoursString, nycTime))
+          if (OSMTimeParser.isOpen(hoursString, nycTime)) {
             openIds.add(int.parse(id));
+          }
         });
 
         if (openIds.length > 400) openIds = openIds.sublist(0, 400);
@@ -3885,9 +3892,9 @@ class OSMTimeParser {
           final d1 = days.indexOf(match.group(1)!);
           final d2 = days.indexOf(match.group(2)!);
           if (d1 != -1 && d2 != -1) {
-            if (d1 <= d2 && todayIdx >= d1 && todayIdx <= d2)
+            if (d1 <= d2 && todayIdx >= d1 && todayIdx <= d2) {
               matchesDay = true;
-            else if (d1 > d2 && (todayIdx >= d1 || todayIdx <= d2))
+            } else if (d1 > d2 && (todayIdx >= d1 || todayIdx <= d2))
               matchesDay = true; // Crosses Sunday
           }
         }

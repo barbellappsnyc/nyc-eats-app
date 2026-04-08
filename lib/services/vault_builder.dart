@@ -52,10 +52,11 @@ class VaultBuilder {
                 ); // 🌟 Increased to 15s to allow for real-world transit times
 
             allRows.addAll(response);
-            if (response.length < pageSize)
+            if (response.length < pageSize) {
               hasMore = false;
-            else
+            } else {
               offset += pageSize;
+            }
 
             chunkSuccess = true; // The fetch succeeded, break the retry loop!
           } catch (e) {

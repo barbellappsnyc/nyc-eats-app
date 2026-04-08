@@ -187,10 +187,11 @@ class _StampPainter extends CustomPainter {
           final double theta = (i * pi / 4) - (pi / 8); // Rotate to flat top
           final double x = cx + radius * cos(theta);
           final double y = cy + radius * sin(theta);
-          if (i == 0)
+          if (i == 0) {
             path.moveTo(x, y);
-          else
+          } else {
             path.lineTo(x, y);
+          }
         }
         path.close();
         break;

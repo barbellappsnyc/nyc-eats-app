@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/cupertino.dart';
 import 'dart:ui';
-import 'package:flutter/scheduler.dart'; // 👈 Add this to the top of the file
+// 👈 Add this to the top of the file
 import 'dart:math';
 
 class MtaBackground extends StatefulWidget {
@@ -12,13 +11,13 @@ class MtaBackground extends StatefulWidget {
   final bool isDragging; // 👈 NEW
 
   const MtaBackground({
-    Key? key,
+    super.key,
     required this.stations,
     this.isDarkMode = true,
     this.passportPosition = Offset.zero,
     this.passportScale = 0.85,
     this.isDragging = false, // 👈 NEW
-  }) : super(key: key);
+  });
 
   @override
   State<MtaBackground> createState() => _MtaBackgroundState();
@@ -26,7 +25,7 @@ class MtaBackground extends StatefulWidget {
 
 // 👇 REMOVED: with SingleTickerProviderStateMixin
 class _MtaBackgroundState extends State<MtaBackground> {
-  List<BlobNode> _blobs = [];
+  final List<BlobNode> _blobs = [];
   bool _isInitialized = false;
   Size _screenSize = Size.zero;
 
@@ -62,8 +61,9 @@ class _MtaBackgroundState extends State<MtaBackground> {
     // IMPORTANT BUG FIX: Also check if the passport scale/position changed!
     if (_isInitialized &&
         _screenSize.width == width &&
-        _blobs.length == stations.length)
+        _blobs.length == stations.length) {
       return;
+    }
     _screenSize = Size(width, height);
     _blobs.clear();
 
@@ -123,7 +123,7 @@ class _MtaBackgroundState extends State<MtaBackground> {
     } else if (count == 3) {
       bW = width * 0.28;
       double spacing = (width - (bW * 3)) / 4;
-      for (int i = 0; i < 3; i++)
+      for (int i = 0; i < 3; i++) {
         _blobs.add(
           BlobNode(
             x: spacing + (i * (bW + spacing)),
@@ -132,6 +132,7 @@ class _MtaBackgroundState extends State<MtaBackground> {
             height: bH,
           ),
         );
+      }
     } else {
       bW = width * 0.44;
       _blobs.add(

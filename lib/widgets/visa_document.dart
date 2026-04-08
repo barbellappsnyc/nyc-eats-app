@@ -298,7 +298,7 @@ class VisaDocument extends StatelessWidget {
                               ),
                             ),
                             child: hasPhoto
-                                ? (photo!.startsWith('/')
+                                ? (photo.startsWith('/')
                                       ? Image.file(
                                           File(photo),
                                           fit: BoxFit.cover,

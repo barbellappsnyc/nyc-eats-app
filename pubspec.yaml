@@ -64,6 +64,7 @@ dependencies:
   fluster: ^1.2.0
   mapbox_maps_flutter: ^2.20.0 # Check for latest version
 
+  intl: any
 dev_dependencies:
   flutter_test:
     sdk: flutter

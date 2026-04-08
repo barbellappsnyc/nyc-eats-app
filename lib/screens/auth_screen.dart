@@ -936,7 +936,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                       )
                                     : DropdownButtonFormField<String>(
                                         isExpanded: true,
-                                        value:
+                                        initialValue:
                                             ['M', 'F'].contains(_selectedGender)
                                             ? _selectedGender
                                             : 'CUSTOM',

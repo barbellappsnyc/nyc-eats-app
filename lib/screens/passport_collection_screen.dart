@@ -1,4 +1,3 @@
-import 'dart:ui';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -8,7 +7,7 @@ import '../services/passport_service.dart';
 import 'passport_stack_screen.dart';
 import '../models/restaurant.dart';
 import '../widgets/animated_background.dart';
-import 'package:supabase_flutter/supabase_flutter.dart'; // 👈 To check auth status
+// 👈 To check auth status
 import 'paywall_screen.dart'; // 👈 To go to shop
 import 'package:tutorial_coach_mark/tutorial_coach_mark.dart'; // 👈 ADD THIS
 
@@ -633,8 +632,9 @@ class _PassportCollectionScreenState extends State<PassportCollectionScreen> {
 
                   // 2. SAFETY CHECK: Accessing library
                   final bookIndex = index - 1;
-                  if (bookIndex < 0 || bookIndex >= _library.length)
+                  if (bookIndex < 0 || bookIndex >= _library.length) {
                     return const SizedBox();
+                  }
 
                   final book = _library[bookIndex];
 

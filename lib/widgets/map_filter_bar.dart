@@ -165,7 +165,7 @@ class _MapFilterBarState extends State<MapFilterBar> {
   }
 
   Widget _buildSheetLabel(String option, bool isDark) {
-    if (option.contains('\$'))
+    if (option.contains('\$')) {
       return Text(
         option,
         style: TextStyle(
@@ -173,6 +173,7 @@ class _MapFilterBarState extends State<MapFilterBar> {
           fontWeight: FontWeight.w500,
         ),
       );
+    }
     if (option == "Bib Gourmand") {
       return Row(
         children: [
@@ -209,10 +210,11 @@ class _MapFilterBarState extends State<MapFilterBar> {
 
   Widget _buildMichelinLabelContent() {
     if (widget.selectedMichelin.isEmpty) return const Text("Michelin");
-    if (widget.selectedMichelin.length > 1)
+    if (widget.selectedMichelin.length > 1) {
       return Text("${widget.selectedMichelin.length} Selected");
+    }
     String selection = widget.selectedMichelin.first;
-    if (selection == "Bib Gourmand")
+    if (selection == "Bib Gourmand") {
       return Row(
         children: [
           const Icon(Icons.restaurant, color: Colors.red, size: 16),
@@ -226,6 +228,7 @@ class _MapFilterBarState extends State<MapFilterBar> {
           ),
         ],
       );
+    }
     int count = selection.contains("1")
         ? 1
         : selection.contains("2")

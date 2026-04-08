@@ -11,7 +11,7 @@ import 'auth_screen.dart';
 import 'package:path_provider/path_provider.dart';
 import '../screens/map_screen.dart'; // Adjust path if needed
 import 'dart:ui'; // 👈 Essential for BackdropFilter blur
-import 'package:flutter/services.dart'; // Just in case, keeping it safe
+// Just in case, keeping it safe
 // ... rest of your existing imports ...
 
 Future<bool?> openProfileScreen(
@@ -177,11 +177,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _onScroll() {
     if (_scrollController.offset > 40) {
-      if (_headerColor != Colors.black)
+      if (_headerColor != Colors.black) {
         setState(() => _headerColor = Colors.black);
+      }
     } else {
-      if (_headerColor != Colors.white)
+      if (_headerColor != Colors.white) {
         setState(() => _headerColor = Colors.white);
+      }
     }
   }
 
@@ -200,8 +202,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _imageFile = File(pickedFile.path);
       }
     } finally {
-      if (mounted)
+      if (mounted) {
         setState(() => _isPickingImage = false); // 🛑 Stop image spinner
+      }
     }
   }
 
@@ -325,10 +328,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     } catch (e) {
       debugPrint("Profile Save Error: $e");
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text("Error: $e")));
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -453,10 +457,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (e) {
       debugPrint("Delete Loop Error: $e");
       if (mounted) setState(() => _isLoading = false);
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text("Error deleting account: $e")));
+      }
     }
   }
 
@@ -685,7 +690,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                             ),
                                           )
                                         : DropdownButtonFormField<String>(
-                                            value:
+                                            initialValue:
                                                 [
                                                   'M',
                                                   'F',

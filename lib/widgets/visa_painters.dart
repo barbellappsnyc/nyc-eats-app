@@ -586,10 +586,11 @@ class UniversalGuillochePainter extends CustomPainter {
           i * step + rotation - (math.pi / 2); // -pi/2 to start at top
       final double x = cx + r * math.cos(currAngle);
       final double y = cy + r * math.sin(currAngle);
-      if (i == 0)
+      if (i == 0) {
         path.moveTo(x, y);
-      else
+      } else {
         path.lineTo(x, y);
+      }
     }
     path.close();
     canvas.drawPath(path, paint);
@@ -732,10 +733,11 @@ class BatchSymbolPainter extends CustomPainter {
       double angle = (i * 4 * math.pi) / 5;
       double x = cx + radius * math.sin(angle);
       double y = cy - radius * math.cos(angle);
-      if (i == 0)
+      if (i == 0) {
         path.moveTo(x, y);
-      else
+      } else {
         path.lineTo(x, y);
+      }
     }
     path.close();
     canvas.drawPath(path, paint);
@@ -754,10 +756,11 @@ class BatchSymbolPainter extends CustomPainter {
       double angle = (i * 2 * math.pi) / sides;
       double x = cx + radius * math.cos(angle);
       double y = cy + radius * math.sin(angle);
-      if (i == 0)
+      if (i == 0) {
         path.moveTo(x, y);
-      else
+      } else {
         path.lineTo(x, y);
+      }
     }
     path.close();
     canvas.drawPath(path, paint);

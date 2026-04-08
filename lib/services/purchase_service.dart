@@ -46,10 +46,11 @@ class PurchaseService {
           offerings.current!.availablePackages.isNotEmpty) {
         return offerings.current!.availablePackages;
       } else {
-        if (kDebugMode)
+        if (kDebugMode) {
           debugPrint(
             "⚠️ No offerings found. Check RevenueCat Dashboard setup.",
           );
+        }
         return [];
       }
     } on PlatformException catch (e) {
@@ -62,8 +63,9 @@ class PurchaseService {
   Future<bool> purchasePackage(Package package) async {
     try {
       await Purchases.purchasePackage(package);
-      if (kDebugMode)
+      if (kDebugMode) {
         debugPrint("✅ PURCHASE SUCCESS: ${package.storeProduct.identifier}");
+      }
       return true;
     } on PlatformException catch (e) {
       final errorCode = PurchasesErrorHelper.getErrorCode(e);

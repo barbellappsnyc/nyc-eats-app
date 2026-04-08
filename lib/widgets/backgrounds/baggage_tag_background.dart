@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 // Note: Adjust this import path to wherever your CuisineConstants is located!
 import 'package:nyc_eats/config/cuisine_constants.dart';

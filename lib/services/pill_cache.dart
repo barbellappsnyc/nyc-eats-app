@@ -30,9 +30,9 @@ class PillCache {
     String emoji = CuisineConstants.emojiPalettes[cuisine]?.first ?? "🍽️";
 
     Color ringColor;
-    if (ringType == "gold")
+    if (ringType == "gold") {
       ringColor = const Color(0xFFFFD700);
-    else if (ringType == "red")
+    } else if (ringType == "red")
       ringColor = const Color(0xFFE53935);
     else
       ringColor = isDarkMode
@@ -115,7 +115,7 @@ class PillCache {
         if (stars > 0)
           const TextSpan(
             text: "★",
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
               color: Colors.red,

@@ -10,7 +10,6 @@ import 'package:screenshot/screenshot.dart';
 import '../widgets/backgrounds/checkered_background.dart';
 
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:path_provider/path_provider.dart';
 import 'package:gal/gal.dart';
 import 'package:share_plus/share_plus.dart';
@@ -25,16 +24,21 @@ import 'package:image_picker/image_picker.dart';
 
 // 🗺️ FAST & FREE BOROUGH CALCULATOR
 String getBorough(double lat, double lng) {
-  if (lat > 40.70 && lat < 40.88 && lng > -74.02 && lng < -73.91)
+  if (lat > 40.70 && lat < 40.88 && lng > -74.02 && lng < -73.91) {
     return "MANHATTAN";
-  if (lat > 40.57 && lat < 40.74 && lng > -74.04 && lng < -73.85)
+  }
+  if (lat > 40.57 && lat < 40.74 && lng > -74.04 && lng < -73.85) {
     return "BROOKLYN";
-  if (lat > 40.69 && lat < 40.80 && lng > -73.96 && lng < -73.70)
+  }
+  if (lat > 40.69 && lat < 40.80 && lng > -73.96 && lng < -73.70) {
     return "QUEENS";
-  if (lat > 40.80 && lat < 40.92 && lng > -73.93 && lng < -73.78)
+  }
+  if (lat > 40.80 && lat < 40.92 && lng > -73.93 && lng < -73.78) {
     return "BRONX";
-  if (lat > 40.50 && lat < 40.65 && lng > -74.26 && lng < -74.05)
+  }
+  if (lat > 40.50 && lat < 40.65 && lng > -74.26 && lng < -74.05) {
     return "STATEN ISLAND";
+  }
   return "NEW YORK";
 }
 
@@ -89,8 +93,8 @@ class _PassportDetailScreenState extends State<PassportDetailScreen>
   bool _isLoadingStations = true;
 
   // 📸 PHOTOBOOTH MEMORY VARIABLES
-  List<String?> _savedPhotoPaths = [null, null, null, null];
-  List<int> _photoRotations = [0, 0, 0, 0];
+  final List<String?> _savedPhotoPaths = [null, null, null, null];
+  final List<int> _photoRotations = [0, 0, 0, 0];
   String _savedDateText = "";
 
   // 💌 POSTAGE STAMP MEMORY VARIABLES
@@ -222,7 +226,7 @@ class _PassportDetailScreenState extends State<PassportDetailScreen>
 
       final directory = await getApplicationDocumentsDirectory();
       final String fileName =
-          '${widget.heroTag}_slot$slotIndex\_${DateTime.now().millisecondsSinceEpoch}.png';
+          '${widget.heroTag}_slot${slotIndex}_${DateTime.now().millisecondsSinceEpoch}.png';
       final String permanentPath = '${directory.path}/$fileName';
 
       await File(image.path).copy(permanentPath);

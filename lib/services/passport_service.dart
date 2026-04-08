@@ -195,9 +195,7 @@ class PassportService {
   }
 
   static Future<void> updateLocalProfile(Map<String, dynamic> updates) async {
-    if (_profileCache == null) {
-      _profileCache = {};
-    }
+    _profileCache ??= {};
     _profileCache!.addAll(updates);
 
     // 1. Save standard cache
@@ -528,9 +526,9 @@ class PassportService {
           .toSet();
 
       int currentFillLevel = existingNames.length;
-      const int MAX_CAPACITY = 4;
+      const int maxCapacity = 4;
 
-      if (currentFillLevel >= MAX_CAPACITY) {
+      if (currentFillLevel >= maxCapacity) {
         await prefs.remove('guest_stamps');
         return;
       }
@@ -538,7 +536,7 @@ class PassportService {
       List<Map<String, dynamic>> rowsToInsert = [];
 
       for (var stamp in localStamps) {
-        if (currentFillLevel >= MAX_CAPACITY) break;
+        if (currentFillLevel >= maxCapacity) break;
 
         final String rName = stamp['restaurant_name'] ?? stamp['name'];
         if (existingNames.contains(rName)) continue;

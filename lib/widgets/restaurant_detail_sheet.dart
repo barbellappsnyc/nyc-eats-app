@@ -3,10 +3,8 @@ import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/restaurant.dart';
 import 'dart:io';
-import 'dart:ui';
 import 'package:flutter/cupertino.dart';
 import 'animated_cuisine_placeholder.dart';
-import '../screens/passport_stack_screen.dart';
 import '../screens/passport_collection_screen.dart'; // Make sure this is imported
 
 class RestaurantDetailSheet extends StatefulWidget {
@@ -35,7 +33,7 @@ class _RestaurantDetailSheetState extends State<RestaurantDetailSheet> {
   // 🌟 NEW: Scroll Controller & Visibility State
   final ScrollController _scrollController = ScrollController();
   bool _showScrollButton = false;
-  bool _isNavigatingToPassport = false;
+  final bool _isNavigatingToPassport = false;
 
   @override
   void initState() {
@@ -352,7 +350,7 @@ class _RestaurantDetailSheetState extends State<RestaurantDetailSheet> {
     }
 
     // Standard Amenities
-    if (r.cocktails)
+    if (r.cocktails) {
       amenities.add(
         _buildAmenityChip(
           "Cocktails",
@@ -361,7 +359,8 @@ class _RestaurantDetailSheetState extends State<RestaurantDetailSheet> {
           Colors.purple,
         ),
       );
-    if (r.reservations)
+    }
+    if (r.reservations) {
       amenities.add(
         _buildAmenityChip(
           "Reservations",
@@ -370,7 +369,8 @@ class _RestaurantDetailSheetState extends State<RestaurantDetailSheet> {
           Colors.blue,
         ),
       );
-    if (r.delivery)
+    }
+    if (r.delivery) {
       amenities.add(
         _buildAmenityChip(
           "Delivery",
@@ -379,7 +379,8 @@ class _RestaurantDetailSheetState extends State<RestaurantDetailSheet> {
           Colors.green,
         ),
       );
-    if (r.takeaway)
+    }
+    if (r.takeaway) {
       amenities.add(
         _buildAmenityChip(
           "Takeaway",
@@ -388,6 +389,7 @@ class _RestaurantDetailSheetState extends State<RestaurantDetailSheet> {
           Colors.orange,
         ),
       );
+    }
 
     return Container(
       constraints: BoxConstraints(

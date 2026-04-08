@@ -111,8 +111,8 @@ class _PassportStackScreenState extends State<PassportStackScreen>
 
   int _targetSlotIndex = 0;
   bool _duplicateApproved = false;
-  Offset _targetStampOffset = Offset.zero;
-  Size _targetSlotSize = Size.zero;
+  final Offset _targetStampOffset = Offset.zero;
+  final Size _targetSlotSize = Size.zero;
   bool _protocolRunning = false;
 
   bool _hasConsumedIncoming =
@@ -508,10 +508,11 @@ class _PassportStackScreenState extends State<PassportStackScreen>
 
     // 🛑 THE BOUNCER: Block auto-handoffs
     if (await _runImmigrationBouncer()) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _isLoading = false;
         });
+      }
       return;
     }
 
@@ -535,9 +536,9 @@ class _PassportStackScreenState extends State<PassportStackScreen>
           .select('target_cuisine')
           .ilike('raw_tag', primaryTag)
           .maybeSingle();
-      if (mappingResponse != null)
+      if (mappingResponse != null) {
         targetCuisine = mappingResponse['target_cuisine'];
-      else {
+      } else {
         final visaCheck = await Supabase.instance.client
             .from('visa_types')
             .select('cuisine')
@@ -816,8 +817,9 @@ class _PassportStackScreenState extends State<PassportStackScreen>
 
       while (_activeIndex < targetPageIndex) {
         await _programmaticPageFlip();
-        if (_activeIndex < targetPageIndex)
+        if (_activeIndex < targetPageIndex) {
           await Future.delayed(const Duration(milliseconds: 50));
+        }
       }
 
       // 3. EXECUTE
@@ -1424,8 +1426,9 @@ class _PassportStackScreenState extends State<PassportStackScreen>
 
     // 🛠 FIX 1: Enforce Capacity
     int filledPagesCount = 1 + userVisas.length;
-    if (_passportSku == 'single_page')
+    if (_passportSku == 'single_page') {
       filledPagesCount = 1; // Single Visa = 1 Page Max
+    }
 
     bool isAssigned = _activeIndex < filledPagesCount;
 
