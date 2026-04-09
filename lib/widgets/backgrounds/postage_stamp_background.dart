@@ -78,7 +78,7 @@ class _PostageStampBackgroundState extends State<PostageStampBackground> {
       const Color(0xFF1A2A42),
     ];
 
-    for (int i = 0; i < 70; i++) {
+    for (int i = 0; i < 150; i++) {
       final Color bgColor = stampColors[rnd.nextInt(stampColors.length)];
       final double slightRotation = (rnd.nextDouble() * 0.1) - 0.05;
 

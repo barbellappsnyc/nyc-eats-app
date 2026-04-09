@@ -1715,7 +1715,10 @@ class _JigglingThumbnailState extends State<JigglingThumbnail>
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
               image: DecorationImage(
-                image: FileImage(File(widget.imagePath)),
+                image: ResizeImage(
+                  FileImage(File(widget.imagePath)),
+                  width: 150, // 🌟 THE FIX: Downsamples the 48MP raw photo to a tiny thumbnail in RAM
+                ),
                 fit: BoxFit.cover,
               ),
               boxShadow: [

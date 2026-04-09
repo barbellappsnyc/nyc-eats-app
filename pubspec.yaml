@@ -92,8 +92,6 @@ flutter:
   assets:
     - assets/sounds/  # This dash has 4 spaces of indentation
     - assets/images/subway_blueprint.png
-    - assets/stamps/
-    - assets/animations/
     - assets/icon.png
     - .env
 

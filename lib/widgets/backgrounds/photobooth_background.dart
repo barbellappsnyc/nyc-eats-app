@@ -219,7 +219,11 @@ class PhotoStripCard extends StatelessWidget {
             if (path != null && !isLoading)
               RotatedBox(
                 quarterTurns: turns,
-                child: Image.file(File(path), fit: BoxFit.cover),
+                child: Image.file(
+                  File(path), 
+                  fit: BoxFit.cover,
+                  cacheWidth: 800, // 🌟 THE FIX: Downsamples the massive raw photo in RAM
+                ),
               ),
 
             // ➕ LAYER 2: THE EMPTY STATE ICON
