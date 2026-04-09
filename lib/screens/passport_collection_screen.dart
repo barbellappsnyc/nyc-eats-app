@@ -10,6 +10,9 @@ import '../widgets/animated_background.dart';
 // 👈 To check auth status
 import 'paywall_screen.dart'; // 👈 To go to shop
 import 'package:tutorial_coach_mark/tutorial_coach_mark.dart'; // 👈 ADD THIS
+import 'package:flutter/gestures.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../widgets/dialogs/traveler_note_dialog.dart';
 
 class PassportCollectionScreen extends StatefulWidget {
   final String? initialBookId;
@@ -454,125 +457,13 @@ class _PassportCollectionScreenState extends State<PassportCollectionScreen> {
 
     // 🛑 SUPPRESS MANIFESTO DURING THE TOUR
     if (stage == 'collection_screen') return;
-    // Default to true so it shows the first time
-    final bool showNote = prefs.getBool('show_traveler_note') ?? true;
-
-    if (!showNote) return;
-
-    bool doNotShowAgain = true; // Default state is ON as requested
 
     if (!mounted) return;
-    await showDialog(
-      context: context,
-      barrierDismissible: false, // Forces use of the 'X' button
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return Dialog(
-              backgroundColor: const Color(0xFF1A1A1A), // Very dark grey
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 400),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // ❌ TOP LEFT CROSS BUTTON
-                      Align(
-                        alignment: Alignment.topLeft,
-                        child: IconButton(
-                          icon: const Icon(
-                            Icons.close,
-                            color: Color(0xFFF5F5F5),
-                            size: 24,
-                          ),
-                          onPressed: () => Navigator.pop(context),
-                        ),
-                      ),
-
-                      Flexible(
-                        child: SingleChildScrollView(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          child: Column(
-                            children: [
-                              const Text(
-                                "A Note to the Travelers:",
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontFamily: 'AppleGaramond',
-                                  // fontStyle: FontStyle.italic,
-                                  fontSize: 26,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFFF5F5F5), // Off-white
-                                ),
-                              ),
-                              const SizedBox(height: 24),
-                              const Text(
-                                "        No subscriptions in this app. And no ads. I, too, am tired of apps charging \$4.99 a month until eternity to make the ads go away, or locking basic functionalities behind the infamous paywall. The core functionality of this app: exploring the 36,000+ restaurants across New York City will be free. I, personally, love New York City, and this is a service that I would like to do for the lovely people inhabiting it.\n\n"
-                                "        Collecting the visas and the immigration stamps for the restaurants will also be free, but will be limited to a maximum of 4 in the Wild Card Visa page. If the Travelers wish, they can purchase a new Passport, and they will own it forever. No hidden charges, no other BS. Just how a real passport would work (excluding, of course, the boring formalities). The visas and the stamps, too, are yours forever; a memoir of your explorations.\n\n"
-                                "        So, share your passport cards with the world and with us (tag us @nyceats.passports if you’d like!). Bon Appétit, and Happy Journey!\n\n"
-                                "        - With love,\n"
-                                "        Barbell Apps",
-                                style: TextStyle(
-                                  fontFamily: 'AppleGaramond',
-                                  fontStyle: FontStyle.italic,
-                                  fontSize: 24,
-                                  color: Color(0xFFE0E0E0),
-                                  height: 1.5,
-                                ),
-                              ),
-                              const SizedBox(height: 28),
-
-                              // ✅ "DO NOT SHOW AGAIN" CHECKBOX
-                              GestureDetector(
-                                onTap: () => setDialogState(
-                                  () => doNotShowAgain = !doNotShowAgain,
-                                ),
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Checkbox(
-                                      value: doNotShowAgain,
-                                      activeColor: Colors.white,
-                                      checkColor: Colors.black,
-                                      side: const BorderSide(
-                                        color: Colors.white54,
-                                      ),
-                                      onChanged: (val) => setDialogState(
-                                        () => doNotShowAgain = val!,
-                                      ),
-                                    ),
-                                    const Text(
-                                      "Do not show again",
-                                      style: TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: 13,
-                                        fontFamily:
-                                            'SFPro', // Using the utility font for the control
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      },
+    
+    await TravelerNoteDialog.showIfNeeded(
+      context,
+      onDismiss: () {}, // Since they are already on the collection screen, do nothing.
     );
-
-    // 💾 Save the preference: If they left it Checked (True), we set showNote to False.
-    await prefs.setBool('show_traveler_note', !doNotShowAgain);
   }
 
   @override
