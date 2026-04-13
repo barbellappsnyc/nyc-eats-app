@@ -34,6 +34,7 @@ import 'dart:math' as math;
 import 'package:flutter/gestures.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../widgets/dialogs/traveler_note_dialog.dart';
+import 'package:timezone/timezone.dart' as tz;
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -2481,9 +2482,8 @@ class _MapScreenState extends State<MapScreen>
 
       if (showOpenOnly) {
         List<int> openIds = [];
-        final nycTime = DateTime.now().toUtc().subtract(
-          const Duration(hours: 4),
-        );
+        final nyLocation = tz.getLocation('America/New_York');
+        final nycTime = tz.TZDateTime.now(nyLocation);
         _restaurantHours.forEach((id, hoursString) {
           if (OSMTimeParser.isOpen(hoursString, nycTime)) {
             openIds.add(int.parse(id));
@@ -2964,6 +2964,67 @@ class _MapScreenState extends State<MapScreen>
                       },
                     ),
 
+                    // 🌟 THE NEW ANCHORED FILTER BRIDGE
+                    if (_isFilteringMap)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 16.0), // 👈 Reasonable padding below the filter bar
+                        child: Center(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(30),
+                            child: BackdropFilter(
+                              filter: ui.ImageFilter.blur(
+                                sigmaX: 15.0,
+                                sigmaY: 15.0,
+                              ),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 24,
+                                  vertical: 14,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isDarkMode
+                                      ? Colors.black.withOpacity(0.75)
+                                      : Colors.white.withOpacity(0.9),
+                                  borderRadius: BorderRadius.circular(30),
+                                  border: Border.all(
+                                    color: isDarkMode
+                                        ? Colors.white30
+                                        : Colors.black12,
+                                    width: 1.5,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.15),
+                                      blurRadius: 15,
+                                      offset: const Offset(0, 6),
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const CupertinoActivityIndicator(radius: 12),
+                                    const SizedBox(width: 12),
+                                    Text(
+                                      "Updating Map...",
+                                      style: TextStyle(
+                                        color: isDarkMode
+                                            ? Colors.white
+                                            : Colors.black,
+                                        fontFamily: 'SFPro',
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
                     // 🌟 THE NO RESULTS OVERLAY (Moved inside the Column for dynamic responsive anchoring)
                     if (_showNoResultsOverlay && !_isFilteringMap)
                       Padding(
@@ -3294,73 +3355,6 @@ class _MapScreenState extends State<MapScreen>
                   ),
                 );
               },
-            ),
-
-          // 🌟 THE FILTER BRIDGE: A sleek, highly visible loading pill
-          if (_isFilteringMap)
-            Positioned(
-              top:
-                  160, // 🌟 Pushed down further to clear the horizontal filter bar
-              left: 0,
-              right: 0,
-              child: Center(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(
-                    30,
-                  ), // Flawless rounded edges
-                  child: BackdropFilter(
-                    filter: ui.ImageFilter.blur(
-                      sigmaX: 15.0,
-                      sigmaY: 15.0,
-                    ), // Heavier glass blur
-                    child: Container(
-                      // 🌟 Bigger padding for a larger pill footprint
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 14,
-                      ),
-                      decoration: BoxDecoration(
-                        // Slightly more opaque so it punches through the map background
-                        color: isDarkMode
-                            ? Colors.black.withOpacity(0.75)
-                            : Colors.white.withOpacity(0.9),
-                        borderRadius: BorderRadius.circular(30),
-                        border: Border.all(
-                          color: isDarkMode
-                              ? Colors.white30
-                              : Colors.black12, // Stronger border
-                          width: 1.5,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.15),
-                            blurRadius: 15,
-                            offset: const Offset(0, 6),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // 🌟 Bigger Apple-style spinner
-                          const CupertinoActivityIndicator(radius: 12),
-                          const SizedBox(width: 12),
-                          Text(
-                            "Updating Map...",
-                            style: TextStyle(
-                              color: isDarkMode ? Colors.white : Colors.black,
-                              fontFamily: 'SFPro',
-                              fontSize: 15, // 🌟 Larger text
-                              fontWeight: FontWeight.w700, // 🌟 Bolder text
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
             ),
 
           if (_isJumpingToLocation)
@@ -3752,64 +3746,150 @@ class _VaultLoadingOverlayState extends State<VaultLoadingOverlay>
 // 🕒 THE OPEN HOURS PARSER
 // =========================================================================
 class OSMTimeParser {
-  static bool isOpen(String hoursStr, DateTime now) {
-    if (hoursStr.contains('24/7')) return true;
+  static bool isOpen(String hoursStr, DateTime currentLocalTime) {
+    if (hoursStr.trim().isEmpty) return false;
+    
+    // 1. Sanitize the string: lowercase, remove quoted descriptors, and normalize spaces
+    String cleanStr = hoursStr.toLowerCase()
+        .replaceAll(RegExp(r'"[^"]*"'), '') 
+        .replaceAll(RegExp(r"\'[^\']*\'"), '') 
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
 
+    // 2. Quick Global Checks
+    if (cleanStr == '24/7' || cleanStr == 'open') return true;
+    if (cleanStr == 'closed' || cleanStr == 'off' || cleanStr.contains('temporarily closed')) return false;
+
+    // 3. Handle "||" fallback rules (e.g., "Bar" || "Food Hall")
+    final fallbackBlocks = cleanStr.split('||');
+    for (final block in fallbackBlocks) {
+      if (_evaluateBlock(block, currentLocalTime)) return true;
+    }
+    return false;
+  }
+
+  static bool _evaluateBlock(String blockStr, DateTime currentLocalTime) {
+    // Semicolons separate different day/time rules
+    final rules = blockStr.split(';');
+
+    // CORE LOGIC: We check today's rules AND yesterday's rules.
+    // If yesterday had a late night shift (e.g., 20:00 - 04:00) that bleeds into today, we stay open!
+    return _evaluateRuleSet(rules, currentLocalTime, 0) ||
+           _evaluateRuleSet(rules, currentLocalTime.subtract(const Duration(days: 1)), 1);
+  }
+
+  static bool _evaluateRuleSet(List<String> rules, DateTime referenceDay, int dayOffset) {
     final days = ['mo', 'tu', 'we', 'th', 'fr', 'sa', 'su'];
-    final todayIdx = now.weekday - 1;
-    final todayStr = days[todayIdx];
-    final currentMinutes = now.hour * 60 + now.minute;
+    final refIdx = referenceDay.weekday - 1;
+    final refStr = days[refIdx];
 
-    final lowerStr = hoursStr.toLowerCase();
-
-    // 1. Check if the string applies to today
-    final hasDays = RegExp(r'[a-z]{2}').hasMatch(lowerStr);
-    bool matchesDay = false;
-
-    if (!hasDays) {
-      matchesDay = true; // No days specified, assume everyday
+    // Calculate current minute of the day. If checking yesterday's rules, we add 24 hours to the clock.
+    int currentMinutes;
+    if (dayOffset == 0) {
+      currentMinutes = referenceDay.hour * 60 + referenceDay.minute;
     } else {
-      if (lowerStr.contains(todayStr)) {
-        matchesDay = true;
+      currentMinutes = (referenceDay.hour + 24) * 60 + referenceDay.minute;
+    }
+
+    bool explicitlyClosed = false;
+    bool explicitlyOpen = false;
+
+    for (var rule in rules) {
+      rule = rule.trim();
+      if (rule.isEmpty) continue;
+
+      // --- STEP 1: Day Matching ---
+      final hasDays = RegExp(r'\b(mo|tu|we|th|fr|sa|su)\b').hasMatch(rule);
+      bool appliesToDay = false;
+
+      if (!hasDays) {
+        // If no day is specified, it might be a specific holiday (e.g., "Dec 25 off").
+        // We skip date-specific un-day'd rules to avoid accidentally overriding the entire weekly schedule.
+        if (RegExp(r'\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|ph|easter)\b').hasMatch(rule)) {
+          continue;
+        }
+        appliesToDay = true; // No days + no month = global rule (e.g., "11:00-23:00")
       } else {
-        // Check ranges like "mo-fr" or "fr-su"
-        final rangeReg = RegExp(r'([a-z]{2})\s*-\s*([a-z]{2})');
-        for (final match in rangeReg.allMatches(lowerStr)) {
-          final d1 = days.indexOf(match.group(1)!);
-          final d2 = days.indexOf(match.group(2)!);
-          if (d1 != -1 && d2 != -1) {
-            if (d1 <= d2 && todayIdx >= d1 && todayIdx <= d2) {
-              matchesDay = true;
-            } else if (d1 > d2 && (todayIdx >= d1 || todayIdx <= d2))
-              matchesDay = true; // Crosses Sunday
+        // Single day match ("mo, we")
+        if (RegExp(r'\b' + refStr + r'\b').hasMatch(rule)) {
+          appliesToDay = true;
+        } else {
+          // Range match ("mo-fr", "sa-su", or wrap-around "su-tu")
+          final rangeReg = RegExp(r'\b(mo|tu|we|th|fr|sa|su)\s*-\s*(mo|tu|we|th|fr|sa|su)\b');
+          for (final match in rangeReg.allMatches(rule)) {
+            final startDay = days.indexOf(match.group(1)!);
+            final endDay = days.indexOf(match.group(2)!);
+            if (startDay != -1 && endDay != -1) {
+              if (startDay <= endDay && refIdx >= startDay && refIdx <= endDay) {
+                appliesToDay = true;
+              } else if (startDay > endDay && (refIdx >= startDay || refIdx <= endDay)) {
+                appliesToDay = true; // Wraps over weekend
+              }
+            }
           }
+        }
+      }
+
+      if (!appliesToDay) continue;
+
+      // --- STEP 2: Explicitly Closed Check ---
+      if (RegExp(r'\boff\b|\bclosed\b').hasMatch(rule)) {
+        explicitlyClosed = true;
+        explicitlyOpen = false; // Reset if this rule overrides a previous one
+        continue;
+      }
+
+      // --- STEP 3: Time Extraction ---
+      // Matches standard "10:00-23:00", wrapping "17:00-02:00", open-ended "06:00+"
+      final timeRangeReg = RegExp(r'(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})\+?');
+      final openEndedReg = RegExp(r'(\d{1,2}):(\d{2})\+');
+
+      final rangeMatches = timeRangeReg.allMatches(rule);
+      
+      if (rangeMatches.isNotEmpty) {
+        explicitlyClosed = false;
+        
+        for (final m in rangeMatches) {
+          final h1 = int.parse(m.group(1)!);
+          final m1 = int.parse(m.group(2)!);
+          final h2 = int.parse(m.group(3)!);
+          final m2 = int.parse(m.group(4)!);
+
+          final start = h1 * 60 + m1;
+          int end = h2 * 60 + m2;
+
+          // The Magic Bullet: Wrap past midnight (e.g., 17:00 - 02:00)
+          if (end <= start) end += 24 * 60; 
+          if (h2 == 24) end = 24 * 60; // Handle literal "24:00"
+
+          if (currentMinutes >= start && currentMinutes <= end) {
+            explicitlyOpen = true;
+          }
+        }
+      } else {
+        // Handle Open-Ended "06:00+"
+        final openEndedMatches = openEndedReg.allMatches(rule);
+        if (openEndedMatches.isNotEmpty) {
+          explicitlyClosed = false;
+          for (final m in openEndedMatches) {
+            final h1 = int.parse(m.group(1)!);
+            final m1 = int.parse(m.group(2)!);
+            final start = h1 * 60 + m1;
+            final end = 24 * 60; // Assume open for the rest of the current day
+            
+            if (currentMinutes >= start && currentMinutes <= end) explicitlyOpen = true;
+          }
+        } else if (hasDays && !explicitlyClosed) {
+          // Fallback: Day is listed but no time (e.g., "Mo 24/7")
+          if (rule.contains('24/7') || rule.contains('open')) explicitlyOpen = true;
         }
       }
     }
 
-    if (!matchesDay) return false;
+    // Yesterday Evaluation: Only true if a shift wrapped past midnight and covered our current time.
+    if (dayOffset == 1) return explicitlyOpen;
 
-    // 2. Extract times and check cross-midnight logic
-    final timeReg = RegExp(r'(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})');
-    final matches = timeReg.allMatches(lowerStr);
-
-    if (matches.isEmpty) return true; // Unparseable, default to open
-
-    for (final m in matches) {
-      final start = int.parse(m.group(1)!) * 60 + int.parse(m.group(2)!);
-      int end = int.parse(m.group(3)!) * 60 + int.parse(m.group(4)!);
-
-      if (end < start) end += 24 * 60; // Opens past midnight
-
-      int checkTime = currentMinutes;
-      if (currentMinutes < start &&
-          end > 24 * 60 &&
-          currentMinutes < (end - 24 * 60)) {
-        checkTime += 24 * 60; // Push current time to "tomorrow" context
-      }
-
-      if (checkTime >= start && checkTime <= end) return true;
-    }
-    return false;
+    // Today Evaluation
+    return explicitlyOpen;
   }
 }

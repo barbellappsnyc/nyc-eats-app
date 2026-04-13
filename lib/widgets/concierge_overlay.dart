@@ -273,16 +273,16 @@ class _ConciergeOverlayState extends State<ConciergeOverlay> {
                                       color: textColor,
                                     ),
                                   ),
+                                  // 👇 YOUR NEW, FRIENDLY COPY 👇
                                   content: Text(
-                                    "The Concierge scans a 1-mile radius for the best spots.\n\n"
-                                    "We rank them strictly by culinary merit: Michelin Stars first, then Bib Gourmands, and finally by price tier to bring you the highest quality options nearby.",
+                                    "Help us learn your tastes!\n\n"
+                                    "Tap ✅ if a spot looks good, or ❌ to pass. This helps the Concierge learn your vibe so we can suggest even better spots to you next time!",
                                     style: TextStyle(
                                       height: 1.4,
-                                      color: isDark
-                                          ? Colors.white70
-                                          : Colors.black87,
+                                      color: textColor,
                                     ),
                                   ),
+                                  // 👆 ---------------------- 👆
                                   actions: [
                                     TextButton(
                                       onPressed: () => Navigator.pop(context),

@@ -1,7 +1,7 @@
-
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:ui'; // 👈 ADD THIS IMPORT
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/passport_service.dart';
 import 'passport_stack_screen.dart';
@@ -466,6 +466,150 @@ class _PassportCollectionScreenState extends State<PassportCollectionScreen> {
     );
   }
 
+  // 🖼️ THE WILDCARD INFO MODAL
+  void _showWildcardInfoModal() {
+    HapticFeedback.lightImpact();
+
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: "Dismiss",
+      barrierColor: Colors.black.withOpacity(0.5),
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return Center(
+          child: Material(
+            color: Colors.transparent,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(32),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+                child: Container(
+                  width: MediaQuery.of(context).size.width * 0.85,
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF111111).withOpacity(0.65),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.15),
+                      width: 1,
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // 1. DISMISS BUTTON
+                      Align(
+                        alignment: Alignment.topRight,
+                        child: GestureDetector(
+                          onTap: () => Navigator.pop(context),
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.close,
+                              color: Colors.white70,
+                              size: 18,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // 2. THEMATIC ICON
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.05),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          CupertinoIcons.globe, // Matches "Global Visa" vibe
+                          size: 42,
+                          color: Colors.blueAccent,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // 3. TITLE
+                      const Text(
+                        "THE WILDCARD",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontFamily: 'AppleGaramond',
+                          color: Colors.white,
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 2.0,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // 4. MAIN DESCRIPTION
+                      const Text(
+                        "A complimentary global visa. On us.\n\nThis document can collect stamps from any restaurant or cuisine. Plus, the manual '+' stamp button inside is completely exclusive to this passport.",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 15,
+                          height: 1.5,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // 5. LOCAL STORAGE DISCLAIMER
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.white10),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: const [
+                            Icon(CupertinoIcons.cloud_upload, color: Colors.white54, size: 16),
+                            SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                "Your data is safely stored locally on your phone. Once you create an account and log in, your entire collection will automatically sync to the cloud.",
+                                style: TextStyle(
+                                  color: Colors.white54,
+                                  fontSize: 12,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+      // SLICK POP-IN ANIMATION
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        return FadeTransition(
+          opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.95, end: 1.0).animate(
+              CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
+            ),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     debugPrint(
@@ -625,7 +769,19 @@ class _PassportCollectionScreenState extends State<PassportCollectionScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 48),
+                      
+                      // 👇 THE NEW CONDITION 👇
+                      if (_currentSku == 'free_tier')
+                        IconButton(
+                          icon: Icon(
+                            CupertinoIcons.info_circle,
+                            size: 22,
+                            color: textColor,
+                          ),
+                          onPressed: _showWildcardInfoModal,
+                        )
+                      else
+                        const SizedBox(width: 48), // Balances the width of the back button to keep title centered
                     ],
                   ),
                 ),

@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -551,420 +552,425 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final isGuest = Supabase.instance.client.auth.currentUser == null;
+Widget build(BuildContext context) {
+  final isGuest = Supabase.instance.client.auth.currentUser == null;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Stack(
-        children: [
-          const Positioned.fill(child: AnimatedBackground(sku: 'profile')),
+  // Wrap the Scaffold to control status bar icon color
+  return AnnotatedRegion<SystemUiOverlayStyle>(
+    value: SystemUiOverlayStyle.light, 
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Stack(
+          children: [
+            const Positioned.fill(child: AnimatedBackground(sku: 'profile')),
 
-          Positioned.fill(
-            child: SafeArea(
-              bottom: false,
-              child: SingleChildScrollView(
-                controller: _scrollController,
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const SizedBox(height: 80),
+            Positioned.fill(
+              child: SafeArea(
+                // ... rest of your code
+                bottom: false,
+                child: SingleChildScrollView(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SizedBox(height: 80),
 
-                    Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFDFBF7),
-                        borderRadius: BorderRadius.circular(24),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
-                            blurRadius: 30,
-                            offset: const Offset(0, 10),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        children: [
-                          const Text(
-                            "OFFICIAL DATA",
-                            style: TextStyle(
-                              fontFamily: 'Courier',
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: Colors.black,
+                      Container(
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFDFBF7),
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.2),
+                              blurRadius: 30,
+                              offset: const Offset(0, 10),
                             ),
-                          ),
-                          const SizedBox(height: 20),
-
-                          GestureDetector(
-                            onTap: _pickImage,
-                            child: Container(
-                              width: 100,
-                              height: 130,
-                              clipBehavior: Clip.antiAlias,
-                              decoration: BoxDecoration(
-                                color: Colors.grey[200],
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: Colors.grey[400]!),
+                          ],
+                        ),
+                        child: Column(
+                          children: [
+                            const Text(
+                              "OFFICIAL DATA",
+                              style: TextStyle(
+                                fontFamily: 'Courier',
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: Colors.black,
                               ),
-                              child: _buildProfileImageContent(),
                             ),
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            "Tap to update ID Photo",
-                            style: TextStyle(fontSize: 10, color: Colors.grey),
-                          ),
-                          const SizedBox(height: 24),
+                            const SizedBox(height: 20),
 
-                          _buildTextField("FULL NAME", _nameController),
-                          const SizedBox(height: 16),
-
-                          // 🛠 FIX: Clean Row without any duplicated columns or unbounded Expanded widgets!
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _buildTextField(
-                                  "AGE",
-                                  _ageController,
-                                  isNumber: true,
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      "GENDER",
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.bold,
-                                        letterSpacing: 1.2,
-                                        color: Color(0xFF9E9E9E),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    _isEditingCustomGender
-                                        ? TextField(
-                                            autofocus: true,
-                                            controller: _customGenderController,
-                                            textCapitalization:
-                                                TextCapitalization.words,
-                                            style: const TextStyle(
-                                              color: Colors.black,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 14,
-                                              fontFamily: 'Roboto',
-                                            ),
-                                            decoration: InputDecoration(
-                                              filled: true,
-                                              fillColor: Colors.white,
-                                              contentPadding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 10,
-                                                    vertical: 0,
-                                                  ),
-                                              border: OutlineInputBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
-                                                borderSide: BorderSide.none,
-                                              ),
-                                              suffixIcon: IconButton(
-                                                icon: const Icon(
-                                                  Icons.close,
-                                                  size: 16,
-                                                ),
-                                                onPressed: () => setState(() {
-                                                  _selectedGender = 'M';
-                                                  _isEditingCustomGender =
-                                                      false;
-                                                }),
-                                              ),
-                                            ),
-                                            // 👇 Snaps back to resting state when they hit "Done/Enter"
-                                            onSubmitted: (_) => setState(
-                                              () => _isEditingCustomGender =
-                                                  false,
-                                            ),
-                                          )
-                                        : DropdownButtonFormField<String>(
-                                            initialValue:
-                                                [
-                                                  'M',
-                                                  'F',
-                                                ].contains(_selectedGender)
-                                                ? _selectedGender
-                                                : 'CUSTOM',
-                                            style: const TextStyle(
-                                              color: Colors.black,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 14,
-                                              fontFamily: 'Roboto',
-                                            ),
-                                            dropdownColor: Colors.white,
-                                            decoration: InputDecoration(
-                                              filled: true,
-                                              fillColor: Colors.white,
-                                              contentPadding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 10,
-                                                    vertical: 0,
-                                                  ),
-                                              border: OutlineInputBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
-                                                borderSide: BorderSide.none,
-                                              ),
-                                            ),
-                                            items: [
-                                              const DropdownMenuItem(
-                                                value: 'M',
-                                                child: Text(
-                                                  "MALE",
-                                                  style: TextStyle(
-                                                    color: Colors.black,
-                                                  ),
-                                                ),
-                                              ),
-                                              const DropdownMenuItem(
-                                                value: 'F',
-                                                child: Text(
-                                                  "FEMALE",
-                                                  style: TextStyle(
-                                                    color: Colors.black,
-                                                  ),
-                                                ),
-                                              ),
-                                              DropdownMenuItem(
-                                                value: 'CUSTOM',
-                                                // 👇 Dynamically shows their saved custom gender in the dropdown list!
-                                                child: Text(
-                                                  (_selectedGender ==
-                                                              'CUSTOM' &&
-                                                          _customGenderController
-                                                              .text
-                                                              .isNotEmpty)
-                                                      ? _customGenderController
-                                                            .text
-                                                            .toUpperCase()
-                                                      : "OTHER...",
-                                                  style: const TextStyle(
-                                                    color: Colors.black,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                            onChanged: (val) {
-                                              if (val == 'CUSTOM') {
-                                                setState(() {
-                                                  _selectedGender = 'CUSTOM';
-                                                  _isEditingCustomGender =
-                                                      true; // 👈 Activates the keyboard
-                                                });
-                                              } else {
-                                                setState(() {
-                                                  _selectedGender = val!;
-                                                  _isEditingCustomGender =
-                                                      false;
-                                                });
-                                              }
-                                            },
-                                          ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 30),
-
-                          // 🛡️ THE LIQUID GLASS "SAVE RECORDS" PILL
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(
-                              999,
-                            ), // 👈 FIX: Proper clipping widget
-                            child: BackdropFilter(
-                              // 🔮 Frosted blur effect over Layer 1
-                              filter: ImageFilter.blur(
-                                sigmaX: 10.0,
-                                sigmaY: 10.0,
-                              ),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
-                                width: double.infinity,
-                                height: 48, // Slightly taller pill
+                            GestureDetector(
+                              onTap: _pickImage,
+                              child: Container(
+                                width: 100,
+                                height: 130,
+                                clipBehavior: Clip.antiAlias,
                                 decoration: BoxDecoration(
-                                  // 🧴 Liquid Glass styling with conditional colors
-                                  color: (!_hasChanges || _isLoading)
-                                      ? Colors.grey.withOpacity(
-                                          0.08,
-                                        ) // Faint glass if disabled
-                                      : Colors.indigo.withOpacity(
-                                          0.12,
-                                        ), // Subtle indigo glass if active
-                                  borderRadius: BorderRadius.circular(
-                                    999,
-                                  ), // Stadium pill shape
-                                  // ✨ The Shining Edge (shimmering border)
-                                  border: Border.all(
-                                    color: Colors.white.withOpacity(0.2),
-                                    width: 1.5,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.1),
-                                      blurRadius: 20,
-                                      offset: const Offset(0, 5),
-                                    ),
-                                  ],
+                                  color: Colors.grey[200],
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.grey[400]!),
                                 ),
-                                child: TextButton(
-                                  onPressed: (!_hasChanges || _isLoading)
-                                      ? null
-                                      : _saveProfile,
-                                  style: TextButton.styleFrom(
-                                    padding: EdgeInsets.zero,
-                                    foregroundColor: Colors.indigo,
+                                child: _buildProfileImageContent(),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              "Tap to update ID Photo",
+                              style: TextStyle(fontSize: 10, color: Colors.grey),
+                            ),
+                            const SizedBox(height: 24),
+
+                            _buildTextField("FULL NAME", _nameController),
+                            const SizedBox(height: 16),
+
+                            // 🛠 FIX: Clean Row without any duplicated columns or unbounded Expanded widgets!
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildTextField(
+                                    "AGE",
+                                    _ageController,
+                                    isNumber: true,
                                   ),
-                                  child: _isLoading
-                                      ? const CupertinoActivityIndicator(
-                                          color: Colors.indigo,
-                                          radius: 10,
-                                        )
-                                      : Text(
-                                          "SAVE RECORDS",
-                                          style: TextStyle(
-                                            color: (!_hasChanges || _isLoading)
-                                                ? Colors.grey[500]
-                                                : Colors.indigo,
-                                            fontWeight: FontWeight.bold,
-                                            letterSpacing: 1.0,
-                                          ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        "GENDER",
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 1.2,
+                                          color: Color(0xFF9E9E9E),
                                         ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      _isEditingCustomGender
+                                          ? TextField(
+                                              autofocus: true,
+                                              controller: _customGenderController,
+                                              textCapitalization:
+                                                  TextCapitalization.words,
+                                              style: const TextStyle(
+                                                color: Colors.black,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 14,
+                                                fontFamily: 'Roboto',
+                                              ),
+                                              decoration: InputDecoration(
+                                                filled: true,
+                                                fillColor: Colors.white,
+                                                contentPadding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 10,
+                                                      vertical: 0,
+                                                    ),
+                                                border: OutlineInputBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                  borderSide: BorderSide.none,
+                                                ),
+                                                suffixIcon: IconButton(
+                                                  icon: const Icon(
+                                                    Icons.close,
+                                                    size: 16,
+                                                  ),
+                                                  onPressed: () => setState(() {
+                                                    _selectedGender = 'M';
+                                                    _isEditingCustomGender =
+                                                        false;
+                                                  }),
+                                                ),
+                                              ),
+                                              // 👇 Snaps back to resting state when they hit "Done/Enter"
+                                              onSubmitted: (_) => setState(
+                                                () => _isEditingCustomGender =
+                                                    false,
+                                              ),
+                                            )
+                                          : DropdownButtonFormField<String>(
+                                              initialValue:
+                                                  [
+                                                    'M',
+                                                    'F',
+                                                  ].contains(_selectedGender)
+                                                  ? _selectedGender
+                                                  : 'CUSTOM',
+                                              style: const TextStyle(
+                                                color: Colors.black,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 14,
+                                                fontFamily: 'Roboto',
+                                              ),
+                                              dropdownColor: Colors.white,
+                                              decoration: InputDecoration(
+                                                filled: true,
+                                                fillColor: Colors.white,
+                                                contentPadding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 10,
+                                                      vertical: 0,
+                                                    ),
+                                                border: OutlineInputBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(8),
+                                                  borderSide: BorderSide.none,
+                                                ),
+                                              ),
+                                              items: [
+                                                const DropdownMenuItem(
+                                                  value: 'M',
+                                                  child: Text(
+                                                    "MALE",
+                                                    style: TextStyle(
+                                                      color: Colors.black,
+                                                    ),
+                                                  ),
+                                                ),
+                                                const DropdownMenuItem(
+                                                  value: 'F',
+                                                  child: Text(
+                                                    "FEMALE",
+                                                    style: TextStyle(
+                                                      color: Colors.black,
+                                                    ),
+                                                  ),
+                                                ),
+                                                DropdownMenuItem(
+                                                  value: 'CUSTOM',
+                                                  // 👇 Dynamically shows their saved custom gender in the dropdown list!
+                                                  child: Text(
+                                                    (_selectedGender ==
+                                                                'CUSTOM' &&
+                                                            _customGenderController
+                                                                .text
+                                                                .isNotEmpty)
+                                                        ? _customGenderController
+                                                              .text
+                                                              .toUpperCase()
+                                                        : "OTHER...",
+                                                    style: const TextStyle(
+                                                      color: Colors.black,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                              onChanged: (val) {
+                                                if (val == 'CUSTOM') {
+                                                  setState(() {
+                                                    _selectedGender = 'CUSTOM';
+                                                    _isEditingCustomGender =
+                                                        true; // 👈 Activates the keyboard
+                                                  });
+                                                } else {
+                                                  setState(() {
+                                                    _selectedGender = val!;
+                                                    _isEditingCustomGender =
+                                                        false;
+                                                  });
+                                                }
+                                              },
+                                            ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 30),
+
+                            // 🛡️ THE LIQUID GLASS "SAVE RECORDS" PILL
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(
+                                999,
+                              ), // 👈 FIX: Proper clipping widget
+                              child: BackdropFilter(
+                                // 🔮 Frosted blur effect over Layer 1
+                                filter: ImageFilter.blur(
+                                  sigmaX: 10.0,
+                                  sigmaY: 10.0,
+                                ),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  width: double.infinity,
+                                  height: 48, // Slightly taller pill
+                                  decoration: BoxDecoration(
+                                    // 🧴 Liquid Glass styling with conditional colors
+                                    color: (!_hasChanges || _isLoading)
+                                        ? Colors.grey.withOpacity(
+                                            0.08,
+                                          ) // Faint glass if disabled
+                                        : Colors.indigo.withOpacity(
+                                            0.12,
+                                          ), // Subtle indigo glass if active
+                                    borderRadius: BorderRadius.circular(
+                                      999,
+                                    ), // Stadium pill shape
+                                    // ✨ The Shining Edge (shimmering border)
+                                    border: Border.all(
+                                      color: Colors.white.withOpacity(0.2),
+                                      width: 1.5,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.1),
+                                        blurRadius: 20,
+                                        offset: const Offset(0, 5),
+                                      ),
+                                    ],
+                                  ),
+                                  child: TextButton(
+                                    onPressed: (!_hasChanges || _isLoading)
+                                        ? null
+                                        : _saveProfile,
+                                    style: TextButton.styleFrom(
+                                      padding: EdgeInsets.zero,
+                                      foregroundColor: Colors.indigo,
+                                    ),
+                                    child: _isLoading
+                                        ? const CupertinoActivityIndicator(
+                                            color: Colors.indigo,
+                                            radius: 10,
+                                          )
+                                        : Text(
+                                            "SAVE RECORDS",
+                                            style: TextStyle(
+                                              color: (!_hasChanges || _isLoading)
+                                                  ? Colors.grey[500]
+                                                  : Colors.indigo,
+                                              fontWeight: FontWeight.bold,
+                                              letterSpacing: 1.0,
+                                            ),
+                                          ),
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        ], // End Column children for Official Data
-                      ),
-                    ), // 👈 FIX: This was the missing bracket that closes the "Official Data" Container!
-
-                    const SizedBox(height: 40),
-
-                    // --- REAL PASSPORTS LIST ---
-                    const Text(
-                      "EXISTING PASSPORTS",
-                      style: TextStyle(
-                        color: Colors.white54,
-                        fontFamily: 'Courier',
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.5,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    if (_isLoadingPassports)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 40),
-                        child: Center(
-                          child: CupertinoActivityIndicator(
-                            color: Colors.white54,
-                            radius: 14,
-                          ),
+                          ], // End Column children for Official Data
                         ),
-                      )
-                    else if (_myPassports.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.all(20.0),
-                        child: Center(
-                          child: Text(
-                            "No passports found.",
-                            style: TextStyle(color: Colors.white30),
-                          ),
+                      ), // 👈 FIX: This was the missing bracket that closes the "Official Data" Container!
+
+                      const SizedBox(height: 40),
+
+                      // --- REAL PASSPORTS LIST ---
+                      const Text(
+                        "EXISTING PASSPORTS",
+                        style: TextStyle(
+                          color: Colors.white54,
+                          fontFamily: 'Courier',
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.5,
                         ),
-                      )
-                    else
-                      ..._myPassports.map((book) {
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 12.0),
-                          child: _buildPassportTile(book),
-                        );
-                      }),
-                    const SizedBox(height: 40),
+                      ),
+                      const SizedBox(height: 16),
 
-                    // --- AUTH & ACCOUNT MANAGEMENT PILLS ---
-                    // Conditioning the visibility of the delete button based on guest status
-                    isGuest
-                        ? // A. JUST A FULL-WIDTH "LOG IN" PILL IF GUEST
-                          _buildAuthPill(isGuest: true)
-                        : // B. ROW OF TWO PILLS IF LOGGED IN (Perfect 50/50 split)
-                          Row(
-                            children: [
-                              Expanded(
-                                flex: 1,
-                                child: _buildAuthPill(isGuest: false),
-                              ),
-                              const SizedBox(
-                                width: 12,
-                              ), // Slightly tighter gap to give text more breathing room
-                              Expanded(flex: 1, child: _buildDeletePill()),
-                            ],
+                      if (_isLoadingPassports)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 40),
+                          child: Center(
+                            child: CupertinoActivityIndicator(
+                              color: Colors.white54,
+                              radius: 14,
+                            ),
                           ),
+                        )
+                      else if (_myPassports.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.all(20.0),
+                          child: Center(
+                            child: Text(
+                              "No passports found.",
+                              style: TextStyle(color: Colors.white30),
+                            ),
+                          ),
+                        )
+                      else
+                        ..._myPassports.map((book) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 12.0),
+                            child: _buildPassportTile(book),
+                          );
+                        }),
+                      const SizedBox(height: 40),
 
-                    const SizedBox(height: 40),
-                  ],
+                      // --- AUTH & ACCOUNT MANAGEMENT PILLS ---
+                      // Conditioning the visibility of the delete button based on guest status
+                      isGuest
+                          ? // A. JUST A FULL-WIDTH "LOG IN" PILL IF GUEST
+                            _buildAuthPill(isGuest: true)
+                          : // B. ROW OF TWO PILLS IF LOGGED IN (Perfect 50/50 split)
+                            Row(
+                              children: [
+                                Expanded(
+                                  flex: 1,
+                                  child: _buildAuthPill(isGuest: false),
+                                ),
+                                const SizedBox(
+                                  width: 12,
+                                ), // Slightly tighter gap to give text more breathing room
+                                Expanded(flex: 1, child: _buildDeletePill()),
+                              ],
+                            ),
+
+                      const SizedBox(height: 40),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
 
-          // Header
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: SafeArea(
-              bottom: false,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 10,
-                ),
-                color: Colors.transparent,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    AnimatedTheme(
-                      data: ThemeData(
-                        iconTheme: IconThemeData(color: _headerColor),
+            // Header
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                bottom: false,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 10,
+                  ),
+                  color: Colors.transparent,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      AnimatedTheme(
+                        data: ThemeData(
+                          iconTheme: IconThemeData(color: _headerColor),
+                        ),
+                        duration: const Duration(milliseconds: 200),
+                        child: IconButton(
+                          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+                          onPressed: () => Navigator.pop(context),
+                        ),
                       ),
-                      duration: const Duration(milliseconds: 200),
-                      child: IconButton(
-                        icon: const Icon(Icons.arrow_back_ios_new, size: 20),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                    ),
 
-                    AnimatedDefaultTextStyle(
-                      style: TextStyle(
-                        fontFamily: 'Courier',
-                        fontWeight: FontWeight.bold,
-                        fontSize: 20,
-                        letterSpacing: 2.5,
-                        color: _headerColor,
+                      AnimatedDefaultTextStyle(
+                        style: TextStyle(
+                          fontFamily: 'Courier',
+                          fontWeight: FontWeight.bold,
+                          fontSize: 20,
+                          letterSpacing: 2.5,
+                          color: _headerColor,
+                        ),
+                        duration: const Duration(milliseconds: 200),
+                        child: const Text("PROFILE"),
                       ),
-                      duration: const Duration(milliseconds: 200),
-                      child: const Text("PROFILE"),
-                    ),
 
-                    const SizedBox(width: 48),
-                  ],
+                      const SizedBox(width: 48),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
